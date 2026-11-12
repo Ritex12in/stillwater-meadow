@@ -169,7 +169,9 @@ body.photo-mode > *:not(#world):not(.photo-bar):not(.photo-vignette):not(.photo-
   .tool { padding: 9px; }
   .tool.menu-only { display: flex; }
   .tool.desk-only { display: none; }
-  .hint { top: calc(var(--top) + 70px); }
+  .brand { top: calc(var(--top) + 52px); }
+  .brand h1 { font-size: 26px; }
+  .hint { top: calc(var(--top) + 118px); }
   .settings label { grid-template-columns: 82px minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {

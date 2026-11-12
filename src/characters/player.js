@@ -85,6 +85,7 @@ function registerSeatActions() {
 }
 
 // ── Each frame ─────────────────────────────────────────────────
+let wasOnIce = false;
 let rescued = false;
 export function updatePlayer(dt, petting) {
   const input = moveInput();
@@ -115,10 +116,12 @@ export function updatePlayer(dt, petting) {
   player.petAmt = damp(player.petAmt, 0, 6, dt);
 
   // Standing somewhere you can't (the ice just thawed under you): head for the nearest shore.
-  if (!walkable(player.x, player.z) && !player.slide) {
+  const canStand = walkable(player.x, player.z);
+  if (canStand) wasOnIce = onIce(player.x, player.z);
+  if (!canStand && !player.slide) {
     const p = nearestShore(player.x, player.z);
     player.slide = { x: p.x, z: p.z, minY: ICE_Y, rescue: true };
-    if (!rescued) { toast('The ice is thawing. You hurry back to the shore.'); rescued = true; }
+    if (!rescued && wasOnIce) { toast('The ice is thawing. You hurry back to the shore.'); rescued = true; }
   }
   if (player.slide) {
     const k = player.slide.rescue ? 2.2 : 10;

@@ -20,7 +20,7 @@ export function initFoley() {
   const prints = [];
   const geo = new THREE.PlaneGeometry(0.13, 0.27).rotateX(-Math.PI / 2);
   for (let i = 0; i < 90; i++) {
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: '#9fb0c4', transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: '#7d8ea6', transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
     m.visible = false;
     m.renderOrder = 1;
     scene.add(m);

@@ -7,453 +7,106 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500;1,600&family=Manrope:wght@500;600;700&display=swap">
-<style>
-  /* Layout: full-bleed 3D world; quiet glass HUD pinned to the corners and bottom edge. */
-  :root {
-    --glass: rgba(16, 24, 28, 0.36);
-    --glass-strong: rgba(16, 24, 28, 0.58);
-    --line: rgba(255, 255, 255, 0.2);
-    --ink: #f7f4ec;
-    --ink-soft: rgba(247, 244, 236, 0.74);
-    --chip: rgba(250, 248, 242, 0.92);
-    --chip-ink: #1d2b2f;
-    --sun: #ffcf7a;
-    --live: #3faa6e;
-    --day-strip: linear-gradient(90deg, #0d1734 0%, #0d1734 19%, #b8789a 24.5%, #f2c7a8 28%, #86b4e2 32%, #3f86d4 52%, #5a92d6 68%, #f39a6b 76.5%, #3a3a72 81%, #0d1734 86%, #0d1734 100%);
-    --font-display: "Cormorant Garamond", "Iowan Old Style", Georgia, serif;
-    --font-ui: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
-    color-scheme: dark;
-  }
-  [hidden] { display: none !important; }
-  html, body { height: 100%; margin: 0; overflow: hidden; background: #0e1418; color: var(--ink); }
-  body { font: 500 14px/1.4 var(--font-ui); -webkit-font-smoothing: antialiased; }
-  #world { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: pointer; }
-  #world.drag-mode { cursor: grab; }
-  #world.dragging { cursor: grabbing; }
-  #world.locked { cursor: none; }
-
-  .lock-tip {
-    position: fixed;
-    left: 50%;
-    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-    transform: translateX(-50%);
-    padding: 7px 14px;
-    border-radius: 999px;
-    background: var(--glass);
-    border: 1px solid var(--line);
-    backdrop-filter: blur(14px) saturate(1.2);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
-    color: var(--ink);
-    font: 600 12.5px var(--font-ui);
-    white-space: nowrap;
-    pointer-events: none;
-  }
-
-  .brand {
-    position: fixed;
-    top: calc(16px + env(safe-area-inset-top, 0px));
-    left: calc(18px + env(safe-area-inset-left, 0px));
-    pointer-events: none;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 18px rgba(0, 0, 0, 0.5);
-  }
-  .brand::before { /* soft shade so the title stays readable over snow, fog and bright sky */
-    content: "";
-    position: absolute;
-    inset: -40px -70px -36px -60px;
-    z-index: -1;
-    background: radial-gradient(ellipse at 35% 45%, rgba(10, 16, 20, 0.34), rgba(10, 16, 20, 0) 70%);
-  }
-  .brand h1 {
-    margin: 0;
-    font-family: var(--font-display);
-    font-style: italic;
-    font-weight: 600;
-    font-size: clamp(28px, 4vw, 40px);
-    line-height: 1;
-    letter-spacing: 0.005em;
-  }
-  .brand p {
-    margin: 6px 0 0;
-    font: 700 11px/1.4 var(--font-ui);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .hint {
-    position: fixed;
-    top: calc(92px + env(safe-area-inset-top, 0px));
-    left: calc(18px + env(safe-area-inset-left, 0px));
-    max-width: min(340px, calc(100vw - 36px));
-    padding: 10px 14px;
-    border-radius: 12px;
-    background: var(--glass);
-    border: 1px solid var(--line);
-    backdrop-filter: blur(14px) saturate(1.2);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
-    color: var(--ink-soft);
-    font-size: 12.5px;
-    line-height: 1.55;
-    pointer-events: none;
-    transition: opacity 1.2s ease;
-  }
-  .hint b { color: var(--ink); font-weight: 700; }
-  .hint.gone { opacity: 0; }
-
-  .audio-btns {
-    position: fixed;
-    top: calc(16px + env(safe-area-inset-top, 0px));
-    right: calc(16px + env(safe-area-inset-right, 0px));
-    display: flex; gap: 6px;
-  }
-  .sound {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 14px 8px 11px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-    background: var(--glass);
-    backdrop-filter: blur(14px) saturate(1.2);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
-    color: var(--ink);
-    font: 600 13px var(--font-ui);
-    cursor: pointer;
-  }
-  .sound svg { width: 18px; height: 18px; }
-  .sound .wave { opacity: 0.25; transition: opacity 0.3s; }
-  .sound[aria-pressed="true"] .wave { opacity: 1; }
-
-  .weather {
-    position: fixed;
-    top: calc(62px + env(safe-area-inset-top, 0px));
-    right: calc(16px + env(safe-area-inset-right, 0px));
-    display: flex; gap: 2px;
-    padding: 4px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-    background: var(--glass);
-    backdrop-filter: blur(14px) saturate(1.2);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  }
-  .weather button {
-    appearance: none; border: 0; background: transparent;
-    position: relative;
-    display: grid; place-items: center;
-    width: 32px; height: 30px;
-    border-radius: 999px;
-    color: var(--ink-soft);
-    cursor: pointer;
-    transition: background-color 0.3s ease, color 0.3s ease;
-  }
-  .weather button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .weather .wx-auto { width: auto; padding: 0 11px; font: 700 10.5px var(--font-ui); letter-spacing: 0.14em; text-transform: uppercase; }
-  .weather button:hover { color: var(--ink); background: rgba(255, 255, 255, 0.08); }
-  .weather button[aria-pressed="true"] { background: var(--chip); color: var(--chip-ink); }
-  .season { top: calc(104px + env(safe-area-inset-top, 0px)); }
-  .weather button.current::after {
-    content: ""; position: absolute; bottom: 2px; left: 50%;
-    width: 4px; height: 4px; margin-left: -2px; border-radius: 50%;
-    background: var(--sun);
-  }
-
-  .timebar {
-    position: fixed;
-    left: 50%;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    transform: translateX(-50%);
-    width: min(620px, calc(100vw - 32px));
-    box-sizing: border-box;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 14px;
-    padding: 9px 16px 9px 9px;
-    border-radius: 18px;
-    border: 1px solid var(--line);
-    background: var(--glass);
-    backdrop-filter: blur(14px) saturate(1.2);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  }
-  .live {
-    appearance: none;
-    display: flex; align-items: center; gap: 7px;
-    padding: 8px 12px 8px 10px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-    background: transparent;
-    color: var(--ink-soft);
-    font: 700 11px var(--font-ui);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: background-color 0.3s ease, color 0.3s ease;
-  }
-  .live i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; box-sizing: border-box; }
-  .live:hover { color: var(--ink); background: rgba(255, 255, 255, 0.08); }
-  .live[aria-pressed="true"] { background: var(--chip); color: var(--chip-ink); border-color: transparent; }
-  .live[aria-pressed="true"] i { background: var(--live); border-color: var(--live); animation: pulse 2.4s ease-in-out infinite; }
-  @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(63, 170, 110, 0.5); } 50% { box-shadow: 0 0 0 4px rgba(63, 170, 110, 0); } }
-
-  .track { display: grid; gap: 5px; min-width: 0; padding-top: 4px; }
-  .track input {
-    -webkit-appearance: none; appearance: none;
-    width: 100%; height: 18px; margin: 0;
-    background: transparent;
-    cursor: pointer;
-  }
-  .track input::-webkit-slider-runnable-track { height: 8px; border-radius: 99px; background: var(--day-strip); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
-  .track input::-moz-range-track { height: 8px; border-radius: 99px; background: var(--day-strip); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
-  .track input::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none;
-    width: 18px; height: 18px; margin-top: -5px;
-    border-radius: 50%; background: var(--ink);
-    border: 3px solid var(--sun);
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
-  }
-  .track input::-moz-range-thumb {
-    width: 12px; height: 12px;
-    border-radius: 50%; background: var(--ink);
-    border: 3px solid var(--sun);
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
-  }
-  .track input:focus-visible { outline: 2px solid var(--sun); outline-offset: 4px; border-radius: 6px; }
-  .ticks {
-    display: flex; justify-content: space-between;
-    font: 700 9.5px var(--font-ui);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-  }
-  #timeOut {
-    min-width: 64px;
-    text-align: right;
-    font: 700 14px var(--font-ui);
-    font-variant-numeric: tabular-nums;
-    color: var(--ink);
-  }
-  button:focus-visible { outline: 2px solid var(--sun); outline-offset: 2px; }
-
-  .actions {
-    position: fixed;
-    left: 50%;
-    bottom: calc(138px + env(safe-area-inset-bottom, 0px));
-    transform: translateX(-50%);
-    display: flex; gap: 8px;
-    pointer-events: none;
-  }
-  .action {
-    display: flex; align-items: center; gap: 9px;
-    padding: 8px 16px 8px 9px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-    background: var(--glass-strong);
-    backdrop-filter: blur(14px) saturate(1.2);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
-    color: var(--ink);
-    font: 600 13.5px var(--font-ui);
-    white-space: nowrap;
-    cursor: pointer;
-    pointer-events: auto;
-  }
-  .action:disabled { cursor: default; color: var(--ink-soft); }
-  .action kbd {
-    display: inline-grid; place-items: center;
-    min-width: 24px; height: 24px; padding: 0 6px;
-    border-radius: 6px;
-    background: var(--chip); color: var(--chip-ink);
-    font: 700 12px var(--font-ui);
-    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
-  }
-  .joy {
-    position: fixed; width: 116px; height: 116px; margin: -58px 0 0 -58px;
-    border-radius: 50%;
-    border: 1.5px solid var(--line);
-    background: rgba(255, 255, 255, 0.07);
-    pointer-events: none;
-  }
-  .joy i {
-    position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px;
-    border-radius: 50%; background: rgba(255, 255, 255, 0.55);
-  }
-
-
-  /* feature UI */
-  .action.urgent { background: var(--sun); color: var(--chip-ink); border-color: transparent; animation: nudge 0.5s ease-in-out infinite alternate; }
-  .action.urgent kbd { background: var(--chip-ink); color: var(--sun); }
-  @keyframes nudge { from { transform: translateY(0); } to { transform: translateY(-3px); } }
-  .actions { flex-wrap: wrap; justify-content: center; width: min(640px, calc(100vw - 32px)); }
-
-  .toast {
-    position: fixed; left: 50%; top: calc(18px + env(safe-area-inset-top, 0px));
-    transform: translate(-50%, -8px);
-    max-width: min(520px, calc(100vw - 32px));
-    padding: 10px 16px; border-radius: 12px;
-    background: var(--glass-strong); border: 1px solid var(--line);
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    color: var(--ink); font: 600 13.5px/1.45 var(--font-ui); text-align: center;
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.4s ease, transform 0.4s ease;
-  }
-  .toast.show { opacity: 1; transform: translate(-50%, 0); }
-
-  .tags { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
-  .tag {
-    position: absolute; left: 0; top: 0;
-    padding: 3px 9px; border-radius: 999px;
-    background: var(--glass-strong); color: var(--ink);
-    font: 700 11.5px var(--font-ui); letter-spacing: 0.02em; white-space: nowrap;
-  }
-
-  .panel {
-    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    width: min(520px, calc(100vw - 32px)); max-height: calc(100% - 140px); overflow: auto;
-    padding: 18px 20px 20px; border-radius: 16px;
-    background: rgba(14, 20, 24, 0.82); border: 1px solid var(--line);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    color: var(--ink);
-  }
-  .panel header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
-  .panel h2 { margin: 0; font: italic 600 26px/1.1 var(--font-display); }
-  .panel .sum { color: var(--ink-soft); font: 700 11px var(--font-ui); letter-spacing: 0.14em; text-transform: uppercase; }
-  .panel .close { margin-left: auto; appearance: none; border: 0; background: transparent; color: var(--ink-soft); font-size: 24px; line-height: 1; cursor: pointer; padding: 0 4px; }
-  .panel .close:hover { color: var(--ink); }
-  .keys { display: grid; grid-template-columns: max-content 1fr; gap: 9px 16px; margin: 0; font-size: 13px; }
-  .keys dt { white-space: nowrap; color: var(--ink-soft); font-weight: 700; }
-  .keys dd { margin: 0; color: var(--ink-soft); min-width: 0; }
-  kbd {
-    display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; margin: 0 1px;
-    border-radius: 5px; background: rgba(255, 255, 255, 0.14); color: var(--ink);
-    font: 700 11px var(--font-ui);
-  }
-  .action kbd { min-width: 24px; height: 24px; }
-  .catches { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .catches li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); color: var(--ink-soft); font-size: 13px; }
-  .catches li.got { color: var(--ink); }
-  .catches .sw { width: 14px; height: 14px; border-radius: 50%; border: 1px dashed var(--line); }
-  .catches li.got .sw { border: 0; }
-  .catches .nm { font-weight: 700; }
-  .catches .st { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 12px; text-align: right; }
-
-  .dialog { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(8, 12, 14, 0.35); }
-  .dialog form {
-    width: min(340px, calc(100vw - 32px)); padding: 20px; border-radius: 16px;
-    background: rgba(14, 20, 24, 0.9); border: 1px solid var(--line); color: var(--ink);
-    display: grid; gap: 14px;
-  }
-  .dialog h2 { margin: 0; font: italic 600 26px/1.1 var(--font-display); }
-  .dialog input {
-    font: 600 16px var(--font-ui); padding: 10px 12px; border-radius: 10px;
-    border: 1px solid var(--line); background: rgba(255, 255, 255, 0.08); color: var(--ink);
-  }
-  .dialog input:focus { outline: 2px solid var(--sun); outline-offset: 1px; }
-  .dialog .row { display: flex; gap: 8px; justify-content: flex-end; }
-  .dialog button, .photo-bar button {
-    appearance: none; border: 1px solid var(--line); background: transparent; color: var(--ink);
-    font: 600 13px var(--font-ui); padding: 8px 14px; border-radius: 999px; cursor: pointer;
-  }
-  .dialog button.primary, .photo-bar button.primary { background: var(--chip); color: var(--chip-ink); border-color: transparent; }
-  .photo-bar button.primary kbd { background: rgba(0, 0, 0, 0.12); color: var(--chip-ink); }
-
-  .photo-bar {
-    position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
-    padding: 8px 10px 8px 16px; border-radius: 999px; max-width: calc(100vw - 32px);
-    background: var(--glass-strong); border: 1px solid var(--line);
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); color: var(--ink);
-  }
-  .photo-bar .pm { font: 700 10.5px var(--font-ui); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); }
-  .photo-bar .pf { font: italic 600 18px var(--font-display); min-width: 70px; }
-  .photo-vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.9) 100%); }
-  .photo-flash { position: fixed; inset: 0; pointer-events: none; background: #fff; opacity: 0; }
-  .photo-flash.go { animation: flash 0.45s ease-out; }
-  @keyframes flash { from { opacity: 0.7; } to { opacity: 0; } }
-  body.photo-mode > *:not(#world):not(.photo-bar):not(.photo-vignette):not(.photo-flash):not(script) { display: none !important; }
-
-  .error {
-    position: fixed; inset: auto 16px calc(90px + env(safe-area-inset-bottom, 0px)) 16px;
-    margin: 0 auto; max-width: 520px;
-    padding: 12px 16px; border-radius: 12px;
-    background: var(--glass-strong); border: 1px solid var(--line);
-    color: var(--ink); font-size: 13px;
-  }
-
-  @media (max-width: 560px) {
-    .timebar { gap: 10px; padding-right: 12px; }
-    .ticks span:nth-child(2), .ticks span:nth-child(4) { visibility: hidden; }
-    #timeOut { min-width: 56px; font-size: 13px; }
-    .sound span { display: none; }
-    .season { top: calc(100px + env(safe-area-inset-top, 0px)); }
-    .sound { padding: 9px; }
-    .hint { top: calc(146px + env(safe-area-inset-top, 0px)); }
-    .weather button { width: 30px; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .hint, .live, .sound .wave, .weather button { transition: none; }
-    .live[aria-pressed="true"] i { animation: none; }
-  }
-</style>
 </head>
 <body>
   <canvas id="world" aria-label="A calm lakeside meadow you can walk around in"></canvas>
 
   <header class="brand">
     <h1>Stillwater Meadow</h1>
-    <p id="clock">Morning · 6:40 am</p>
+    <p id="clock">&nbsp;</p>
   </header>
+  <div class="hint glass auto-hide" id="hint"></div>
 
-  <div class="hint" id="hint"></div>
+  <nav class="toolbar auto-hide" aria-label="Meadow controls">
+    <button class="tool glass" id="sound" type="button" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span id="soundLabel">Sound off</span>
+    </button>
+    <button class="tool glass" id="musicBtn" type="button" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5V6l10-2v11.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="2.5" fill="currentColor"/><circle cx="16.5" cy="15.5" r="2.5" fill="currentColor"/></svg>
+      <span id="musicLabel">Music off</span>
+    </button>
+    <button class="tool glass" type="button" data-panel="worldPanel" aria-expanded="false" title="Time, weather and season">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>World</span>
+    </button>
+    <button class="tool glass icon-only" type="button" data-panel="settingsPanel" aria-expanded="false" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>
+    <button class="tool glass icon-only" type="button" data-panel="menuPanel" aria-expanded="false" title="Journal, photo mode and controls" aria-label="Menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </nav>
 
-  <div class="audio-btns">
-  <button class="sound" id="sound" type="button" aria-pressed="false">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z" fill="currentColor"/>
-      <path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-    </svg>
-    <span id="soundLabel">Sound off</span>
-  </button>
-  <button class="sound" id="musicBtn" type="button" aria-pressed="false">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5V6l10-2v11.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="2.5" fill="currentColor"/><circle cx="16.5" cy="15.5" r="2.5" fill="currentColor"/></svg>
-    <span id="musicLabel">Music off</span>
-  </button>
-  </div>
-
-  <div class="weather" id="weather" role="group" aria-label="Weather">
-    <button type="button" data-wx="auto" class="wx-auto" aria-pressed="true" title="Weather changes on its own">Auto</button>
-    <button type="button" data-wx="clear" aria-pressed="false" title="Clear" aria-label="Clear"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
-    <button type="button" data-wx="rain" aria-pressed="false" title="Rain" aria-label="Rain"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14.5h9.5a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.7 1.4A3 3 0 0 0 7 14.5z"/><path d="M8.5 17.5l-1 2.5M12.5 17.5l-1 2.5M16.5 17.5l-1 2.5"/></svg></button>
-    <button type="button" data-wx="storm" aria-pressed="false" title="Thunderstorm" aria-label="Thunderstorm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14.5h9.5a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.7 1.4A3 3 0 0 0 7 14.5z"/><path d="M12.8 15.5l-2.3 3.5h3l-2.3 3.5"/></svg></button>
-    <button type="button" data-wx="fog" aria-pressed="false" title="Fog" aria-label="Fog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M6 12h14M4 16h12M8 20h10"/></svg></button>
-    <button type="button" data-wx="snow" aria-pressed="false" title="Snow" aria-label="Snow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5L12 6l2.5-1.5M9.5 19.5L12 18l2.5 1.5"/></svg></button>
-  </div>
-
-  <div class="weather season" id="season" role="group" aria-label="Season">
-    <button type="button" data-season="auto" class="wx-auto" aria-pressed="true" title="Follow the calendar">Auto</button>
-    <button type="button" data-season="spring" aria-pressed="false" title="Spring" aria-label="Spring"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.2"/><path d="M12 9.8c-1.6-2.6-1-5.3 0-6.3 1 1 1.6 3.7 0 6.3zM14.1 11.3c2.9-.8 5.3.6 5.9 1.8-1.3.5-4 .4-5.9-1.8zM13.4 14c1.2 2.8.2 5.4-.9 6.2-.8-1.2-.9-3.9.9-6.2zM10.6 14c-1.8 2.3-1.7 5-.9 6.2 1.1-.8 2.1-3.4.9-6.2zM9.9 11.3C8 13.5 5.3 13.6 4 13.1c.6-1.2 3-2.6 5.9-1.8z"/></svg></button>
-    <button type="button" data-season="summer" aria-pressed="false" title="Summer" aria-label="Summer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9"/><path d="M12 10c-3.5 0-6-2.2-6-5.5 3.5 0 6 2.2 6 5.5zM12 13c3.5 0 6-2.2 6-5.5-3.5 0-6 2.2-6 5.5z"/></svg></button>
-    <button type="button" data-season="autumn" aria-pressed="false" title="Autumn" aria-label="Autumn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14z"/><path d="M5 19l8-8"/></svg></button>
-    <button type="button" data-season="winter" aria-pressed="false" title="Winter" aria-label="Winter"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5L12 6l2.5-1.5M9.5 19.5L12 18l2.5 1.5"/></svg></button>
-  </div>
-
-  <div class="timebar" role="group" aria-label="Time of day">
-    <button type="button" class="live" id="liveBtn" aria-pressed="true" title="Follow your computer's clock"><i></i>Live</button>
-    <div class="track">
-      <input id="timeSlider" type="range" min="0" max="1439" step="1" value="0" aria-label="Time of day">
-      <div class="ticks" aria-hidden="true"><span>12 am</span><span>6 am</span><span>12 pm</span><span>6 pm</span><span>12 am</span></div>
+  <section class="popover" id="worldPanel" data-exclusive="1" hidden aria-label="Time, weather and season">
+    <div>
+      <h3>Time of day</h3>
+      <div class="time">
+        <button type="button" class="live" id="liveBtn" aria-pressed="true" title="Follow your computer's clock"><i></i>Live</button>
+        <div class="track">
+          <input id="timeSlider" type="range" min="0" max="1439" step="1" value="0" aria-label="Time of day">
+          <div class="ticks" aria-hidden="true"><span>12 am</span><span>6 am</span><span>12 pm</span><span>6 pm</span><span>12 am</span></div>
+        </div>
+        <output id="timeOut" for="timeSlider">--:--</output>
+      </div>
     </div>
-    <output id="timeOut" for="timeSlider">--:--</output>
-  </div>
+    <div>
+      <h3>Weather <kbd>Q</kbd></h3>
+      <div class="chips" id="weather" role="group" aria-label="Weather">
+        <button type="button" data-wx="auto" class="auto" aria-pressed="true" title="Weather changes on its own">Auto</button>
+        <button type="button" data-wx="clear" aria-pressed="false" title="Clear" aria-label="Clear"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
+        <button type="button" data-wx="rain" aria-pressed="false" title="Rain" aria-label="Rain"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14.5h9.5a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.7 1.4A3 3 0 0 0 7 14.5z"/><path d="M8.5 17.5l-1 2.5M12.5 17.5l-1 2.5M16.5 17.5l-1 2.5"/></svg></button>
+        <button type="button" data-wx="storm" aria-pressed="false" title="Thunderstorm" aria-label="Thunderstorm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14.5h9.5a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.7 1.4A3 3 0 0 0 7 14.5z"/><path d="M12.8 15.5l-2.3 3.5h3l-2.3 3.5"/></svg></button>
+        <button type="button" data-wx="fog" aria-pressed="false" title="Fog" aria-label="Fog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M6 12h14M4 16h12M8 20h10"/></svg></button>
+        <button type="button" data-wx="snow" aria-pressed="false" title="Snow" aria-label="Snow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5L12 6l2.5-1.5M9.5 19.5L12 18l2.5 1.5"/></svg></button>
+      </div>
+    </div>
+    <div>
+      <h3>Season <kbd>N</kbd></h3>
+      <div class="chips" id="season" role="group" aria-label="Season">
+        <button type="button" data-season="auto" class="auto" aria-pressed="true" title="Follow the calendar">Auto</button>
+        <button type="button" data-season="spring" aria-pressed="false">Spring</button>
+        <button type="button" data-season="summer" aria-pressed="false">Summer</button>
+        <button type="button" data-season="autumn" aria-pressed="false">Autumn</button>
+        <button type="button" data-season="winter" aria-pressed="false">Winter</button>
+      </div>
+    </div>
+  </section>
 
-  <div class="actions">
-    <button class="action" id="sitPrompt" type="button" hidden></button>
-    <button class="action" id="petPrompt" type="button" hidden></button>
-  </div>
-  <div class="lock-tip" id="lockTip" hidden>Click anywhere to look around with the mouse</div>
+  <section class="popover settings" id="settingsPanel" data-exclusive="1" hidden aria-label="Settings">
+    <header><h2>Settings</h2><button type="button" class="close" data-close="settingsPanel" aria-label="Close">×</button></header>
+    <div class="stack">
+      <h3>Volume</h3>
+      <label>All sound <input type="range" min="0" max="100" data-volume="master"></label>
+      <label>Nature <input type="range" min="0" max="100" data-volume="ambience"></label>
+      <label>Animals <input type="range" min="0" max="100" data-volume="animals"></label>
+      <label>Music <input type="range" min="0" max="100" data-volume="music"></label>
+    </div>
+    <div class="stack">
+      <h3>Controls and graphics</h3>
+      <label>Look speed <input id="sensitivity" type="range" min="0.4" max="2" step="0.1"></label>
+      <label>Graphics <select id="quality"><option value="auto">Auto</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+      <p class="note" id="qualityNow">&nbsp;</p>
+    </div>
+    <div class="stack">
+      <h3>Saved meadow</h3>
+      <p class="note">Names, bonds, your catch journal and settings are kept in this browser.</p>
+      <button type="button" class="btn danger" id="resetBtn">Start over</button>
+      <div class="confirm" id="resetConfirm" hidden>
+        <span>Forget every name, bond and catch, and start fresh?</span>
+        <div class="row"><button type="button" class="btn" id="resetNo">Keep my meadow</button><button type="button" class="btn danger" id="resetYes">Start over</button></div>
+      </div>
+    </div>
+  </section>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <div class="tags" id="tags" aria-hidden="true"></div>
+  <section class="popover menu" id="menuPanel" data-exclusive="1" hidden aria-label="Menu">
+    <button type="button" class="tool glass" data-panel="journal"><span>Catch journal</span><kbd>J</kbd></button>
+    <button type="button" class="tool glass" id="menuPhoto"><span>Photo mode</span><kbd>P</kbd></button>
+    <button type="button" class="tool glass" data-panel="controls"><span>All controls</span><kbd>H</kbd></button>
+  </section>
 
-  <section class="panel" id="controls" hidden aria-label="Controls">
-    <header><h2>Controls</h2><button type="button" class="close" id="controlsClose" aria-label="Close">×</button></header>
+  <section class="panel" id="controls" data-exclusive="1" hidden aria-label="Controls">
+    <header><h2>Controls</h2><button type="button" class="close" data-close="controls" aria-label="Close">×</button></header>
     <dl class="keys">
       <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Walk · <kbd>Shift</kbd> to jog</dd>
       <dt>Mouse</dt><dd>Click the world, then look around · <kbd>Esc</kbd> frees the cursor · scroll to zoom</dd>
@@ -464,15 +117,16 @@
       <dt><kbd>B</kbd></dt><dd>Toss bread to the ducks</dd>
       <dt><kbd>G</kbd></dt><dd>Pick flowers, give or leave the bouquet</dd>
       <dt><kbd>Z</kbd></dt><dd>Lie down and watch the stars</dd>
-      <dt><kbd>P</kbd></dt><dd>Photo mode: <kbd>1</kbd>–<kbd>5</kbd> filters, <kbd>Enter</kbd> saves, <kbd>Space</kbd>/<kbd>C</kbd> up and down</dd>
+      <dt><kbd>P</kbd></dt><dd>Photo mode: <kbd>1</kbd>–<kbd>5</kbd> filters, <kbd>V</kbd> focus blur, <kbd>Enter</kbd> saves, <kbd>Space</kbd>/<kbd>C</kbd> up and down</dd>
       <dt><kbd>Q</kbd> <kbd>N</kbd></dt><dd>Change the weather · change the season</dd>
       <dt><kbd>[</kbd> <kbd>]</kbd> <kbd>L</kbd></dt><dd>Shift the time · back to live time</dd>
       <dt><kbd>M</kbd> <kbd>H</kbd></dt><dd>Music on or off · this panel</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Close any open panel</dd>
     </dl>
   </section>
 
-  <section class="panel" id="journal" hidden aria-label="Catch journal">
-    <header><h2>Catch journal</h2><span class="sum" id="journalSummary"></span><button type="button" class="close" id="journalClose" aria-label="Close">×</button></header>
+  <section class="panel" id="journal" data-exclusive="1" hidden aria-label="Catch journal">
+    <header><h2>Catch journal</h2><span class="sum" id="journalSummary"></span><button type="button" class="close" data-close="journal" aria-label="Close">×</button></header>
     <ul class="catches" id="journalList"></ul>
   </section>
 
@@ -480,33 +134,31 @@
     <form id="nameForm">
       <h2 id="nameTitle">Name this cat</h2>
       <input id="nameInput" type="text" maxlength="16" autocomplete="off" spellcheck="false" aria-label="Name">
-      <div class="row"><button type="button" id="nameSkip">Not now</button><button type="submit" class="primary">Save name</button></div>
+      <div class="row"><button type="button" class="btn" id="nameSkip">Not now</button><button type="submit" class="btn primary">Save name</button></div>
     </form>
   </div>
+
+  <div class="prompts">
+    <div class="line" id="promptExtra"></div>
+    <div class="line"><span id="promptPrimary" class="line"></span><button type="button" class="more" id="promptMore" hidden aria-expanded="false"></button></div>
+  </div>
+  <div class="lock-tip glass auto-hide" id="lockTip" hidden>Click anywhere to look around with the mouse</div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <div class="photo-vignette" id="photoVignette"></div>
   <div class="photo-flash" id="photoFlash"></div>
   <div class="photo-bar" id="photoBar" hidden>
     <span class="pm">Photo mode</span>
     <span class="pf" id="photoFilter">Natural</span>
-    <button type="button" id="photoNext">Filter <kbd>1</kbd>–<kbd>5</kbd></button>
-    <button type="button" id="photoSave" class="primary">Save photo <kbd>Enter</kbd></button>
-    <button type="button" id="photoExit">Exit <kbd>P</kbd></button>
+    <button type="button" class="btn" id="photoNext">Filter <kbd>1</kbd>–<kbd>5</kbd></button>
+    <button type="button" class="btn" id="photoFocus" aria-pressed="false">Focus <kbd>V</kbd></button>
+    <button type="button" class="btn primary" id="photoSave">Save photo <kbd>Enter</kbd></button>
+    <button type="button" class="btn" id="photoExit">Exit <kbd>P</kbd></button>
   </div>
 
   <div class="joy" id="joy" hidden><i id="knob"></i></div>
-  <div class="error" id="error" hidden></div>
+  <div class="error" id="error" hidden><p></p><button type="button" class="btn" id="errorClose">Dismiss</button></div>
 
-  <script src="lib/three.min.js"></script>
-  <script src="main.js"></script>
-  <script src="features/core.js"></script>
-  <script src="features/life.js"></script>
-  <script src="features/seasons.js"></script>
-  <script src="features/flowers.js"></script>
-  <script src="features/fishing.js"></script>
-  <script src="features/campfire.js"></script>
-  <script src="features/stargaze.js"></script>
-  <script src="features/photo.js"></script>
-  <script src="features/music.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

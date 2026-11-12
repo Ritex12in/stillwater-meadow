@@ -1,0 +1,120 @@
+// Built things: the jetty, the bench, lawn chairs and the path lamps.
+import * as THREE from 'three';
+import { scene } from '../core/render.js';
+import { TAU, rand, pick, angDiff } from '../core/math.js';
+import { height, LAKE, lakePoint, PATH_T, dockStart, dockDir, DOCK_A, DOCK_BACK, DOCK_LEN, DOCK_HALF, DOCK_Y, chairSpots, BENCH_SPOT } from '../core/shape.js';
+import { std, weatherize, glowTex } from '../core/materials.js';
+import { world, obstacles, seats } from '../core/state.js';
+
+export const lampMat = new THREE.MeshStandardMaterial({ color: '#fff4d6', emissive: '#ffbb55', emissiveIntensity: 0, flatShading: true });
+export const lampGlows = [];
+
+export function buildDockAndBench() {
+  const dock = new THREE.Group();
+  dock.position.set(dockStart.x, 0, dockStart.z);
+  dock.rotation.y = Math.atan2(dockDir.x, dockDir.z);
+  const plankCols = ['#9b7653', '#8c6a4a', '#a7815c'];
+  const plankMats = new Map(); // one material per colour instead of one per plank
+  const plankGeo = new THREE.BoxGeometry(DOCK_HALF * 2, 0.08, 0.5);
+  for (let s = -DOCK_BACK; s < DOCK_LEN; s += 0.56) {
+    const c = pick(plankCols);
+    if (!plankMats.has(c)) plankMats.set(c, weatherize(std(c), 'std'));
+    const m = new THREE.Mesh(plankGeo, plankMats.get(c));
+    m.position.set(rand(-0.03, 0.03), DOCK_Y, s + 0.25);
+    m.rotation.y = rand(-0.015, 0.015);
+    m.castShadow = true; m.receiveShadow = true;
+    dock.add(m);
+  }
+  const postMat = std('#6b4f3a'), postGeo = new THREE.CylinderGeometry(0.09, 0.1, 2.4, 6);
+  for (let s = 0.5; s < DOCK_LEN; s += 2.8) {
+    for (const side of [-1, 1]) {
+      const post = new THREE.Mesh(postGeo, postMat);
+      post.position.set(side * (DOCK_HALF - 0.08), DOCK_Y - 0.9, s);
+      post.castShadow = true;
+      dock.add(post);
+    }
+  }
+  scene.add(dock);
+
+  const bp = world.benchPos = BENCH_SPOT;
+  const bench = new THREE.Group();
+  bench.position.set(bp.x, height(bp.x, bp.z), bp.z);
+  bench.rotation.y = Math.atan2(LAKE.x - bp.x, LAKE.z - bp.z);
+  const wood = weatherize(std('#8a6646'), 'std'), iron = std('#3a3f3f');
+  [
+    [new THREE.BoxGeometry(1.9, 0.07, 0.5), wood, 0, 0.48, 0, 0],
+    [new THREE.BoxGeometry(1.9, 0.36, 0.06), wood, 0, 0.8, -0.24, -0.18],
+    [new THREE.BoxGeometry(0.08, 0.5, 0.48), iron, -0.85, 0.24, 0, 0],
+    [new THREE.BoxGeometry(0.08, 0.5, 0.48), iron, 0.85, 0.24, 0, 0],
+  ].forEach(([g, m, x, y, z, rx]) => {
+    const mesh = new THREE.Mesh(g, m);
+    mesh.position.set(x, y, z); mesh.rotation.x = rx; mesh.castShadow = true;
+    bench.add(mesh);
+  });
+  scene.add(bench);
+  obstacles.push({ x: bp.x, z: bp.z, r: 0.95 });
+  seats.push({ name: 'bench', x: bp.x, z: bp.z, baseY: bench.position.y, top: 0.515, rot: bench.rotation.y, standOff: 1.35 });
+}
+
+function makeChair(paint) {
+  const g = new THREE.Group();
+  const m = weatherize(std(paint), 'std');
+  const add = (w, h, d, x, y, z, rx) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+    b.position.set(x, y, z); b.rotation.x = rx || 0;
+    b.castShadow = true; b.receiveShadow = true;
+    g.add(b);
+  };
+  [-0.3, 0.3].forEach((x) => {
+    add(0.06, 0.62, 0.06, x * 1.18, 0.31, 0.22);           // front legs, up to the armrest
+    add(0.06, 0.4, 0.06, x, 0.2, -0.24);                  // back legs
+    add(0.1, 0.035, 0.66, x * 1.2, 0.63, 0.02);            // armrests
+  });
+  for (let i = 0; i < 4; i++) add(0.62, 0.035, 0.12, 0, 0.43 - i * 0.012, 0.2 - i * 0.135, -0.08); // seat slats
+  for (let i = 0; i < 5; i++) add(0.1, 0.78, 0.03, -0.24 + i * 0.12, 0.8, -0.34, -0.32);           // back slats
+  add(0.62, 0.06, 0.04, 0, 1.12, -0.46, -0.32);
+  return g;
+}
+function placeChair(x, z, baseY, rot, paint) {
+  const c = makeChair(paint);
+  c.position.set(x, baseY, z);
+  c.rotation.y = rot;
+  scene.add(c);
+  obstacles.push({ x, z, r: 0.45 });
+  seats.push({ name: 'chair', x, z, baseY, top: 0.44, rot, standOff: 0.9 });
+}
+
+export function buildChairs() {
+  const paints = ['#efe9dc', '#86aea6'];
+  chairSpots.forEach((p, i) => {
+    const rot = Math.atan2(LAKE.x - p.x, LAKE.z - p.z) + (i ? -0.12 : 0.12);
+    placeChair(p.x, p.z, height(p.x, p.z) - 0.02, rot, paints[i]);
+  });
+  const s = DOCK_LEN - 1.9, w = -0.5;
+  placeChair(dockStart.x + dockDir.x * s + dockDir.z * w, dockStart.z + dockDir.z * s - dockDir.x * w, DOCK_Y + 0.04, Math.atan2(dockDir.x, dockDir.z) - 0.35, '#d8a95e');
+}
+
+export function buildLamps() {
+  const postMat = std('#2f3534');
+  const postGeo = new THREE.CylinderGeometry(0.05, 0.08, 2.2, 6).translate(0, 1.1, 0);
+  const lampGeo = new THREE.BoxGeometry(0.24, 0.3, 0.24);
+  const capGeo = new THREE.ConeGeometry(0.22, 0.16, 4).rotateY(Math.PI / 4);
+  const glowMat = new THREE.SpriteMaterial({ map: glowTex, color: '#ffc979', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU + 0.2;
+    if (Math.abs(angDiff(a, DOCK_A)) < 0.2) continue;
+    const p = lakePoint(a, PATH_T + 0.085);
+    const y = height(p.x, p.z);
+    const post = new THREE.Mesh(postGeo, postMat);
+    post.position.set(p.x, y, p.z); post.castShadow = true;
+    const lamp = new THREE.Mesh(lampGeo, lampMat);
+    lamp.position.set(p.x, y + 2.35, p.z);
+    const cap = new THREE.Mesh(capGeo, postMat);
+    cap.position.set(p.x, y + 2.58, p.z);
+    const glow = new THREE.Sprite(glowMat); // all lamps share one material: one opacity update per frame
+    glow.position.copy(lamp.position); glow.scale.set(2.2, 2.2, 1);
+    scene.add(post, lamp, cap, glow);
+    lampGlows.push(glow);
+    obstacles.push({ x: p.x, z: p.z, r: 0.2 });
+  }
+}

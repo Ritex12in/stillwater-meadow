@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview --port 8080",
     "lint": "eslint src tests",
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:quick": "MEADOW_RUNNER=1 node tests/run.mjs"
   },
   "dependencies": {
     "three": "0.128.0"
@@ -21,6 +22,7 @@
     "globals": "15.14.0",
     "lil-gui": "0.20.0",
     "stats.js": "0.17.0",
-    "vite": "5.4.11"
+    "vite": "5.4.11",
+    "playwright": "1.49.1"
   }
 }

@@ -4,8 +4,8 @@ import { clamp, smooth } from './core/math.js';
 import { reduceMotion, debug } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU } from './core/materials.js';
-import { lakeT } from './core/shape.js';
-import { hooks, seasonState } from './core/state.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT } from './core/shape.js';
+import { hooks, seasonState, seats } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU, starMat } from './world/sky.js';
 import { buildLights, hemi, ambient, sun } from './world/lights.js';
@@ -36,7 +36,7 @@ import { initPetVoices } from './features/voices.js';
 import { initDucks, duckState } from './features/ducks.js';
 import { initWildlife } from './features/wildlife.js';
 import { initSeasons } from './features/seasons.js';
-import { initFlowers } from './features/flowers.js';
+import { initFlowers, flowerView } from './features/flowers.js';
 import { initFishing, fishingState } from './features/fishing.js';
 import { initCampfire, fire } from './features/campfire.js';
 import { initStargaze } from './features/stargaze.js';
@@ -217,7 +217,8 @@ requestAnimationFrame(frame);
 window.__meadow = {
   tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio,
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
-  fishing: fishingState, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, toast,
+  fishing: fishingState, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, toast,
+  geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, bench: () => seats.find((s) => s.name === 'bench') },
   hour: () => wrap24(timeCtl.hour),
 };
 if (debug) import('./debug.js').then((m) => m.initDebug(window.__meadow)).catch((e) => console.error(e));

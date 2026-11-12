@@ -17,7 +17,8 @@ import { toast } from '../ui/hud.js';
 export function initStargaze() {
   player.lieAmt = 0;
   let wished = false;
-  const lieDown = () => { if (activity.enter('lie')) { wished = false; camState.pitch = 0.32; } };
+  let nextIn = 20;
+  const lieDown = () => { if (activity.enter('lie')) { wished = false; camState.pitch = 0.32; nextIn = Math.min(nextIn, rnd(3, 6)); } };
   const getUp = () => activity.leave('lie');
   registerAction({ id: 'get-up', key: 'KeyZ', keyLabel: 'Z', score: () => 1000, available: () => activity.is('lie'), label: () => 'Get up', run: getUp });
   registerAction({
@@ -64,7 +65,6 @@ export function initStargaze() {
   streak.visible = false;
   sky.add(streak);
   const s = { t: 1, start: new THREE.Vector3(), vel: new THREE.Vector3() };
-  let nextIn = 20;
   const launch = () => {
     const el = rnd(0.5, 1.15), yaw = camState.yaw, lying = activity.is('lie');
     const az = lying ? Math.atan2(-Math.cos(yaw), -Math.sin(yaw)) + rnd(-0.6, 0.6) : rnd() * TAU;

@@ -15,6 +15,9 @@ import { store, saveSoon, onSave } from '../systems/save.js';
 import { toast } from '../ui/hud.js';
 
 const MAX = 12, REGROW = 240;
+let debugView = () => [];
+/** For tests: every flower with whether it is currently shown. */
+export const flowerView = () => debugView();
 const stemMat = std('#4f7a36'), wrapMat = std('#f2e6cf', { side: THREE.DoubleSide });
 
 function buildBouquet(colors) {
@@ -39,6 +42,7 @@ export function initFlowers() {
   const items = world.flowerItems, stem = world.flowerStem, head = world.flowerHead;
   const picked = new Float32Array(items.length).fill(-1e9);
   const shownF = new Uint8Array(items.length).fill(1);
+  debugView = () => items.map((it, i) => ({ x: it.x, z: it.z, shown: !!shownF[i] }));
   const keep = items.map((it) => ((Math.sin(it.x * 12.9898 + it.z * 78.233) * 43758.5453) % 1 + 1) % 1); // stable per flower
   const setShown = (i, on) => {
     if (shownF[i] === on) return;
@@ -87,7 +91,7 @@ export function initFlowers() {
   const skipperPos = new THREE.Vector3();
   const nearSkipper = () => { skipper.root.getWorldPosition(skipperPos); return ferry.state === 'docked' && Math.hypot(skipperPos.x - player.x, skipperPos.z - player.z) < 3.2; };
   const nearBench = () => benchSeat && Math.hypot(benchSeat.x - player.x, benchSeat.z - player.z) < 2.3;
-  let nearFlower = -1;
+  let nearFlower = -1, nearDist = 9;
   const scan = () => {
     nearFlower = -1;
     let best = 1.2;
@@ -96,6 +100,7 @@ export function initFlowers() {
       const it = items[i], d = Math.abs(it.x - player.x) + Math.abs(it.z - player.z);
       if (d < best) { best = d; nearFlower = i; }
     }
+    nearDist = best;
   };
 
   registerAction({
@@ -122,7 +127,7 @@ export function initFlowers() {
     },
   });
   registerAction({
-    id: 'pick', key: 'KeyG', keyLabel: 'G', score: () => 0,
+    id: 'pick', key: 'KeyG', keyLabel: 'G', score: () => (nearDist < 0.7 ? 20 : 0), // standing on a flower picks it
     available: () => activity.free && bouquet.length < MAX && nearFlower >= 0,
     label: () => `Pick a flower${bouquet.length ? ` (${bouquet.length}/${MAX})` : ''}`,
     run: () => {
@@ -145,7 +150,7 @@ export function initFlowers() {
     refreshIn -= dt;
     if (refreshIn <= 0) { refresh(); refreshIn = 1; }
     scanIn -= dt;
-    if (scanIn <= 0) { scan(); scanIn = 0.2; }
+    if (scanIn <= 0) { scan(); scanIn = 0.1; }
   });
 
   // crouch to pick; hold the bouquet in front while walking

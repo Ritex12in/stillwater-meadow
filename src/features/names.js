@@ -90,7 +90,7 @@ export function initNames() {
       let t = tags.get(a);
       const label = a.name ? a.name + (a.bond > 0.6 ? ' ♥' : '') : '';
       if (!t || t.label !== label) {
-        if (t) { a.head.remove(t.s); t.s.material.map.dispose(); t.s.material.dispose(); }
+        if (t && t.s) { a.head.remove(t.s); t.s.material.map.dispose(); t.s.material.dispose(); }
         t = { label, s: label ? tagSprite(label) : null };
         if (t.s) { t.s.position.set(0, 0.62 / (a.scale || 1), 0); a.head.add(t.s); }
         tags.set(a, t);

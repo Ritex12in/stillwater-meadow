@@ -64,7 +64,7 @@ body.quiet .brand { opacity: 0.45; }
 .tool.menu-only { display: none; }
 
 /* ── popovers and panels ── */
-.popover { position: fixed; top: calc(var(--top) + 46px); right: var(--right); width: min(380px, calc(100vw - 32px)); max-height: calc(100% - 140px); overflow: auto; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); display: grid; gap: 16px; }
+.popover { box-sizing: border-box; position: fixed; top: calc(var(--top) + 46px); right: var(--right); width: min(380px, calc(100vw - 32px)); max-height: calc(100% - 140px); overflow: auto; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); display: grid; gap: 16px; }
 .popover h3 { margin: 0 0 8px; font: 700 10.5px var(--font-ui); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); }
 .row { display: flex; align-items: center; gap: 10px; }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); }
@@ -104,7 +104,7 @@ input[type="range"]::-moz-range-thumb { width: 10px; height: 10px; border-radius
 .menu { display: grid; gap: 8px; }
 .menu button { justify-content: flex-start; }
 
-.panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(540px, calc(100vw - 32px)); max-height: calc(100% - 140px); overflow: auto; padding: 18px 20px 20px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.panel { box-sizing: border-box; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(540px, calc(100vw - 32px)); max-height: calc(100% - 140px); overflow: auto; padding: 18px 20px 20px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 .panel header, .popover header { display: flex; align-items: baseline; gap: 12px; }
 .panel header { margin-bottom: 12px; }
 .panel h2, .popover h2 { margin: 0; font: italic 600 26px/1.1 var(--font-display); }
@@ -152,10 +152,11 @@ kbd { display: inline-grid; place-items: center; min-width: 20px; height: 20px; 
 .error p { margin: 0; flex: 1; }
 
 /* ── photo mode ── */
-.photo-bar { position: fixed; left: 50%; bottom: var(--bottom); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; padding: 8px 10px 8px 16px; border-radius: 999px; max-width: calc(100vw - 32px); background: var(--glass-strong); border: 1px solid var(--line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.photo-bar { position: fixed; left: 50%; bottom: var(--bottom); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; padding: 8px 10px 8px 16px; border-radius: 999px; max-width: calc(100vw - 32px); width: max-content; background: var(--glass-strong); border: 1px solid var(--line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 .photo-bar .pm { font: 700 10.5px var(--font-ui); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); }
 .photo-bar .pf { font: italic 600 18px var(--font-display); min-width: 70px; }
 .photo-bar .btn[aria-pressed="true"] { background: var(--chip); color: var(--chip-ink); }
+.photo-bar .btn[aria-pressed="true"] kbd { background: rgba(0, 0, 0, 0.12); color: var(--chip-ink); }
 .photo-bar .btn.primary kbd { background: rgba(0, 0, 0, 0.12); color: var(--chip-ink); }
 .photo-vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.9) 100%); }
 .photo-flash { position: fixed; inset: 0; pointer-events: none; background: #fff; opacity: 0; }
@@ -173,6 +174,7 @@ body.photo-mode > *:not(#world):not(.photo-bar):not(.photo-vignette):not(.photo-
   .brand h1 { font-size: 26px; }
   .hint { top: calc(var(--top) + 118px); }
   .settings label { grid-template-columns: 82px minmax(0, 1fr); }
+  .chips button { padding-left: 8px; padding-right: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hint, .chips button, .tool .wave, .auto-hide, .toast { transition: none; }

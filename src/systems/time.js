@@ -45,7 +45,7 @@ export function periodName(h) {
   if (h < solar.sunrise + 0.6) return 'Dawn';
   if (h < 11) return 'Morning';
   if (h < 14) return 'Midday';
-  if (h < solar.sunset - 1.5) return 'Afternoon';
+  if (h < Math.min(solar.sunset - 1.5, 18)) return 'Afternoon';
   if (h < solar.sunset + 1.3) return 'Evening';
   return 'Night';
 }

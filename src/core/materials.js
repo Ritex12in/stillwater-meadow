@@ -52,6 +52,21 @@ export function weatherize(mat, mode) {
   return mat;
 }
 
+/**
+ * Thin things (grass, petals, leaves) drawn from both sides with the same light on each face.
+ * Plain double-sided Lambert lights the back with a flipped normal, which turns it black.
+ */
+export function bothSides(mat) {
+  const prev = mat.onBeforeCompile, baseKey = mat.customProgramCacheKey();
+  mat.side = THREE.DoubleSide;
+  mat.onBeforeCompile = (sh, r) => {
+    prev.call(mat, sh, r);
+    sh.fragmentShader = sh.fragmentShader.split(': vLightBack').join(': vLightFront').split(': vIndirectBack').join(': vIndirectFront');
+  };
+  mat.customProgramCacheKey = () => baseKey + '|both';
+  return mat;
+}
+
 export function mergeGeos(geos) {
   const parts = geos.map((g) => (g.index ? g.toNonIndexed() : g));
   let n = 0;
@@ -165,5 +180,23 @@ export function instancedChunks(geo, mat, items, opts = {}) {
       dirtyM.clear(); dirtyC.clear();
     },
     set visible(v) { meshes.forEach((m) => { m.visible = v; }); },
+  };
+}
+
+/**
+ * Several shapes drawn as one set: `variantOf(item, i)` picks the geometry for each item (or -1
+ * for none). The handle edits instances by their index in `items`, like instancedChunks.
+ */
+export function instancedVariants(geos, mat, items, variantOf, opts = {}) {
+  const lists = geos.map(() => []), where = [];
+  items.forEach((it, i) => { const v = variantOf(it, i); where[i] = v < 0 ? null : [v, lists[v].length]; if (v >= 0) lists[v].push(it); });
+  const hs = lists.map((l, v) => (l.length ? instancedChunks(geos[v], mat, l, opts) : null));
+  return {
+    material: mat,
+    count: items.length,
+    setColorAt(i, color) { const w = where[i]; if (w) hs[w[0]].setColorAt(w[1], color); },
+    setVisibleAt(i, on) { const w = where[i]; if (w) hs[w[0]].setVisibleAt(w[1], on); },
+    commit() { hs.forEach((h) => h && h.commit()); },
+    set visible(v) { hs.forEach((h) => { if (h) h.visible = v; }); },
   };
 }

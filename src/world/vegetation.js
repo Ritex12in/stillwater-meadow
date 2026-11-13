@@ -3,7 +3,8 @@
 import * as THREE from 'three';
 import { TAU, rng, rand, pick, smooth, fbm, vnoise, angDiff } from '../core/math.js';
 import { height, lakeT, lakePoint, pathAmt, SPAWN, onDock, dockStart, DOCK_A, nearReserved, BENCH_SPOT } from '../core/shape.js';
-import { std, col, weatherize, addWind, mergeGeos, instanced, instancedChunks } from '../core/materials.js';
+import { std, col, weatherize, addWind, bothSides, instanced, instancedChunks, instancedVariants } from '../core/materials.js';
+import { pineGeos, crownGeos, grassTuftGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
 import { world, obstacles } from '../core/state.js';
 
 export const treeSpots = [];
@@ -33,30 +34,21 @@ export function buildTrees() {
   const pines = treeSpots.filter((t) => t.type === 'pine');
   const rounds = treeSpots.filter((t) => t.type !== 'pine');
 
-  const pineTrunk = new THREE.CylinderGeometry(0.16, 0.26, 1.6, 6).translate(0, 0.8, 0);
-  const pineTop = mergeGeos([
-    new THREE.ConeGeometry(1.6, 2.4, 7).translate(0, 2.4, 0),
-    new THREE.ConeGeometry(1.25, 2.0, 7).translate(0, 3.5, 0),
-    new THREE.ConeGeometry(0.85, 1.6, 7).translate(0, 4.5, 0),
-  ]);
-  const roundTrunk = new THREE.CylinderGeometry(0.18, 0.3, 2.4, 6).translate(0, 1.2, 0);
-  const roundTop = mergeGeos([
-    new THREE.IcosahedronGeometry(1.6, 0).translate(0, 3.3, 0),
-    new THREE.IcosahedronGeometry(1.2, 0).translate(0.95, 2.9, 0.4),
-    new THREE.IcosahedronGeometry(1.1, 0).translate(-0.85, 3.05, -0.3),
-    new THREE.IcosahedronGeometry(1.0, 0).translate(0.1, 4.2, 0.2),
-  ]);
   const bark = std('#6b4f3a');
-  const leaf = weatherize(std('#ffffff'), 'std');
+  const leaf = weatherize(std('#ffffff', { vertexColors: true }), 'std');
   const pineCols = ['#2f5a3a', '#3b6a40', '#2a4e37', '#456f43'].map(col);
   const roundCols = ['#5b8f3e', '#6fa04a', '#4d7f3a', '#86a948', '#7a9c3c'].map(col);
   const blossomCols = ['#f2b8c6', '#eaa3b8', '#f7cdd8'].map(col);
 
-  instancedChunks(pineTrunk, bark, pines, { cast: true, cell: 50 });
-  instancedChunks(pineTop, leaf, pines.map((t) => Object.assign({}, t, { color: pick(pineCols) })), { cast: true, cell: 50 });
-  instancedChunks(roundTrunk, bark, rounds, { cast: true, cell: 50 });
+  // colours are drawn in the original order (all pines, then all the others) so nothing shifts
+  const pineItems = pines.map((t) => Object.assign({}, t, { color: pick(pineCols) }));
   world.roundItems = rounds.map((t) => Object.assign({}, t, { color: t.type === 'blossom' ? pick(blossomCols) : pick(roundCols) }));
-  world.roundTop = instancedChunks(roundTop, leaf, world.roundItems, { cast: true, cell: 50 });
+  const pg = pineGeos(), cg = crownGeos();
+  const pineKind = (t) => variantAt(t.x, t.z, pg.length, 3), crownKind = (t) => variantAt(t.x, t.z, cg.length, 8);
+  instancedVariants(pg.map((g) => g.trunk), bark, pines, pineKind, { cast: true, cell: 90 });
+  instancedVariants(pg.map((g) => g.top), leaf, pineItems, pineKind, { cast: true, cell: 90 });
+  instancedVariants(cg.map((g) => g.trunk), bark, rounds, crownKind, { cast: true, cell: 90 });
+  world.roundTop = instancedVariants(cg.map((g) => g.top), leaf, world.roundItems, crownKind, { cast: true, cell: 90 });
   treeSpots.forEach((t) => obstacles.push({ x: t.x, z: t.z, r: 0.32 * t.s }));
 }
 
@@ -80,28 +72,8 @@ export function buildRocks() {
 
 export function buildGrass() {
   const blades = [];
-  const shape = [[-0.06, 0, 0], [0.06, 0, 0], [-0.04, 0.28, 0], [0.04, 0.28, 0], [0, 0.6, 0]];
-  const shade = [0.55, 0.55, 0.85, 0.85, 1.2];
-  const pos = [], colr = [], nrm = [], idx = [];
-  for (let b = 0; b < 3; b++) {
-    const a = (b / 3) * Math.PI + rand(-0.3, 0.3);
-    const ox = rand(-0.12, 0.12), oz = rand(-0.12, 0.12), hs = rand(0.75, 1.15);
-    const base = pos.length / 3;
-    shape.forEach((v, i) => {
-      const x = v[0] * Math.cos(a), z = v[0] * Math.sin(a);
-      pos.push(x + ox, v[1] * hs, z + oz);
-      colr.push(shade[i], shade[i], shade[i]);
-      nrm.push(0, 1, 0);
-    });
-    // both windings, so each side is front-facing and lit with the up-normal
-    idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2, base + 2, base + 3, base + 4);
-    idx.push(base, base + 2, base + 1, base + 1, base + 2, base + 3, base + 2, base + 4, base + 3);
-  }
-  const tuft = new THREE.BufferGeometry();
-  tuft.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  tuft.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-  tuft.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
-  tuft.setIndex(idx);
+  for (let i = 0; i < 12; i++) rng(); // the old tuft shape used twelve layout draws; keep the stream in step
+  const tufts = grassTuftGeos();
 
   const grassCols = ['#6f9c45', '#83ad4f', '#5d8a3e', '#9bb957', '#77a24a'].map(col);
   for (let i = 0; i < 26000; i++) {
@@ -114,8 +86,10 @@ export function buildGrass() {
     const s = rand(0.7, 1.35);
     blades.push({ x, z, y: h - 0.03, s, sy: s * rand(0.7, 1.15), ry: rng() * TAU, color: pick(grassCols) });
   }
-  world.grassMat = weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.55), 'lam');
-  world.grass = instancedChunks(tuft, world.grassMat, blades, { cast: false, cell: 25 });
+  world.grassMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.55), 'lam'));
+  // seed stalks gather in drifts; low clumps fill in between the upright ones
+  const tuftKind = (it) => { const h = variantAt(it.x, it.z, 100, 21); return vnoise(it.x * 0.09 + 3, it.z * 0.09 - 7) > 0.62 && h < 45 ? 2 : h < 58 ? 0 : h < 90 ? 1 : 2; };
+  world.grass = instancedVariants(tufts, world.grassMat, blades, tuftKind, { cast: false, cell: 36 });
 }
 
 export function buildFlowers() {
@@ -129,11 +103,24 @@ export function buildFlowers() {
     const patch = Math.floor(vnoise(x * 0.15, z * 0.15) * petals.length) % petals.length;
     flowers.push({ x, z, y: height(x, z) - 0.02, s: rand(0.8, 1.4), ry: rng() * TAU, color: rng() < 0.8 ? petals[patch] : pick(petals) });
   }
-  const stemMat = addWind(new THREE.MeshLambertMaterial({ color: '#4f7a36' }), 0.6);
-  const headMat = weatherize(addWind(new THREE.MeshLambertMaterial({ color: '#ffffff' }), 0.6), 'lam');
+  // kinds grow in drifts, with a few strays; stems vary in height
+  flowers.forEach((f) => {
+    const drift = Math.floor(vnoise(f.x * 0.12 + 7, f.z * 0.12 + 3) * FLOWER_KINDS.length * 1.6) % FLOWER_KINDS.length;
+    f.kind = variantAt(f.x, f.z, 10, 5) < 7 ? drift : variantAt(f.x, f.z, FLOWER_KINDS.length, 6);
+    f.sy = f.s * (0.75 + 0.6 * variantAt(f.x, f.z, 100, 7) / 100);
+  });
+  const stemMat = bothSides(addWind(new THREE.MeshLambertMaterial({ color: '#4f7a36', vertexColors: true }), 0.6));
+  const headMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), 0.6), 'lam'));
+  const centreMat = addWind(new THREE.MeshLambertMaterial({ color: '#ffffff' }), 0.6);
+  const centres = flowers.map((f) => Object.assign({}, f, { color: FLOWER_CENTRE[FLOWER_KINDS[f.kind]] ? col(FLOWER_CENTRE[FLOWER_KINDS[f.kind]]) : null }));
   world.flowerItems = flowers;
-  world.flowerStem = instancedChunks(new THREE.CylinderGeometry(0.012, 0.016, 0.38, 3).translate(0, 0.19, 0), stemMat, flowers, { cell: 25 });
-  world.flowerHead = instancedChunks(new THREE.IcosahedronGeometry(0.075, 0).scale(1, 0.55, 1).translate(0, 0.39, 0), headMat, flowers, { cell: 25 });
+  const parts = [
+    instancedChunks(flowerStemGeo(), stemMat, flowers.map((f) => Object.assign({}, f, { color: null })), { cell: 50 }),
+    instancedVariants(flowerHeadGeos(), headMat, flowers, (f) => f.kind, { cell: 50 }),
+    instancedVariants([flowerCentreGeo()], centreMat, centres, (f) => (f.color ? 0 : -1), { cell: 50 }),
+  ];
+  /** Every part of flower `i` shows or hides together. */
+  world.flowerSet = { setVisibleAt(i, on) { parts.forEach((p) => p.setVisibleAt(i, on)); }, commit() { parts.forEach((p) => p.commit()); } };
 }
 
 export function buildReedsAndPads() {

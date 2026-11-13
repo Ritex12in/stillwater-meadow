@@ -53,7 +53,7 @@ window.addEventListener('keydown', (e) => {
   // a hotkey can return false to let the key fall through to contextual actions
   if (hk && (!blocked() || hk.modal) && hk.fn(e) !== false) { e.preventDefault(); return; }
   if (blocked()) return;
-  const a = chosen.find((x) => x.key === e.code);
+  const a = evaluateActions().find((x) => x.key === e.code); // fresh, so a quick press never acts on a stale list
   if (a) { e.preventDefault(); runAction(a); }
 });
 

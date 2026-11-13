@@ -1,6 +1,6 @@
 // Stillwater Meadow: boot, build the world in a fixed order, and run the frame loop.
 import './style.css';
-import { clamp, smooth } from './core/math.js';
+import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU } from './core/materials.js';
@@ -215,7 +215,7 @@ requestAnimationFrame(frame);
 
 // A small handle for automated tests and the debug panel.
 window.__meadow = {
-  tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, solar,
+  tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
   fishing: fishingState, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, toast,
   geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, bench: () => seats.find((s) => s.name === 'bench') },

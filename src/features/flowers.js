@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { lerp } from '../core/math.js';
 import { heightAt } from '../core/shape.js';
-import { std } from '../core/materials.js';
+import { std, bothSides } from '../core/materials.js';
+import { flowerHeadGeos, flowerCentreGeo, FLOWER_KINDS, FLOWER_CENTRE, STEM_H } from '../world/detail.js';
 import { clock } from '../core/clock.js';
 import { hooks, seats, seasonState, world } from '../core/state.js';
 import { player, hero } from '../characters/player.js';
@@ -18,6 +19,7 @@ const MAX = 12, REGROW = 240;
 let debugView = () => [];
 /** For tests: every flower with whether it is currently shown. */
 export const flowerView = () => debugView();
+const headGeos = flowerHeadGeos(), centreGeo = flowerCentreGeo();
 const stemMat = std('#4f7a36'), wrapMat = std('#f2e6cf', { side: THREE.DoubleSide });
 
 function buildBouquet(colors) {
@@ -30,16 +32,23 @@ function buildBouquet(colors) {
     const s = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.3, 3).translate(0, 0.15, 0), stemMat);
     s.position.set(Math.cos(a) * r * 0.5, 0, Math.sin(a) * r * 0.5);
     s.rotation.set(Math.sin(a) * 0.25, 0, -Math.cos(a) * 0.25);
-    const h = new THREE.Mesh(new THREE.IcosahedronGeometry(0.035, 0), std(hex));
-    h.position.set(Math.cos(a) * (r + 0.05), 0.3 + (i % 3) * 0.02, Math.sin(a) * (r + 0.05));
+    // saved as "#colour:kind"; older saves hold only the colour
+    const [colour, kind] = String(hex).split(':');
+    const k = FLOWER_KINDS[kind] ? Number(kind) : 4;
+    const h = new THREE.Mesh(headGeos[k], bothSides(new THREE.MeshLambertMaterial({ color: colour, vertexColors: true })));
+    h.scale.setScalar(0.5);
+    h.position.set(Math.cos(a) * (r + 0.05), 0.3 + (i % 3) * 0.02 - STEM_H * 0.5, Math.sin(a) * (r + 0.05));
+    h.rotation.y = a;
     g.add(s, h);
+    const centre = FLOWER_CENTRE[FLOWER_KINDS[k]];
+    if (centre) { const c = new THREE.Mesh(centreGeo, std(centre)); h.add(c); }
   });
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   return g;
 }
 
 export function initFlowers() {
-  const items = world.flowerItems, stem = world.flowerStem, head = world.flowerHead;
+  const items = world.flowerItems, set = world.flowerSet;
   const picked = new Float32Array(items.length).fill(-1e9);
   const shownF = new Uint8Array(items.length).fill(1);
   debugView = () => items.map((it, i) => ({ x: it.x, z: it.z, shown: !!shownF[i] }));
@@ -47,13 +56,12 @@ export function initFlowers() {
   const setShown = (i, on) => {
     if (shownF[i] === on) return;
     shownF[i] = on;
-    stem.setVisibleAt(i, !!on);
-    head.setVisibleAt(i, !!on);
+    set.setVisibleAt(i, !!on);
   };
   const refresh = () => {
     const frac = seasonState.flowerFrac;
     for (let i = 0; i < items.length; i++) setShown(i, keep[i] < frac && clock.elapsed - picked[i] > REGROW ? 1 : 0);
-    stem.commit(); head.commit();
+    set.commit();
   };
 
   let bouquet = Array.isArray(store.bouquet) ? store.bouquet.slice(0, MAX) : [];
@@ -135,8 +143,8 @@ export function initFlowers() {
       if (i < 0) return;
       picked[i] = clock.elapsed;
       setShown(i, 0);
-      stem.commit(); head.commit();
-      bouquet.push('#' + items[i].color.getHexString());
+      set.commit();
+      bouquet.push('#' + items[i].color.getHexString() + ':' + items[i].kind);
       rebuildHand();
       player.pickT = 0.6;
       if (bouquet.length === 1) toast('Picked a flower. Gather more, then give the bouquet to the skipper or leave it on the bench.', 4.5);

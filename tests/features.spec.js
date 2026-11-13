@@ -87,6 +87,7 @@ test('the skipper trades his rod for a full bouquet of three kinds, not before',
 test('campfire: light it and the animals gather round; logs can be sat on', async ({ page }) => {
   const errors = await open(page, 'weather=clear', '#21');
   await step(page, 0.5);
+  await page.evaluate(() => window.__meadow.animals.forEach((a) => { a.tamed = true; })); // only your pets come to the fire
   const c = await page.evaluate(() => window.__meadow.geo.FIRE_SPOT);
   await teleport(page, c.x + 1.0, c.z + 0.6, -1, -0.6);
   await press(page, 'KeyE', 0.3);
@@ -136,7 +137,7 @@ test('dogs following you fan out instead of overlapping', async ({ page }) => {
   const min = await page.evaluate(() => {
     const m = window.__meadow;
     const dogs = m.animals.filter((a) => a.kind === 'dog');
-    dogs.forEach((a) => { a.state = 'follow'; a.timer = 999; a.side = 0.3; a.x = m.player.x + 1; a.z = m.player.z + 1; });
+    dogs.forEach((a) => { a.tamed = true; a.sit = 0; a.sitting = false; a.state = 'follow'; a.timer = 999; a.side = 0.3; a.x = m.player.x + 1; a.z = m.player.z + 1; });
     let best = 99;
     for (let i = 0; i < 30 * 40; i++) {
       m.tick(1 / 30);
@@ -148,23 +149,77 @@ test('dogs following you fan out instead of overlapping', async ({ page }) => {
   noErrors(errors);
 });
 
-test('petting asks for a name, and a bonded dog greets you after a reload', async ({ page }) => {
+test('feeding a dog fish tames it: then you name it, pet it, and it greets you after a reload', async ({ page }) => {
   const errors = await open(page, 'weather=clear');
   await step(page, 0.5);
-  const dog = await page.evaluate(() => { const a = window.__meadow.animals[0]; return { x: a.x, z: a.z }; });
-  await teleport(page, dog.x + 1.5, dog.z);
-  await press(page, 'KeyF', 2.5);
+  await page.evaluate(() => { window.__meadow.store.creel = [{ id: 'perch', cm: 20 }, { id: 'carp', cm: 40 }]; });
+  // the others stay at home, out of the way, so T always means this dog
+  const dog = await page.evaluate(() => {
+    const [a, ...rest] = window.__meadow.animals;
+    rest.forEach((o, i) => { o.x = a.x + 30 + i * 3; o.z = a.z; o.home = { x: o.x, z: o.z }; o.hasTarget = false; });
+    return { x: a.x, z: a.z };
+  });
+  await teleport(page, dog.x + 1.2, dog.z);
+  await step(page, 0.2);
+  expect((await actions(page)).find((a) => a.id === 'pet-untamed'), 'not yours yet, so no petting').toBeTruthy();
+  // the first fish: the best you have (the carp, worth 3); now you know it loves perch
+  await press(page, 'KeyT', 0.3);
+  let pet = (await page.evaluate(() => window.__meadow.pets()))[0];
+  expect(pet.trust).toBe(3);
+  expect(pet.favKnown, 'favourite revealed').toBe(true);
+  expect(pet.tamed, 'not yet tamed').toBe(false);
+  // it's chewing for a minute; after that, its favourite (perch, worth 2 x 2) wins it over
+  await step(page, 61);
+  const d = await page.evaluate(() => { const a = window.__meadow.animals[0]; return { x: a.x, z: a.z }; });
+  await teleport(page, d.x + 1.2, d.z);
+  await step(page, 0.2);
+  await press(page, 'KeyT', 1.5);
+  pet = (await page.evaluate(() => window.__meadow.pets()))[0];
+  expect(pet.tamed).toBe(true);
+  expect(await page.evaluate(() => window.__meadow.store.creel.length)).toBe(0);
   await expect(page.locator('#nameDialog')).toBeVisible();
   await page.locator('#nameInput').fill('Biscuit');
   await page.locator('#nameInput').press('Enter');
   await step(page, 0.3);
   expect(await page.evaluate(() => window.__meadow.animals[0].name)).toBe('Biscuit');
+  const d2 = await page.evaluate(() => { const a = window.__meadow.animals[0]; return { x: a.x, z: a.z }; });
+  await teleport(page, d2.x + 1.2, d2.z);
+  await step(page, 0.2);
+  expect((await actions(page)).map((a) => a.id)).toContain('pet');
   await page.evaluate(() => { window.__meadow.animals[0].bond = 0.8; window.dispatchEvent(new Event('pagehide')); });
   await page.reload();
   await page.waitForFunction(() => window.__meadow && window.__meadow.player);
   await page.waitForTimeout(1500);
   await expect(page.locator('#toast')).toContainText('Biscuit runs over to greet you');
   expect(await page.evaluate(() => window.__meadow.animals[0].state)).toBe('follow');
+  expect((await page.evaluate(() => window.__meadow.pets()))[0].tamed).toBe(true);
+  noErrors(errors);
+});
+
+test('an untamed cat runs from you, but eats a thrown fish if you keep still at a distance', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer');
+  await step(page, 0.5);
+  await page.evaluate(() => { window.__meadow.store.creel = [{ id: 'minnow', cm: 8 }]; });
+  const cat = await page.evaluate(() => { const a = window.__meadow.animals[3]; return { x: a.x, z: a.z }; });
+  // walk straight at it: it bolts
+  await teleport(page, cat.x + 5, cat.z, -1, 0);
+  await page.keyboard.down('KeyW'); await step(page, 0.8); await page.keyboard.up('KeyW');
+  await step(page, 0.4);
+  const fled = await page.evaluate(() => window.__meadow.pets()[3]);
+  expect(['flee', 'wary', 'cornered']).toContain(fled.state);
+  // from a few metres off, throw it the fish, then keep still
+  await step(page, 4);
+  const c2 = await page.evaluate(() => { const a = window.__meadow.animals[3]; return { x: a.x, z: a.z }; });
+  await teleport(page, c2.x + 5, c2.z, -1, 0);
+  await step(page, 0.2);
+  const throwIt = (await actions(page)).find((a) => a.id === 'feed');
+  expect(throwIt && throwIt.label).toContain('Throw');
+  await press(page, 'KeyT', 0.2);
+  await step(page, 10);
+  const fed = await page.evaluate(() => window.__meadow.pets()[3]);
+  expect(fed.trust, 'its favourite minnow: 1 x 2').toBe(2);
+  expect(fed.favKnown).toBe(true);
+  expect(fed.tamed).toBe(false);
   noErrors(errors);
 });
 

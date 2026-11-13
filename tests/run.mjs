@@ -22,7 +22,8 @@ async function worker() {
       console.log(`  ✓ ${t.name} (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
     } catch (e) {
       fail++;
-      console.log(`  ✗ ${t.name}\n      ${String(e.message).split('\n').slice(0, 30).join('\n      ')}`);
+      const at = (String(e.stack).match(/\w+\.spec\.js:\d+/) || [''])[0];
+      console.log(`  ✗ ${t.name}${at ? ` (${at})` : ''}\n      ${String(e.message).split('\n').slice(0, 30).join('\n      ')}`);
     }
     await ctx.close();
   }

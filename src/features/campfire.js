@@ -135,7 +135,7 @@ export function initCampfire() {
   const gather = () => {
     const used = new Set(animals.filter((a) => a.goal && a.goal.src === 'fire').map((a) => a.goal.slot));
     for (const a of animals) {
-      if (a.goal || a.petted || a.state === 'shelter') continue;
+      if (a.goal || a.petted || !a.tamed || a.state === 'shelter') continue;
       if (Math.hypot(a.x - C.x, a.z - C.z) > 50) continue;
       const free = slots.map((s, i) => i).filter((i) => !used.has(i));
       if (!free.length) return;

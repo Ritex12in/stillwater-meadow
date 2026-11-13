@@ -134,9 +134,16 @@ export function registerPetting() {
   });
   registerAction({
     id: 'pet', key: 'KeyF', keyLabel: 'F',
-    available: () => activity.free && nearestAnimal(),
+    available: () => activity.free && nearestAnimal() && nearestAnimal().a.tamed,
     label: () => { const n = nearestAnimal(); return `Pet ${n.a.name || 'the ' + n.a.kind}`; },
     score: () => -nearestAnimal().d,
-    run: () => { const n = nearestAnimal(); if (n) startPet(n.a); },
+    run: () => { const n = nearestAnimal(); if (n && n.a.tamed) startPet(n.a); },
+  });
+  registerAction({
+    id: 'pet-untamed', key: 'KeyF', keyLabel: 'F', score: () => -50,
+    available: () => activity.free && nearestAnimal() && !nearestAnimal().a.tamed,
+    disabled: () => true,
+    label: () => 'Not tame yet: try a fish (T)',
+    run: () => {},
   });
 }

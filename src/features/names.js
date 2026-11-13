@@ -1,4 +1,4 @@
-// Pet names: the first time you pet a cat or dog you can name it. Names float above them as
+// Pet names: when you tame a cat or dog (features/pets.js) you can name it. Names float above them as
 // small signs in the 3D scene (so trees and people in front hide them), bonds and names are
 // saved, and bonded dogs come running to greet you when you return.
 import * as THREE from 'three';
@@ -37,14 +37,17 @@ function tagSprite(text) {
   return s;
 }
 
+/** Offer to name a newly tamed animal (as soon as you're free to answer). */
+export const askName = (a) => { if (!a.name) a.wantName = true; };
+
 export function initNames() {
   // restore bonds and names
   (store.animals || []).forEach((s, i) => { const a = animals[i]; if (a && s) { a.bond = s.bond || 0; a.name = s.name || ''; } });
-  onSave((st) => { st.animals = animals.map((a) => ({ name: a.name || '', bond: Math.round(a.bond * 1000) / 1000 })); });
+  onSave((st) => { st.animals = animals.map((a) => ({ name: a.name || '', bond: Math.round(a.bond * 1000) / 1000, trust: a.trust, favKnown: !!a.favKnown, tamed: !!a.tamed, tamedAt: a.tamedAt || '' })); });
 
   // welcome back: bonded dogs run over to say hello
   if (isReturning()) {
-    const greeters = animals.filter((a) => a.kind === 'dog' && a.bond > 0.3);
+    const greeters = animals.filter((a) => a.kind === 'dog' && a.tamed && a.bond > 0.3);
     greeters.forEach((a) => { a.state = 'follow'; a.timer = 45 + a.bond * 60; a.greet = true; });
     const named = greeters.map((a) => a.name).filter(Boolean);
     let msg = 'Welcome back to the meadow.';
@@ -59,9 +62,9 @@ export function initNames() {
   let naming = null;
   setActionBlocker(() => activity.is('dialog') || photoOn());
   const open = (a) => {
-    if (!activity.enter('dialog')) return;
+    if (naming || a.name || !activity.enter('dialog')) return;
     naming = a;
-    a.nameAsked = true;
+    a.wantName = false;
     const taken = new Set(animals.map((x) => x.name));
     const options = NAMES[a.kind].filter((n) => !taken.has(n));
     title.textContent = `Name this ${a.kind}`;
@@ -86,7 +89,7 @@ export function initNames() {
   const tags = new Map();
   hooks.frame.push(() => {
     for (const a of animals) {
-      if (a.petted && !a.name && !a.nameAsked && !naming && player.petAmt > 0.6) open(a);
+      if (a.wantName && !naming && activity.free) open(a);
       let t = tags.get(a);
       const label = a.name ? a.name + (a.bond > 0.6 ? ' ♥' : '') : '';
       if (!t || t.label !== label) {

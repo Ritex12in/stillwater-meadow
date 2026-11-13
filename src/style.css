@@ -196,3 +196,9 @@ body.photo-mode > *:not(#world):not(.photo-bar):not(.photo-vignette):not(.photo-
 .gauge.pulling .g-label { color: #ffb08a; }
 .gauge.danger .g-fill { background: #e04a3a; }
 @media (pointer: coarse) { .gauge.fighting .g-reel { display: block; } }
+
+/* Pets, in the journal */
+.panel h3.sub { margin: 16px 0 8px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
+.catches.pets li { grid-template-columns: 18px minmax(0, 1fr); row-gap: 2px; }
+.catches.pets .sw { width: auto; height: auto; border: 0; border-radius: 0; font-size: 14px; line-height: 1; }
+.catches.pets .st { grid-column: 2; text-align: left; }

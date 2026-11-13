@@ -1,5 +1,7 @@
 // Cats and dogs: wandering, following you, sheltering from rain, goals set by features
-// (campfire circle, fishing buddy), personal space, and body language.
+// (campfire circle, fishing buddy, food on the ground), personal space, and body language.
+// Until tamed (features/pets.js), cats keep their distance and run from you, and dogs watch
+// but don't follow; a tamed animal behaves like a pet.
 import { scene } from '../core/render.js';
 import { TAU, rng, rand, rnd, clamp, damp, angDiff, turnTo } from '../core/math.js';
 import { lakePoint, heightAt, groundAt, animalWalkable } from '../core/shape.js';
@@ -20,7 +22,7 @@ function spotNear(cx, cz, r, random = rnd) {
   return { x: cx, z: cz };
 }
 
-function addAnimal(kind, rig, near, range) {
+function addAnimal(kind, rig, near, range, desc) {
   const p = spotNear(near.x, near.z, 6, rng);
   rig.root.scale.setScalar(rig.scale);
   rig.root.position.set(p.x, heightAt(p.x, p.z), p.z);
@@ -31,6 +33,7 @@ function addAnimal(kind, rig, near, range) {
     heading: rng() * TAU, speed: 0, phase: rng() * TAU, sit: 0, wag: 0.3, look: 0, side: rng() * TAU,
     bond: 0, petted: false, petAmt: 0, purr: null, shake: 0, shakeDelay: 0, goal: null, name: '',
     radius: kind === 'dog' ? 0.42 * (rig.scale || 1) : 0.28, nudgeT: 0, tilt: 0,
+    desc, tamed: false, trust: 0, cornerT: 0, cornerCool: 0,
   }));
 }
 
@@ -38,20 +41,46 @@ export function buildAnimals() {
   const homeA = lakePoint(Math.PI / 2 + 0.12, 1.2);
   const homeB = lakePoint(Math.PI / 2 - 0.18, 1.22);
   const homeC = lakePoint(Math.PI, 1.6);
-  addAnimal('dog', makeDog({ coat: '#d9a65a', accent: '#f2dcb0', ear: '#b9853f' }), homeA, 22);
-  addAnimal('dog', makeDog({ coat: '#3a3330', accent: '#e9e2d6', ear: '#2a2523', scale: 0.85, collar: '#3f8f86' }), homeB, 20);
-  addAnimal('dog', makeDog({ coat: '#f1ece2', accent: '#ffffff', ear: '#8a5a3a', scale: 0.72, collar: '#4a6fb0' }), homeC, 18);
-  addAnimal('cat', makeCat({ fur: '#e0954a', belly: '#f6dcb8' }), homeA, 12);
-  addAnimal('cat', makeCat({ fur: '#7f8288', belly: '#c9cbd0', eye: '#d9c14a' }), homeB, 12);
-  addAnimal('cat', makeCat({ fur: '#2a2726', belly: '#3a3634', eye: '#d6c23a' }), lakePoint(Math.PI / 2 - 0.5, 1.5), 9);
-  addAnimal('cat', makeCat({ fur: '#f3efe7', belly: '#ffffff', eye: '#7fb6d9' }), homeC, 12);
+  addAnimal('dog', makeDog({ coat: '#d9a65a', accent: '#f2dcb0', ear: '#b9853f' }), homeA, 22, 'golden dog');
+  addAnimal('dog', makeDog({ coat: '#3a3330', accent: '#e9e2d6', ear: '#2a2523', scale: 0.85, collar: '#3f8f86' }), homeB, 20, 'black-and-white dog');
+  addAnimal('dog', makeDog({ coat: '#f1ece2', accent: '#ffffff', ear: '#8a5a3a', scale: 0.72, collar: '#4a6fb0' }), homeC, 18, 'little white dog');
+  addAnimal('cat', makeCat({ fur: '#e0954a', belly: '#f6dcb8' }), homeA, 12, 'ginger cat');
+  addAnimal('cat', makeCat({ fur: '#7f8288', belly: '#c9cbd0', eye: '#d9c14a' }), homeB, 12, 'grey cat');
+  addAnimal('cat', makeCat({ fur: '#2a2726', belly: '#3a3634', eye: '#d6c23a' }), lakePoint(Math.PI / 2 - 0.5, 1.5), 9, 'black cat');
+  addAnimal('cat', makeCat({ fur: '#f3efe7', belly: '#ffffff', eye: '#7fb6d9' }), homeC, 12, 'white cat');
 }
 
 const setTarget = (a, x, z) => { a.target.x = x; a.target.z = z; a.hasTarget = true; };
 
+// ── untamed cats: how close you can get before they run ──
+const CAT_FLEE_SPEED = 4.0; // faster than your walk (2.7), slower than your run (5.4)
+/** Distance at which this untamed cat bolts, given how you're moving (0: it won't). */
+function fleeRadius(a, dp) {
+  const tr = a.trust;
+  if (tr >= 6) return 0;                                    // curious: keeps a step away instead
+  const toCat = Math.atan2(a.x - player.x, a.z - player.z);
+  const headOn = player.move > 0.3 && Math.abs(angDiff(player.rot, toCat)) < 0.6;
+  const running = player.move > 3.5;
+  let r = tr <= 2 ? 7 : (running || headOn ? 4 : 0);        // wary cats only mind running or a straight approach
+  const behind = Math.abs(angDiff(a.heading, Math.atan2(player.x - a.x, player.z - a.z))) > 2.2;
+  if (behind || player.move < 0.2) r *= 0.5;                // creeping up from behind, or standing still
+  return dp < 30 ? r : 0;
+}
+/** A spot to run to, away from you; null if the cat is boxed in (water, fences) and freezes. */
+function fleeSpot(a) {
+  const away = Math.atan2(a.x - player.x, a.z - player.z);
+  for (const off of [0, 0.5, -0.5, 1.0, -1.0, 1.4, -1.4]) {
+    const ang = away + off;
+    let ok = true;
+    for (let d = 1.5; d <= 10.5; d += 1.5) if (!animalWalkable(a.x + Math.sin(ang) * d, a.z + Math.cos(ang) * d)) { ok = false; break; }
+    if (ok) return { x: a.x + Math.sin(ang) * 10.5, z: a.z + Math.cos(ang) * 10.5 };
+  }
+  return null;
+}
+
 function pickTarget(a) {
   const dp = Math.hypot(player.x - a.x, player.z - a.z);
-  if (a.kind === 'cat' && a.bond > 0.2 && dp < 30 && rnd() < a.bond * 0.7) {
+  if (a.kind === 'cat' && a.tamed && a.bond > 0.2 && dp < 30 && rnd() < a.bond * 0.7) {
     for (let i = 0; i < 12; i++) {
       const ang = rnd() * TAU, x = player.x + Math.cos(ang) * 1.2, z = player.z + Math.sin(ang) * 1.2;
       if (animalWalkable(x, z)) { setTarget(a, x, z); a.state = 'walk'; return; }
@@ -84,6 +113,7 @@ export function updateAnimal(a, dt, t) {
   let want = 0, wantSit = 0;
   a.petAmt = damp(a.petAmt, a.petted ? 1 : 0, 4, dt);
   if (a.nudgeT > 0) a.nudgeT -= dt;
+  if (a.cornerCool > 0) a.cornerCool -= dt;
 
   if (a.petted) {
     a.heading = turnTo(a.heading, Math.atan2(dxp, dzp), dt * 3);
@@ -97,6 +127,29 @@ export function updateAnimal(a, dt, t) {
       wantSit = g.sit === false ? 0 : 1;
       if (g.faceX !== undefined) a.heading = turnTo(a.heading, Math.atan2(g.faceX - a.x, g.faceZ - a.z), dt * 3);
     }
+  } else if (a.kind === 'cat' && !a.tamed && (a.state === 'flee' || a.state === 'cornered' || a.state === 'wary' || (a.cornerCool <= 0 && dp < fleeRadius(a, dp)))) {
+    // an untamed cat that's been startled: run, look back from a safe distance, or freeze if boxed in
+    if (a.state === 'cornered') {
+      a.cornerT -= dt; wantSit = 1;
+      a.heading = turnTo(a.heading, Math.atan2(dxp, dzp), dt * 4);
+      if (a.cornerT <= 0) { a.state = 'idle'; a.timer = 1; a.cornerCool = 4; }
+    } else if (a.state === 'wary') {                       // looking back at you from its safe spot
+      a.timer -= dt;
+      a.heading = turnTo(a.heading, Math.atan2(dxp, dzp), dt * 3);
+      if (dp < fleeRadius(a, dp)) a.state = 'idle';       // you came closer: run again
+      else if (a.timer <= 0) { a.state = 'idle'; a.timer = 2; a.home = { x: a.x, z: a.z }; }
+    } else {
+      if (a.state !== 'flee' || !a.hasTarget) {
+        const spot = fleeSpot(a);
+        if (!spot) { a.state = 'cornered'; a.cornerT = 3; } // nowhere to go: it freezes, crouched
+        else { setTarget(a, spot.x, spot.z); a.state = 'flee'; }
+      }
+      if (a.state === 'flee') {
+        const d = Math.hypot(a.target.x - a.x, a.target.z - a.z);
+        if (dp > 12 || d < 0.6) { a.state = 'wary'; a.timer = 3; a.hasTarget = false; } // far enough: stop and look back
+        else want = CAT_FLEE_SPEED;
+      }
+    }
   } else if (a.kind === 'cat' && (wx.rain > 0.35 || wx.storm > 0.3)) {
     // cats hurry under the nearest tree and curl up until the rain passes
     if (a.state !== 'shelter') { const s = shelterSpot(a); setTarget(a, s.x, s.z); a.state = 'shelter'; }
@@ -104,9 +157,9 @@ export function updateAnimal(a, dt, t) {
     if (d > 0.45) want = d > 3 ? 2.2 : 1.1;
     else wantSit = 1;
   } else {
-    if (a.state === 'shelter' || a.state === 'goal' || a.state === 'petted') { a.state = 'idle'; a.timer = rnd(2, 6); a.sitting = false; a.home = { x: a.x, z: a.z }; }
+    if (a.state === 'shelter' || a.state === 'goal' || a.state === 'petted' || a.state === 'flee' || a.state === 'cornered' || a.state === 'wary') { a.state = 'idle'; a.timer = rnd(2, 6); a.sitting = false; a.home = { x: a.x, z: a.z }; }
     if (a.kind === 'dog') {
-      if (a.state !== 'follow' && dp < 8 + a.bond * 10 && rnd() < dt * (0.35 + a.bond * 1.5)) { a.state = 'follow'; a.timer = rnd(18, 40) * (1 + a.bond * 2); }
+      if (a.state !== 'follow' && a.tamed && dp < 8 + a.bond * 10 && rnd() < dt * (0.35 + a.bond * 1.5)) { a.state = 'follow'; a.timer = rnd(18, 40) * (1 + a.bond * 2); }
       if (a.state === 'follow') {
         a.timer -= dt;
         if (dp > 26 + a.bond * 20 || a.timer <= 0) { a.state = 'idle'; a.timer = rnd(2, 5); a.home = { x: a.x, z: a.z }; }
@@ -125,8 +178,17 @@ export function updateAnimal(a, dt, t) {
           if (d > settle) want = d > 5 ? 4.4 : Math.min(2.4, d * 1.1);
           else wantSit = player.move < 0.1 ? 1 : 0;
         }
+      } else if (a.beg && dp < 3.5) {
+        // a dog that isn't yours yet sits and watches you, hoping for food (features/pets.js sets `beg`)
+        a.state = 'idle'; a.timer = Math.max(a.timer, 1); a.sitting = true;
+        a.heading = turnTo(a.heading, Math.atan2(dxp, dzp), dt * 3);
       }
-    } else if (dp < 2.8 && a.state !== 'rest' && !(a.nudgeT > 0)) {
+    } else if (!a.tamed && a.trust >= 6 && dp < 2) {
+      // a curious cat: lets you near, but keeps a step away
+      const ang = Math.atan2(a.x - player.x, a.z - player.z);
+      setTarget(a, a.x + Math.sin(ang) * 1.2, a.z + Math.cos(ang) * 1.2);
+      a.state = 'walk';
+    } else if (a.tamed && dp < 2.8 && a.state !== 'rest' && !(a.nudgeT > 0)) {
       a.state = 'rest'; a.timer = rnd(5, 10) * (1 + a.bond * 2);
     }
     if (a.state === 'walk') {

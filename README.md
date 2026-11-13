@@ -1,7 +1,8 @@
 # Stillwater Meadow
 
 A calm, walkable low-poly lakeside world in the browser: real-time day and night, weather,
-seasons, cats and dogs to befriend, ducks, a bamboo boat with a skipper, fishing, a campfire,
+seasons, cats and dogs to tame with fish you catch, ducks, a bamboo boat with a skipper (who trades
+his fishing rod for a good bouquet), a fishing game, a campfire,
 stargazing and a photo mode. Trees, grass, flowers, bushes and rocks use the free (CC0)
 [Stylized Nature MegaKit](https://quaternius.com/packs/stylizednaturemegakit.html) by Quaternius,
 and the bench, fences and vines come from his free (CC0)
@@ -66,7 +67,7 @@ src/
                      input, camera, quality, post-processing
   ui/                HUD and prompts, World popover, settings
   features/          ducks, wildlife, voices, seasons, flowers, fishing, campfire, stargazing,
-                     photo mode, music, pet names, footsteps
+                     photo mode, music, the rod quest, taming and pet names, footsteps
 tests/               Playwright regression and feature tests
 tools/               asset preparation script
 public/assets/       nature models and textures (CC0)
@@ -77,9 +78,16 @@ Key ideas:
 - **Activity state machine** (`systems/activity.js`): sitting, petting, fishing, lying down,
   dialogs and photo mode each say which others may start on top of them. This replaced loose
   flags that let modes fight each other.
-- **Action registry** (`systems/actions.js`): every contextual key (E, F, R, B, G, Z) registers
+- **Action registry** (`systems/actions.js`): every contextual key (E, F, R, T, B, G, Z) registers
   an action with a label, an availability test and a score. The best action per key becomes the
   on-screen prompt and the thing the key does.
+- **Fishing and taming** (`features/rod.js`, `fishing.js`, `pets.js`): the rod is earned from the
+  skipper (a full bouquet of three kinds, or five pine cones in winter). Fishing is a skill: a
+  charged cast, nibbles before the real bite, and a tension fight with a fixed rhythm per species;
+  catches fill an 8-fish creel. Fish are worth 1-3 trust by size, double for each animal's
+  favourite. Dogs need 5 and take food from your hand; cats need 8, run from you until they trust
+  you, and only eat a thrown fish while you keep still at a distance. Nothing is random, and trust
+  is never lost. Only tamed animals can be named, petted, follow you or join you at the fire.
 - **Audio mixer** (`systems/audio.js`): four buses — nature, animals, music, interface — each with
   its own volume; suspended while the tab is hidden.
 - **Two random streams** (`core/math.js`): the seeded world-building stream is only used at boot

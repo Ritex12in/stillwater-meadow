@@ -74,7 +74,7 @@ export function togglePanel(id, force) {
   wake();
   return open;
 }
-export const onPanel = (id, fn) => panels.set(id, fn);
+export const onPanel = (id, fn) => { const prev = panels.get(id); panels.set(id, prev ? (open) => { prev(open); fn(open); } : fn); };
 function syncMenuButtons() {
   document.querySelectorAll('[data-panel]').forEach((b) => b.setAttribute('aria-expanded', String(!$(b.dataset.panel).hidden)));
 }

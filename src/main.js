@@ -54,6 +54,7 @@ import { initStargaze } from './features/stargaze.js';
 import { initPhoto, photoSaveCount } from './features/photo.js';
 import { initMusic } from './features/music.js';
 import { initNames } from './features/names.js';
+import { initPets, petsView } from './features/pets.js';
 import { initFoley } from './features/foley.js';
 import { ferry, boatSeat, BOARD_POINT } from './characters/boat.js';
 import { seasonNow } from './features/seasons.js';
@@ -125,7 +126,7 @@ onQualityChange((o) => {
 window.addEventListener('resize', resize);
 
 // ── Features, each isolated so one failing can't take down the rest ──
-const features = { initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initNames, initFoley };
+const features = { initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initFoley };
 for (const [name, init] of Object.entries(features)) {
   try {
     const r = init();
@@ -270,7 +271,7 @@ requestAnimationFrame(frame);
 window.__meadow = {
   get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, get shrine() { return world.shrine; }, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
-  fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, toast,
+  fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, pets: petsView, toast,
   geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, bench: () => seats.find((s) => s.name === 'bench') },
   hour: () => wrap24(timeCtl.hour),
 };

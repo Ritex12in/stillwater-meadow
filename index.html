@@ -114,7 +114,8 @@
       <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Walk · <kbd>Shift</kbd> to jog</dd>
       <dt>Mouse</dt><dd>Click the world, then look around · <kbd>Esc</kbd> frees the cursor · scroll to zoom</dd>
       <dt><kbd>E</kbd></dt><dd>Sit, board the boat, light the campfire</dd>
-      <dt><kbd>F</kbd></dt><dd>Pet a cat or dog (you can name them)</dd>
+      <dt><kbd>F</kbd></dt><dd>Pet a cat or dog once it's tame</dd>
+      <dt><kbd>T</kbd></dt><dd>Feed or throw a fish to a cat or dog to win its trust</dd>
       <dt><kbd>R</kbd></dt><dd>Fish: cast, hook a bite, reel in</dd>
       <dt><kbd>J</kbd></dt><dd>Catch journal</dd>
       <dt><kbd>B</kbd></dt><dd>Toss bread to the ducks</dd>
@@ -131,6 +132,8 @@
   <section class="panel" id="journal" data-exclusive="1" hidden aria-label="Catch journal">
     <header><h2>Catch journal</h2><span class="sum" id="journalSummary"></span><button type="button" class="close" data-close="journal" aria-label="Close">×</button></header>
     <ul class="catches" id="journalList"></ul>
+    <h3 class="sub">Pets</h3>
+    <ul class="catches pets" id="petList"></ul>
   </section>
 
   <div class="dialog" id="nameDialog" hidden>

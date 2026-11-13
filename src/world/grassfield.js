@@ -11,6 +11,7 @@ import { smooth } from '../core/math.js';
 import { heightAt, lakeT, pathAmt, nearReserved, onDock, TERRAIN, BENCH_SPOT } from '../core/shape.js';
 import { weatherize, bothSides, timeU, windU, camU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
+import { onShrineGround } from './shrine.js';
 
 /** Share of the tufts drawn (the grass-density setting). */
 export const grassU = { density: { value: 1 } };
@@ -23,7 +24,7 @@ function groundMap() {
     for (let ix = 0; ix < n; ix++) {
       const x = -half + ix * step, z = -half + iz * step, h = heightAt(x, z), i = (iz * n + ix) * 4;
       let g = smooth(1.12, 1.22, lakeT(x, z)) * (1 - smooth(0.15, 0.5, pathAmt(x, z))) * (1 - smooth(11, 16, h));
-      if (onDock(x, z) || nearReserved(x, z, 1.2) || Math.hypot(x - BENCH_SPOT.x, z - BENCH_SPOT.z) < 1.3) g = 0;
+      if (onDock(x, z) || nearReserved(x, z, 1.2) || Math.hypot(x - BENCH_SPOT.x, z - BENCH_SPOT.z) < 1.3 || onShrineGround(x, z)) g = 0;
       data[i] = h; data[i + 1] = g;
     }
   }

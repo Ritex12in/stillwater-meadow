@@ -20,6 +20,7 @@ import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows, lampSpo
 import { buildFences } from './world/kitprops.js';
 import { buildWildflowers } from './world/wildflowers.js';
 import { buildFarForest } from './world/farforest.js';
+import { chooseShrineSite, buildShrine } from './world/shrine.js';
 import { buildClouds, buildFireflies, buildButterflies, buildPollen, buildBirds, birds, birdMat, updateAmbientLife, tintClouds, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
 import { buildEffects, updateEffects } from './world/effects.js';
 import { player, buildPlayer, updatePlayer } from './characters/player.js';
@@ -72,6 +73,7 @@ buildLights();
 buildTerrain();
 buildWater();
 buildTrees();
+chooseShrineSite(treeSpots);
 buildRocks();
 buildGrass();
 buildFlowers();
@@ -83,6 +85,7 @@ buildDockAndBench();
 buildChairs();
 buildLamps();
 buildFences();
+buildShrine(lampSpots);
 waterU.lampW.value = Array.from({ length: 12 }, (_, i) => lampSpots[i] || new THREE.Vector3(0, -1e4, 0));
 buildClouds();
 buildFireflies();
@@ -266,7 +269,7 @@ requestAnimationFrame(frame);
 
 // A small handle for automated tests and the debug panel.
 window.__meadow = {
-  get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
+  get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, get shrine() { return world.shrine; }, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
   fishing: fishingState, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, toast,
   geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, bench: () => seats.find((s) => s.name === 'bench') },

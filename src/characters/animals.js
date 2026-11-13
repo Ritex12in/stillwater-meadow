@@ -39,8 +39,8 @@ export function buildAnimals() {
   const homeB = lakePoint(Math.PI / 2 - 0.18, 1.22);
   const homeC = lakePoint(Math.PI, 1.6);
   addAnimal('dog', makeDog({ coat: '#d9a65a', accent: '#f2dcb0', ear: '#b9853f' }), homeA, 22);
-  addAnimal('dog', makeDog({ coat: '#3a3330', accent: '#e9e2d6', ear: '#2a2523', scale: 0.85 }), homeB, 20);
-  addAnimal('dog', makeDog({ coat: '#f1ece2', accent: '#ffffff', ear: '#8a5a3a', scale: 0.72 }), homeC, 18);
+  addAnimal('dog', makeDog({ coat: '#3a3330', accent: '#e9e2d6', ear: '#2a2523', scale: 0.85, collar: '#3f8f86' }), homeB, 20);
+  addAnimal('dog', makeDog({ coat: '#f1ece2', accent: '#ffffff', ear: '#8a5a3a', scale: 0.72, collar: '#4a6fb0' }), homeC, 18);
   addAnimal('cat', makeCat({ fur: '#e0954a', belly: '#f6dcb8' }), homeA, 12);
   addAnimal('cat', makeCat({ fur: '#7f8288', belly: '#c9cbd0', eye: '#d9c14a' }), homeB, 12);
   addAnimal('cat', makeCat({ fur: '#2a2726', belly: '#3a3634', eye: '#d6c23a' }), lakePoint(Math.PI / 2 - 0.5, 1.5), 9);

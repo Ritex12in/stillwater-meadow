@@ -185,6 +185,8 @@ export function poseHero(dt) {
     hero.arms[0].rotation.x = lerp(hero.arms[0].rotation.x, -0.5, pa);
   }
   hero.head.rotation.x = 0.35 * pa;
+  const blink = timeU.value % 3.7 < 0.12 ? 0.12 : 1;
+  hero.eyes[0].scale.y = hero.eyes[1].scale.y = blink;
   const covered = player.seat && player.seat.covered;
   player.umbAmt = damp(player.umbAmt, (wx.rain > 0.25 || wx.snow > 0.35 || wx.storm > 0.3) && !covered ? 1 : 0, 3, dt);
   const ua = player.umbAmt;

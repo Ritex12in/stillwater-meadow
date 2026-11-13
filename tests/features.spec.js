@@ -13,17 +13,47 @@ test('fishing: cast, hook a bite, and the catch goes in the journal', async ({ p
   await teleport(page, p.x, p.z, s.x, s.z);
   await step(page, 0.4);
   expect((await actions(page)).map((a) => a.id)).toContain('fish-cast');
-  await press(page, 'KeyR', 1);
-  let hooked = false;
-  for (let i = 0; i < 400 && !hooked; i++) {
+  // hold R to charge the cast, let go to throw
+  await page.keyboard.down('KeyR'); await step(page, 0.7); await page.keyboard.up('KeyR');
+  let info = await page.evaluate(() => window.__meadow.fishingInfo());
+  for (let i = 0; i < 600 && info.state !== 'bite'; i++) { await step(page, 0.1); info = await page.evaluate(() => window.__meadow.fishingInfo()); }
+  expect(info.state).toBe('bite');
+  await page.keyboard.press('KeyR'); // strike while the float is under
+  await step(page, 0.05);
+  // the fight: reel in the rests, ease off when it pulls
+  let down = false;
+  for (let i = 0; i < 400; i++) {
+    info = await page.evaluate(() => window.__meadow.fishingInfo());
+    if (info.state !== 'fight') break;
+    const want = (!info.pulling && info.tension < 0.75) || info.tension < 0.12;
+    if (want && !down) { await page.keyboard.down('KeyR'); down = true; }
+    if (!want && down) { await page.keyboard.up('KeyR'); down = false; }
     await step(page, 0.1);
-    if ((await page.evaluate(() => window.__meadow.fishing())) === 'bite') { await page.keyboard.press('KeyR'); hooked = true; }
   }
-  expect(hooked).toBe(true);
+  if (down) await page.keyboard.up('KeyR');
   await step(page, 2);
   const journal = await page.evaluate(() => window.__meadow.store.journal);
   expect(Object.keys(journal).length).toBe(1);
   await expect(page.locator('#toast')).toContainText('You caught');
+  expect((await page.evaluate(() => window.__meadow.store.creel)).length, 'the catch went into the creel').toBe(1);
+  noErrors(errors);
+});
+
+test('fishing punishes reeling non-stop: the line snaps', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#18');
+  await step(page, 0.5);
+  await page.evaluate(() => { window.__meadow.store.rod = true; });
+  const p = await page.evaluate(() => window.__meadow.geo.dockAt(5, 0));
+  const s = await side(page);
+  await teleport(page, p.x, p.z, s.x, s.z);
+  await step(page, 0.4);
+  await page.keyboard.down('KeyR'); await step(page, 0.5); await page.keyboard.up('KeyR');
+  let info = await page.evaluate(() => window.__meadow.fishingInfo());
+  for (let i = 0; i < 600 && info.state !== 'bite'; i++) { await step(page, 0.1); info = await page.evaluate(() => window.__meadow.fishingInfo()); }
+  await page.keyboard.press('KeyR');
+  await page.keyboard.down('KeyR'); await step(page, 12); await page.keyboard.up('KeyR');
+  await expect(page.locator('#toast')).toContainText('Snap');
+  expect(await page.evaluate(() => window.__meadow.store.creel.length)).toBe(0);
   noErrors(errors);
 });
 

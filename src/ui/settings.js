@@ -40,6 +40,11 @@ export function initSettings() {
   });
   onSave((st) => { st.settings.volumes = Object.assign({}, audio.volumes); });
 
+  // relaxed fishing: wider strike windows, a gentler line (read by features/fishing.js)
+  const fm = $('fishingMode');
+  fm.value = s.relaxedFishing ? 'relaxed' : 'challenging';
+  fm.addEventListener('change', () => { s.relaxedFishing = fm.value === 'relaxed'; saveSoon(); });
+
   const sens = $('sensitivity');
   sens.value = String(camState.sensitivity);
   sens.addEventListener('input', () => { camState.sensitivity = +sens.value; s.sensitivity = camState.sensitivity; saveSoon(); });

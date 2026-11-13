@@ -48,7 +48,7 @@ import { initWildlife } from './features/wildlife.js';
 import { initSeasons } from './features/seasons.js';
 import { initFlowers, flowerView } from './features/flowers.js';
 import { initRod, rodView } from './features/rod.js';
-import { initFishing, fishingState } from './features/fishing.js';
+import { initFishing, fishingState, fishingInfo } from './features/fishing.js';
 import { initCampfire, fire } from './features/campfire.js';
 import { initStargaze } from './features/stargaze.js';
 import { initPhoto, photoSaveCount } from './features/photo.js';
@@ -270,7 +270,7 @@ requestAnimationFrame(frame);
 window.__meadow = {
   get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, get shrine() { return world.shrine; }, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
-  fishing: fishingState, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, toast,
+  fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, toast,
   geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, bench: () => seats.find((s) => s.name === 'bench') },
   hour: () => wrap24(timeCtl.hour),
 };

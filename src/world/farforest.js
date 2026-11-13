@@ -97,11 +97,11 @@ function cardMaterial(atlas, cells, distant) {
     if (distant) {
       sh.fragmentShader = 'uniform vec3 uHaze; uniform vec3 uGlow; uniform vec3 uSun;\nvarying vec3 vMW;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `
         vec3 fdir = vMW - cameraPosition;
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, meadowHaze(uHaze, uGlow, fdir, uSun), 0.36);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, meadowHaze(uHaze, uGlow, fdir, uSun), ${(+distant).toFixed(2)});
         #include <fog_fragment>`);
     }
   };
-  mat.customProgramCacheKey = () => 'farforest' + (distant ? '-d' : '');
+  mat.customProgramCacheKey = () => 'farforest' + (distant ? '-d' + distant : '');
   return mat;
 }
 
@@ -161,16 +161,16 @@ export function buildFarForest(renderer) {
   // 2. the mountains' lower slopes, below the rock and snow: denser, bigger, hazier
   RANGES.forEach((R, k) => {
     const list = [];
-    const count = k === 0 ? 5000 : 7000;
+    const count = R.forest ? 9000 : k === 0 ? 3500 : 6000;
     for (let i = 0; i < count * 3 && list.length < count; i++) {
-      const a = r() * TAU, t = 0.04 + r() * 0.36, y = rangeHeight(R, a, t);
-      if (y > R.height * (k === 0 ? 0.32 : 0.5) || y < -2) continue;
-      if (fbm(Math.cos(a) * 14 + k, Math.sin(a) * 14 + t * 6) < 0.38) continue;
-      const rr = R.radius + t * R.depth, h = (k === 0 ? 22 : 15) * (0.75 + r() * 0.5);
-      const fade = 1 - smooth(R.height * 0.2, R.height * 0.45, y); // fewer, and more pines, up the slope
+      const a = r() * TAU, t = 0.04 + r() * (R.forest ? 0.42 : 0.3), y = rangeHeight(R, a, t);
+      if (y > R.height * (R.forest ? 1.2 : 0.3) || y < -2) continue;
+      if (fbm(Math.cos(a) * 14 + k, Math.sin(a) * 14 + t * 6) < (R.forest ? 0.3 : 0.38)) continue;
+      const rr = R.radius + t * R.depth, h = (R.forest ? 11 : k === 0 ? 22 : 15) * (0.75 + r() * 0.5);
+      const fade = R.forest ? 1 : 1 - smooth(R.height * 0.12, R.height * 0.28, y); // fewer, and more pines, up the slope
       if (r() > 0.35 + 0.65 * fade) continue;
       list.push(tree(Math.cos(a) * rr, y - 1.5, Math.sin(a) * rr, h, fade < 0.5 ? [['slimpine', 0.55], ['pine', 0.35], ['birch', 0.1]] : [['slimpine', 0.3], ['pine', 0.25], ['common', 0.15], ['normal', 0.1], ['maple', 0.12], ['birch', 0.08]]));
     }
-    farForest.push(cards(list, texture, fams.length, true));
+    farForest.push(cards(list, texture, fams.length, R.haze * 0.9)); // hazed like the slope it stands on
   });
 }

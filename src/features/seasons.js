@@ -55,6 +55,7 @@ function apply(next, instant) {
     writeTrees();
     st.ice = P[season].ice; st.coverFloor = P[season].cover; st.bugs = P[season].bugs;
     world.grassMat.color.setRGB(...P[season].grass);
+    if (world.grassKitMat) world.grassKitMat.color.setRGB(...P[season].grass);
     world.terrain.material.color.setRGB(...P[season].ground);
   }
   st.flowerFrac = P[season].flowers;
@@ -119,6 +120,7 @@ export function initSeasons() {
     st.bugs = damp(st.bugs, p.bugs, 0.5, dt);
     const g = world.grassMat.color, gr = world.terrain.material.color;
     g.setRGB(damp(g.r, p.grass[0], 1, dt), damp(g.g, p.grass[1], 1, dt), damp(g.b, p.grass[2], 1, dt));
+    if (world.grassKitMat) world.grassKitMat.color.copy(g);
     gr.setRGB(damp(gr.r, p.ground[0], 1, dt), damp(gr.g, p.ground[1], 1, dt), damp(gr.b, p.ground[2], 1, dt));
     const padsOn = st.ice < 0.4;
     world.padMesh.visible = padsOn;

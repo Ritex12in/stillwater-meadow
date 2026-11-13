@@ -18,7 +18,7 @@ function blocked(x, y, z, near) {
   if (y < Math.max(heightAt(x, z), 0.05) + 0.35) return true;
   for (const t of near) {
     const r = t.type === 'pine' ? 1.3 * t.s : 1.5 * t.s;
-    const bottom = t.y + (t.type === 'pine' ? 1.2 : 1.8) * t.s, top = t.y + 5.2 * t.s;
+    const bottom = t.y + (t.type === 'pine' ? 1.2 : 1.8) * t.s, top = t.y + (t.top || 5.2 * t.s);
     if (y > bottom && y < top && (x - t.x) ** 2 + (z - t.z) ** 2 < r * r) return true;
   }
   // the boat canopy (a box around the roof)

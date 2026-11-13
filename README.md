@@ -2,7 +2,9 @@
 
 A calm, walkable low-poly lakeside world in the browser: real-time day and night, weather,
 seasons, cats and dogs to befriend, ducks, a bamboo boat with a skipper, fishing, a campfire,
-stargazing and a photo mode. No downloaded assets — everything is built from code.
+stargazing and a photo mode. Trees, grass, flowers, bushes and rocks use the free (CC0)
+[Stylized Nature MegaKit](https://quaternius.com/packs/stylizednaturemegakit.html) by Quaternius;
+everything else is built from code.
 
 ## Run it
 
@@ -22,7 +24,16 @@ Other scripts:
 
 Open with `?debug` for a frame-time graph and live tuning panel. Other URL options:
 `?weather=rain|storm|fog|snow`, `?season=spring|summer|autumn|winter`, and a fixed time with
-`#morning`, `#noon`, `#evening`, `#night` or an hour such as `#21.5`.
+`#morning`, `#noon`, `#evening`, `#night` or an hour such as `#21.5`. `?assets=0` uses the
+hand-built plants instead of the nature models (also the automatic fallback if they fail to load).
+
+## Nature models
+
+The models in `public/assets/nature/` come from the standard (free) version of Quaternius'
+Stylized Nature MegaKit, CC0 1.0 (see `LICENSE.txt` there). `tools/prepare_nature.py` rebuilds
+that folder from the unzipped pack: it copies the models the meadow uses without their texture
+references, turns the leaf textures grey so the season colours can tint them, and downscales
+the textures. It needs Python with Pillow.
 
 ## How the code is organised
 
@@ -38,6 +49,8 @@ src/
   features/          ducks, wildlife, voices, seasons, flowers, fishing, campfire, stargazing,
                      photo mode, music, pet names, footsteps
 tests/               Playwright regression and feature tests
+tools/               asset preparation script
+public/assets/       nature models and textures (CC0)
 ```
 
 Key ideas:
@@ -53,6 +66,9 @@ Key ideas:
 - **Two random streams** (`core/math.js`): the seeded world-building stream is only used at boot
   in a fixed order, so trees and flowers never move between versions; runtime randomness uses a
   separate stream.
+- **Nature models** (`core/assets.js`, `world/kitplants.js`): loaded before the world is built and
+  reduced to plain geometry, so the same placement, wind, distance fade and season tinting apply.
+  Detailed models are used near the camera; simple shapes take over further away.
 - **Performance**: grass, flowers, trees and rocks are split into culled chunks; rain, snow and
   leaves animate on the GPU; terrain height is baked into a grid matching the rendered mesh;
   quality tiers (shadow size and refresh rate, resolution, bloom) adapt to the frame rate.

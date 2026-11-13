@@ -5,13 +5,14 @@ import { reduceMotion, debug } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU, updateDetail } from './core/materials.js';
 import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT } from './core/shape.js';
-import { hooks, seasonState, seats } from './core/state.js';
+import { hooks, seasonState, seats, world } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU, starMat } from './world/sky.js';
 import { buildLights, hemi, ambient, sun } from './world/lights.js';
 import { buildTerrain } from './world/terrain.js';
 import { buildWater, waterU } from './world/water.js';
-import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads } from './world/vegetation.js';
+import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots } from './world/vegetation.js';
+import { loadKit, kit } from './core/assets.js';
 import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows } from './world/props.js';
 import { buildClouds, buildFireflies, buildButterflies, updateAmbientLife, cloudMat, ffMat, fireflies, butterflies } from './world/ambient.js';
 import { buildEffects, updateEffects } from './world/effects.js';
@@ -56,6 +57,7 @@ try {
 }
 
 // ── Build the world. The order matters: it fixes where every tree and flower grows. ──
+await loadKit(); // nature models; the meadow falls back to hand-built shapes without them
 buildSky();
 buildLights();
 buildTerrain();
@@ -65,6 +67,7 @@ buildRocks();
 buildGrass();
 buildFlowers();
 buildReedsAndPads();
+if (kit) buildUndergrowth(treeSpots);
 buildDockAndBench();
 buildChairs();
 buildLamps();
@@ -217,7 +220,7 @@ requestAnimationFrame(frame);
 
 // A small handle for automated tests and the debug panel.
 window.__meadow = {
-  tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, solar, rng, get renderer() { return renderer; },
+  get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
   fishing: fishingState, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, toast,
   geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, bench: () => seats.find((s) => s.name === 'bench') },

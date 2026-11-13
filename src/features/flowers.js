@@ -5,7 +5,7 @@ import { scene } from '../core/render.js';
 import { lerp } from '../core/math.js';
 import { heightAt } from '../core/shape.js';
 import { std, bothSides } from '../core/materials.js';
-import { flowerHeadGeos, flowerCentreGeo, FLOWER_KINDS, FLOWER_CENTRE, STEM_H } from '../world/detail.js';
+import { flowerHeadGeos, flowerCentreGeo, FLOWER_KINDS, FLOWER_CENTRE, BOUQUET_SHAPE, STEM_H } from '../world/detail.js';
 import { clock } from '../core/clock.js';
 import { hooks, seats, seasonState, world } from '../core/state.js';
 import { player, hero } from '../characters/player.js';
@@ -34,7 +34,7 @@ function buildBouquet(colors) {
     s.rotation.set(Math.sin(a) * 0.25, 0, -Math.cos(a) * 0.25);
     // saved as "#colour:kind"; older saves hold only the colour
     const [colour, kind] = String(hex).split(':');
-    const k = FLOWER_KINDS[kind] ? Number(kind) : 4;
+    const k = BOUQUET_SHAPE[Number(kind)] ?? 4;
     const h = new THREE.Mesh(headGeos[k], bothSides(new THREE.MeshLambertMaterial({ color: colour, vertexColors: true })));
     h.scale.setScalar(0.5);
     h.position.set(Math.cos(a) * (r + 0.05), 0.3 + (i % 3) * 0.02 - STEM_H * 0.5, Math.sin(a) * (r + 0.05));

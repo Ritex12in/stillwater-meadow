@@ -13,10 +13,11 @@ export const std = (color, extra) => new THREE.MeshStandardMaterial(Object.assig
 /**
  * Wind sway in the vertex shader; taller vertices move more. With `fade` ([near, far] metres),
  * each instance shrinks into the ground between those distances from the camera, so small
- * plants can stop being drawn far away without popping. (Lambert materials don't get three's
+ * plants can stop being drawn far away without popping; `fadeIn` does the reverse, growing
+ * them in with distance (a cheap far version taking over from a detailed near one). (Lambert materials don't get three's
  * own cameraPosition in r128, hence camU.)
  */
-export function addWind(mat, k, fade = null) {
+export function addWind(mat, k, fade = null, fadeIn = null) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = timeU;
     sh.uniforms.uWind = windU;
@@ -31,9 +32,10 @@ export function addWind(mat, k, fade = null) {
       float hh = max(position.y, 0.0);
       transformed.x += wv * hh * hh * ${k.toFixed(3)} * uWind;
       transformed.z += wv * hh * hh * ${(k * 0.5).toFixed(3)} * uWind;
-      ${fade ? `transformed *= 1.0 - smoothstep(${fade[0].toFixed(1)}, ${fade[1].toFixed(1)}, distance(ip, uCam.xz));` : ''}`);
+      ${fade ? `transformed *= 1.0 - smoothstep(${fade[0].toFixed(1)}, ${fade[1].toFixed(1)}, distance(ip, uCam.xz));` : ''}
+      ${fadeIn ? `transformed *= smoothstep(${fadeIn[0].toFixed(1)}, ${fadeIn[1].toFixed(1)}, distance(ip, uCam.xz));` : ''}`);
   };
-  mat.customProgramCacheKey = () => 'wind' + k + (fade ? '-fade' + fade.join('-') : '');
+  mat.customProgramCacheKey = () => 'wind' + k + (fade ? '-fade' + fade.join('-') : '') + (fadeIn ? '-in' + fadeIn.join('-') : '');
   return mat;
 }
 
@@ -170,6 +172,7 @@ export function instancedChunks(geo, mat, items, opts = {}) {
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.castShadow = !!opts.cast;
     mesh.receiveShadow = opts.receive !== false;
+    if (opts.depthMat) mesh.customDepthMaterial = opts.depthMat;
     scene.add(mesh);
     meshes.push(mesh);
   }
@@ -226,8 +229,9 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
   items.forEach((it, i) => composeItem(it).toArray(mats, i * 16));
   const colors = items.map((it) => (it.color ? it.color.clone() : null));
   const counts = nearGeos.map((_, v) => kind.filter((k) => k === v).length);
-  const mk = (geo, cap, cast) => {
-    const m = new THREE.InstancedMesh(geo, mat, Math.max(cap, 1));
+  const mk = (geo, cap, cast, material = mat) => {
+    const m = new THREE.InstancedMesh(geo, material, Math.max(cap, 1));
+    if (cast && opts.depthMat) m.customDepthMaterial = opts.depthMat;
     if (colors[0]) m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(cap, 1) * 3), 3);
     m.count = 0; m.visible = false;
     m.frustumCulled = false; // placement is handled here
@@ -236,7 +240,7 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
     return m;
   };
   const nearM = nearGeos.map((g, v) => mk(g, counts[v], !!opts.cast));
-  const farM = farGeos.map((g, v) => mk(g, counts[v], false));
+  const farM = farGeos.map((g, v) => mk(g, counts[v], false, opts.farMat || mat));
   const state = new Uint8Array(n).fill(255), fill = new Int32Array(nearGeos.length * 2);
   let dirty = true, on = true;
   const set = {
@@ -294,4 +298,9 @@ export function updateDetail(camera, focus) {
   camera.updateMatrixWorld();
   FR.setFromProjectionMatrix(FM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
   for (const l of lodSets) l.update(camera.position);
+}
+
+/** Shadow material for leaf and grass cards: three r128 ignores alphaTest when drawing shadows. */
+export function cutoutDepth(map, alphaTest = 0.5) {
+  return new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest });
 }

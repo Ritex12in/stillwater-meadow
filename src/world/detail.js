@@ -57,6 +57,8 @@ export const STEM_H = 0.38;
 export const FLOWER_KINDS = ['daisy', 'tulip', 'poppy', 'lavender', 'allium'];
 /** Colour of the centre disc for the kinds that have one. */
 export const FLOWER_CENTRE = { daisy: '#f2c230', poppy: '#2b2320' };
+/** Which hand-built head stands in for each kind in a bouquet (kinds 5 and 6 come from the kit). */
+export const BOUQUET_SHAPE = [0, 1, 2, 3, 4, 2, 1];
 
 function daisy() {
   const b = new Builder(), n = 10;

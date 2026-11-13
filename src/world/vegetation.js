@@ -6,6 +6,9 @@ import { height, lakeT, lakePoint, pathAmt, SPAWN, onDock, dockStart, DOCK_A, ne
 import { std, col, weatherize, addWind, bothSides, instanced, instancedChunks, instancedVariants, lodSet } from '../core/materials.js';
 import { pineFarGeos, crownFarGeos, pineTrunkFarGeos, crownTrunkFarGeos, pineGeos, crownGeos, grassTuftGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
 import { world, obstacles } from '../core/state.js';
+import { kit } from '../core/assets.js';
+import { kitTrees, kitRocks, kitGrass, kitFlowerParts, KIT_FLOWER_COLOURS, KIT_GRASS_FADE } from './kitplants.js';
+export { buildUndergrowth } from './kitplants.js';
 
 export const treeSpots = [];
 
@@ -53,11 +56,14 @@ export function buildTrees() {
   const pineKind = (t) => variantAt(t.x, t.z, pg.length, 3), crownKind = (t) => variantAt(t.x, t.z, cg.length, 8);
   // detailed (and shadow-casting) near the camera, a simple shape further out
   const lod = { cast: true, near: TREE_NEAR, lift: 2.8, radius: 3.6 };
-  lodSet(pg.map((g) => g.trunk), pineTrunkFarGeos(), bark, pines, pineKind, lod);
-  lodSet(pg.map((g) => g.top), pineFarGeos(), leaf, pineItems, pineKind, lod);
-  lodSet(cg.map((g) => g.trunk), crownTrunkFarGeos(), bark, rounds, crownKind, lod);
-  world.roundTop = lodSet(cg.map((g) => g.top), crownFarGeos(), leaf, world.roundItems, crownKind, lod);
-  treeSpots.forEach((t) => obstacles.push({ x: t.x, z: t.z, r: 0.32 * t.s }));
+  if (kit) world.roundTop = kitTrees(pines, pineItems, rounds, world.roundItems, lod, leaf, bark);
+  else {
+    lodSet(pg.map((g) => g.trunk), pineTrunkFarGeos(), bark, pines, pineKind, lod);
+    lodSet(pg.map((g) => g.top), pineFarGeos(), leaf, pineItems, pineKind, lod);
+    lodSet(cg.map((g) => g.trunk), crownTrunkFarGeos(), bark, rounds, crownKind, lod);
+    world.roundTop = lodSet(cg.map((g) => g.top), crownFarGeos(), leaf, world.roundItems, crownKind, lod);
+  }
+  treeSpots.forEach((t) => { t.top = (kit ? 6.2 : 5.2) * t.s; obstacles.push({ x: t.x, z: t.z, r: 0.32 * t.s }); });
 }
 
 export function buildRocks() {
@@ -75,7 +81,9 @@ export function buildRocks() {
     rocks.push({ x, z, y: height(x, z) - s * 0.25, s, sx: s * rand(0.9, 1.5), sy: s * rand(0.55, 0.9), sz: s * rand(0.9, 1.3), ry: rng() * TAU, rx: rand(-0.2, 0.2), color: pick(rockCols) });
     if (s > 0.6) obstacles.push({ x, z, r: s * 0.95 });
   }
-  instancedChunks(new THREE.IcosahedronGeometry(1, 0), weatherize(std('#ffffff'), 'std'), rocks, { cast: true, cell: 60, shadowRange: SHADOW_RANGE });
+  const opts = { cast: true, cell: 60, shadowRange: SHADOW_RANGE };
+  if (kit) kitRocks(rocks, opts);
+  else instancedChunks(new THREE.IcosahedronGeometry(1, 0), weatherize(std('#ffffff'), 'std'), rocks, opts);
 }
 
 export function buildGrass() {
@@ -94,10 +102,12 @@ export function buildGrass() {
     const s = rand(0.7, 1.35);
     blades.push({ x, z, y: h - 0.03, s, sy: s * rand(0.7, 1.15), ry: rng() * TAU, color: pick(grassCols) });
   }
-  world.grassMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.55, GRASS_FADE), 'lam'));
+  // with the kit, detailed grass grows close to you and these light tufts only further out
+  world.grassMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.55, GRASS_FADE, kit ? [KIT_GRASS_FADE[0] - 2, KIT_GRASS_FADE[1] - 2] : null), 'lam'));
   // seed stalks gather in drifts; low clumps fill in between the upright ones
   const tuftKind = (it) => { const h = variantAt(it.x, it.z, 100, 21); return vnoise(it.x * 0.09 + 3, it.z * 0.09 - 7) > 0.62 && h < 45 ? 2 : h < 58 ? 0 : h < 90 ? 1 : 2; };
   world.grass = instancedVariants(tufts, world.grassMat, blades, tuftKind, { cast: false, cell: 24, far: GRASS_FADE[1] });
+  if (kit) kitGrass(blades);
 }
 
 export function buildFlowers() {
@@ -112,9 +122,12 @@ export function buildFlowers() {
     flowers.push({ x, z, y: height(x, z) - 0.02, s: rand(0.8, 1.4), ry: rng() * TAU, color: rng() < 0.8 ? petals[patch] : pick(petals) });
   }
   // kinds grow in drifts, with a few strays; stems vary in height
+  // (with the kit there are two more kinds, 5 and 6, whose colour comes with the model)
+  const kinds = kit ? FLOWER_KINDS.length + 2 : FLOWER_KINDS.length;
   flowers.forEach((f) => {
-    const drift = Math.floor(vnoise(f.x * 0.12 + 7, f.z * 0.12 + 3) * FLOWER_KINDS.length * 1.6) % FLOWER_KINDS.length;
-    f.kind = variantAt(f.x, f.z, 10, 5) < 7 ? drift : variantAt(f.x, f.z, FLOWER_KINDS.length, 6);
+    const drift = Math.floor(vnoise(f.x * 0.12 + 7, f.z * 0.12 + 3) * kinds * 1.6) % kinds;
+    f.kind = variantAt(f.x, f.z, 10, 5) < 7 ? drift : variantAt(f.x, f.z, kinds, 6);
+    if (KIT_FLOWER_COLOURS[f.kind]) f.color = KIT_FLOWER_COLOURS[f.kind];
     f.sy = f.s * (0.75 + 0.6 * variantAt(f.x, f.z, 100, 7) / 100);
   });
   const stemMat = bothSides(addWind(new THREE.MeshLambertMaterial({ color: '#4f7a36', vertexColors: true }), 0.6, FLOWER_FADE));
@@ -123,10 +136,11 @@ export function buildFlowers() {
   const centres = flowers.map((f) => Object.assign({}, f, { color: FLOWER_CENTRE[FLOWER_KINDS[f.kind]] ? col(FLOWER_CENTRE[FLOWER_KINDS[f.kind]]) : null }));
   world.flowerItems = flowers;
   const parts = [
-    instancedChunks(flowerStemGeo(), stemMat, flowers.map((f) => Object.assign({}, f, { color: null })), { cell: 50, far: FLOWER_FADE[1] }),
-    instancedVariants(flowerHeadGeos(), headMat, flowers, (f) => f.kind, { cell: 50, far: FLOWER_FADE[1] }),
+    instancedVariants([flowerStemGeo()], stemMat, flowers.map((f) => Object.assign({}, f, { color: null })), (f) => (f.kind < FLOWER_KINDS.length ? 0 : -1), { cell: 50, far: FLOWER_FADE[1] }),
+    instancedVariants(flowerHeadGeos(), headMat, flowers, (f) => (f.kind < FLOWER_KINDS.length ? f.kind : -1), { cell: 50, far: FLOWER_FADE[1] }),
     instancedVariants([flowerCentreGeo()], centreMat, centres, (f) => (f.color ? 0 : -1), { cell: 50, far: FLOWER_FADE[1] }),
   ];
+  if (kit) parts.push(...kitFlowerParts(flowers));
   /** Every part of flower `i` shows or hides together. */
   world.flowerSet = { setVisibleAt(i, on) { parts.forEach((p) => p.setVisibleAt(i, on)); }, commit() { parts.forEach((p) => p.commit()); } };
 }

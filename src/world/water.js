@@ -118,6 +118,7 @@ export function buildWater() {
         vec3 c = mix(base, skyc, clamp(fres * 0.85 + 0.12, 0.0, 1.0));
         float sp = pow(max(dot(r, normalize(sunDir)), 0.0), 220.0);
         c += sunColor * sp * 1.8;
+        vec3 lampGlint = vec3(0.0);
         // the lamps' reflections: long wavering streaks of warm light across the water
         if (lampAmt > 0.01) {
           vec3 rs = normalize(vec3(r.x, r.y * 0.35, r.z)); // squashed: the streaks run toward you
@@ -125,9 +126,10 @@ export function buildWater() {
             vec3 L = lampW[i] - vWP;
             vec3 Ls = normalize(vec3(L.x, L.y * 0.35, L.z));
             float k = pow(max(dot(rs, Ls), 0.0), 3000.0);
-            c += vec3(1.0, 0.66, 0.32) * k * 1.3 * lampAmt * (1.0 - uIce);
+            lampGlint += vec3(1.0, 0.66, 0.32) * k * 1.3 * lampAmt;
           }
         }
+        c += lampGlint * (1.0 - uIce);
         // gentle foam where the water laps the shore
         float band = smoothstep(0.86, 0.95, t) * (1.0 - smoothstep(0.985, 1.03, t));
         float lap = 0.55 + 0.45 * sin(t * 140.0 - uTime * 1.3 + sin(p.x * 0.7 + p.y * 0.5) * 2.0);
@@ -136,6 +138,8 @@ export function buildWater() {
         vec3 ice = mix(vec3(0.7, 0.8, 0.88), vec3(0.84, 0.9, 0.96), 0.45 + 0.18 * sin(p.x * 0.21 + sin(p.y * 0.13) * 2.0) + 0.12 * sin(p.y * 0.37 + p.x * 0.11)) * uIceLight;
         ice = mix(ice, vec3(0.94, 0.96, 1.0) * uIceLight, uSnowIce * (0.2 + 0.6 * smoothstep(0.3, 0.7, hash21(floor(p * 0.9)))));
         ice += sunColor * pow(max(dot(r, normalize(sunDir)), 0.0), 60.0) * 0.5;
+        // ice is a dull mirror: it takes on the sky and far shore, and the lamps glow on it
+        ice = mix(ice * vec3(0.82, 0.93, 1.18), skyc * vec3(0.9, 1.0, 1.2), 0.12 + 0.3 * fres) + lampGlint * 0.7;
         c = mix(c, ice, uIce);
         float dist = length(cameraPosition - vWP);
         c = mix(c, meadowHaze(fogColor, fogGlow, vWP - cameraPosition, fogSun), smoothstep(fogNear, fogFar, dist));

@@ -3,9 +3,9 @@
 import { setShadowSize } from '../world/lights.js';
 
 export const LEVELS = {
-  high: { label: 'High', dprCap: 2, shadow: 2048, shadowEvery: 1, bloom: true },
-  medium: { label: 'Medium', dprCap: 1.5, shadow: 1536, shadowEvery: 2, bloom: false },
-  low: { label: 'Low', dprCap: 1, shadow: 1024, shadowEvery: 3, bloom: false },
+  high: { label: 'High', dprCap: 2, shadow: 2048, shadowEvery: 2, bloom: true },
+  medium: { label: 'Medium', dprCap: 1.5, shadow: 1536, shadowEvery: 3, bloom: false },
+  low: { label: 'Low', dprCap: 1, shadow: 1024, shadowEvery: 4, bloom: false },
 };
 const ORDER = ['low', 'medium', 'high'];
 

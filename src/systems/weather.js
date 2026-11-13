@@ -16,7 +16,7 @@ export const WX_TYPES = {
   rain: { cloud: 0.78, rain: 0.6, storm: 0, fog: 0.12, snow: 0, wind: 0.5 },
   storm: { cloud: 1, rain: 1, storm: 1, fog: 0.2, snow: 0, wind: 1 },
   fog: { cloud: 0.35, rain: 0, storm: 0, fog: 1, snow: 0, wind: 0.08 },
-  snow: { cloud: 0.7, rain: 0, storm: 0, fog: 0.25, snow: 1, wind: 0.25 },
+  snow: { cloud: 0.34, rain: 0, storm: 0, fog: 0.08, snow: 1, wind: 0.25 }, // gentle snowfall under a breaking sky: moon and stars still show
 };
 const WX_KEYS = ['cloud', 'rain', 'storm', 'fog', 'snow', 'wind'];
 export const WX_LABEL = { clear: '', rain: 'Rain', storm: 'Thunderstorm', fog: 'Fog', snow: 'Snow' };
@@ -95,7 +95,7 @@ export function weatherModify(cur) {
   toGrey(cur.shallow, oc * 0.5, dark);
   cur.glow.multiplyScalar(1 - oc * 0.85);
   const lightLevel = 0.25 + 0.75 * Math.max(cur.day, 0.05);
-  if (wx.snow > 0.001) cur.horizon.lerp(greyTmp.setRGB(0.86, 0.88, 0.92).multiplyScalar(lightLevel), wx.snow * 0.5);
+  if (wx.snow > 0.001) cur.horizon.lerp(greyTmp.setRGB(0.74, 0.82, 1.0).multiplyScalar(lightLevel), wx.snow * 0.3);
   if (wx.fog > 0.001) cur.horizon.lerp(greyTmp.setRGB(0.8, 0.82, 0.84).multiplyScalar(lightLevel), wx.fog * 0.6);
   cur.lightI *= 1 - oc * 0.62 - st * 0.15;
   cur.hemiI *= 1 + oc * 0.25;

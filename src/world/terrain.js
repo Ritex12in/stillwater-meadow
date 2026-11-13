@@ -83,7 +83,7 @@ function groundDetail(mat, textured) {
         vec2 q = vGround.xz;
         float d = length(vGround - uCam);
         float broad = gNoise(q * 0.045) * 0.6 + gNoise(q * 0.11) * 0.4;
-        float mid = gNoise(q * 0.55) * 0.6 + gNoise(q * 1.3) * 0.4;
+        float mid = gNoise(q * 0.8);
         ${textured ? `
         // grass: two scales and angles of the lush texture (so no tile repeats), patches of the
         // flowery one, and the fine one far off where the others would shimmer
@@ -92,17 +92,22 @@ function groundDetail(mat, textured) {
         vec3 grass = mix(lush, flw, smoothstep(0.5, 0.68, gNoise(q * 0.07 + 3.0)) * 0.85);
         // drifts of colour: violet-and-pink and orange meadow flowers in broad patches
         // (as many as the season allows: full in spring and summer, few in autumn, none in winter)
-        float bloomP = smoothstep(0.66, 0.8, gNoise(q * 0.045 + 17.0)) * uBloom;
-        vec3 bloom = mix(texture2D(tViolet, gRot(q, 1.3) / 4.6).rgb, texture2D(tOrange, gRot(q, 0.4) / 4.6).rgb, step(0.55, gNoise(q * 0.012 - 5.0)));
-        grass = mix(grass, bloom * 1.12, bloomP * 0.9);
+        // (each seasonal layer is skipped entirely when its season isn't showing)
+        if (uBloom > 0.01) {
+          float bloomP = smoothstep(0.66, 0.8, gNoise(q * 0.045 + 17.0)) * uBloom;
+          vec3 bloom = mix(texture2D(tViolet, gRot(q, 1.3) / 4.6).rgb, texture2D(tOrange, gRot(q, 0.4) / 4.6).rgb, step(0.55, gNoise(q * 0.012 - 5.0)));
+          grass = mix(grass, bloom * 1.12, bloomP * 0.9);
+        }
         grass *= vec3(1.03, 1.0, 0.84); // the painted grasses lean cool; warm them toward the meadow
         grass = mix(grass, texture2D(tFine, q / 7.0).rgb * vec3(1.05, 1.0, 0.95), smoothstep(28.0, 70.0, d));
         // autumn: drifts of fallen leaves over the grass, thickest in hollows of a broad noise
-        vec4 lf = texture2D(tLeaves, gRot(q, 0.6) / 3.4);
-        float litter = lf.a * smoothstep(0.25, 0.65, gNoise(q * 0.09 + 41.0) * 0.7 + gNoise(q * 0.4) * 0.3) * uAutumn;
-        grass = mix(grass, lf.rgb * 0.95, litter);
+        if (uAutumn > 0.01) {
+          vec4 lf = texture2D(tLeaves, gRot(q, 0.6) / 3.4);
+          float litter = lf.a * smoothstep(0.25, 0.65, gNoise(q * 0.09 + 41.0) * 0.7 + gNoise(q * 0.4) * 0.3) * uAutumn;
+          grass = mix(grass, lf.rgb * 0.95, litter);
+        }
         // winter: snow with soft drifts, wind ripples, blue in the hollows and glints of sparkle
-        {
+        if (uSnow > 0.01) {
           float drift = gNoise(q * 0.08 + 7.0) * 0.6 + gNoise(q * 0.3) * 0.4;
           float ripple = sin(q.x * 1.7 + q.y * 0.6 + gNoise(q * 0.5) * 4.0) * 0.5 + 0.5;
           gSnow = mix(vec3(0.74, 0.82, 0.95), vec3(0.97, 0.98, 1.0), smoothstep(0.2, 0.75, drift)) * (0.95 + 0.05 * ripple);

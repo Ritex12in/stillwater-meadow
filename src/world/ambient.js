@@ -1,7 +1,7 @@
-// Drifting clouds, fireflies at dusk and butterflies by day.
+// Drifting clouds, fireflies at dusk, butterflies and pollen in the sunlight by day.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
-import { TAU, rng, rand, wrap } from '../core/math.js';
+import { TAU, rng, rand, wrap, mulberry32 } from '../core/math.js';
 import { heightAt } from '../core/shape.js';
 import { std, glowTex } from '../core/materials.js';
 
@@ -14,6 +14,22 @@ const ffGeo = new THREE.BufferGeometry();
 export const ffMat = new THREE.PointsMaterial({ size: 0.32, map: glowTex, color: '#fff0a0', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
 export const fireflies = new THREE.Points(ffGeo, ffMat);
 export const butterflies = [];
+
+// pollen and seed fluff, catching the light; its own random stream, so it can't move anything else
+const PN = 260;
+const pnSeed = [];
+const pnGeo = new THREE.BufferGeometry();
+export const pollenMat = new THREE.PointsMaterial({ size: 0.11, map: glowTex, color: '#fff1c2', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+export const pollen = new THREE.Points(pnGeo, pollenMat);
+let pnDrift = 0;
+
+export function buildPollen() {
+  const r = mulberry32(7741);
+  for (let i = 0; i < PN; i++) pnSeed.push({ x: (r() - 0.5) * 48, z: (r() - 0.5) * 48, y: 0.3 + r() * r() * 4.5, p: r() * TAU, s: 0.5 + r() });
+  pnGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(PN * 3), 3));
+  pollen.frustumCulled = false;
+  scene.add(pollen);
+}
 
 export function buildClouds() {
   for (let i = 0; i < 16; i++) {
@@ -57,6 +73,18 @@ export function buildButterflies() {
 
 /** Fireflies and butterflies wrap around `center` so there are always some nearby. */
 export function updateAmbientLife(dt, t, center, dayLevel, wind) {
+  if (pollen.visible) {
+    pnDrift += dt * (0.25 + wind * 1.6);
+    const arr = pnGeo.attributes.position.array;
+    for (let i = 0; i < PN; i++) {
+      const f = pnSeed[i];
+      const x = wrap(f.x + pnDrift * 0.894 * f.s - center.x, -24, 24) + center.x + Math.sin(t * 0.21 * f.s + f.p) * 0.8;
+      const z = wrap(f.z + pnDrift * 0.447 * f.s - center.z, -24, 24) + center.z + Math.cos(t * 0.17 * f.s + f.p) * 0.8;
+      const y = Math.max(heightAt(x, z), 0) + f.y + Math.sin(t * 0.5 * f.s + f.p * 2.0) * 0.4;
+      arr[i * 3] = x; arr[i * 3 + 1] = y; arr[i * 3 + 2] = z;
+    }
+    pnGeo.attributes.position.needsUpdate = true;
+  }
   if (fireflies.visible) {
     const arr = ffGeo.attributes.position.array;
     for (let i = 0; i < FF; i++) {

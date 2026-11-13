@@ -70,6 +70,12 @@ Key ideas:
   reduced to plain geometry, so the same placement, wind, distance fade and season tinting apply.
   Beyond 55 m a tree draws a thinned copy of its own model (fewer, larger leaf cards; trunk and
   main boughs only), so it keeps its look at a third of the cost.
+- **Atmosphere** (`core/atmosphere.js`): patches three's fog so the haze glows toward the sun,
+  matching the sky's horizon, and adds a gentle colour grade (soft highlights, warm shade) to
+  every surface; the sky and lake shaders call the same functions so the horizon stays seamless.
+  Imported first in `main.js`, before anything is drawn.
+- **Wind** (`addWind` in `core/materials.js`): plants sway, and gusts roll across the meadow as
+  bands that press the grass over and lighten it; tree crowns rustle with the same field.
 - **Performance**: grass, flowers, trees and rocks are split into culled chunks; rain, snow and
   leaves animate on the GPU; terrain height is baked into a grid matching the rendered mesh;
   quality tiers (shadow size and refresh rate, resolution, bloom) adapt to the frame rate.

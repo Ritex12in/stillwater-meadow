@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { LAKE } from '../core/shape.js';
 import { skyU } from './sky.js';
+import { GRADE_GLSL, HAZE_GLSL } from '../core/atmosphere.js';
 
 export const waterU = {
   uTime: { value: 0 },
@@ -13,6 +14,8 @@ export const waterU = {
   sunDir: { value: new THREE.Vector3(0, 1, 0) },   // sun by day, moon by night
   sunColor: { value: new THREE.Color() },
   fogColor: { value: new THREE.Color() },
+  fogGlow: { value: new THREE.Color() },
+  fogSun: { value: new THREE.Vector3(0, 1, 0) },
   fogNear: { value: 50 },
   fogFar: { value: 220 },
   lakeC: { value: new THREE.Vector2(LAKE.x, LAKE.z) },
@@ -35,10 +38,10 @@ export function buildWater() {
         vWP = wp.xyz;
         gl_Position = projectionMatrix * viewMatrix * wp;
       }`,
-    fragmentShader: `
+    fragmentShader: GRADE_GLSL + HAZE_GLSL + `
       uniform float uTime; uniform float uRain; uniform float uIce; uniform float uIceLight; uniform float uSnowIce; uniform float uLight;
       uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyTop; uniform vec3 skyHorizon;
-      uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor;
+      uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun;
       uniform float fogNear; uniform float fogFar; uniform vec2 lakeC;
       varying vec3 vWP;
       vec2 wave(vec2 p, vec2 d, float f, float s, float a) {
@@ -95,8 +98,8 @@ export function buildWater() {
         ice += sunColor * pow(max(dot(r, normalize(sunDir)), 0.0), 60.0) * 0.5;
         c = mix(c, ice, uIce);
         float dist = length(cameraPosition - vWP);
-        c = mix(c, fogColor, smoothstep(fogNear, fogFar, dist));
-        gl_FragColor = vec4(c, 1.0);
+        c = mix(c, meadowHaze(fogColor, fogGlow, vWP - cameraPosition, fogSun), smoothstep(fogNear, fogFar, dist));
+        gl_FragColor = vec4(meadowGrade(c), 1.0);
       }`,
   }));
   water.position.set(LAKE.x, 0.02, LAKE.z);

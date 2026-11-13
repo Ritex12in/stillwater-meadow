@@ -17,25 +17,32 @@ export const std = (color, extra) => new THREE.MeshStandardMaterial(Object.assig
  * them in with distance (a cheap far version taking over from a detailed near one). (Lambert materials don't get three's
  * own cameraPosition in r128, hence camU.)
  */
-export function addWind(mat, k, fade = null, fadeIn = null) {
+export function addWind(mat, k, fade = null, fadeIn = null, sheen = 0.2) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = timeU;
     sh.uniforms.uWind = windU;
     sh.uniforms.uCam = camU;
-    sh.vertexShader = 'uniform float uTime;\nuniform float uWind;\nuniform vec3 uCam;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    sh.vertexShader = 'uniform float uTime;\nuniform float uWind;\nuniform vec3 uCam;\nvarying float vGust;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       #ifdef USE_INSTANCING
         vec2 ip = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xz;
       #else
         vec2 ip = vec2(0.0);
       #endif
       float wv = sin(uTime * 1.7 + ip.x * 0.31 + ip.y * 0.23) * 0.6 + sin(uTime * 3.1 + ip.x * 0.8 - ip.y * 0.5) * 0.25;
+      // gusts: broad soft bands that roll across the meadow with the wind, pressing plants over
+      float gb = dot(ip, vec2(0.894, 0.447)) * 0.075 - uTime * 0.9 + sin(ip.x * 0.043 - ip.y * 0.061 + uTime * 0.13) * 2.2;
+      float gust = pow(0.5 + 0.5 * sin(gb), 4.0) * (0.55 + 0.45 * sin(ip.y * 0.021 + ip.x * 0.013 + uTime * 0.07));
+      vGust = gust * min(uWind, 1.6);
       float hh = max(position.y, 0.0);
-      transformed.x += wv * hh * hh * ${k.toFixed(3)} * uWind;
-      transformed.z += wv * hh * hh * ${(k * 0.5).toFixed(3)} * uWind;
+      transformed.x += (wv + gust * 1.8) * hh * hh * ${k.toFixed(4)} * uWind;
+      transformed.z += (wv + gust * 1.8) * hh * hh * ${(k * 0.5).toFixed(4)} * uWind;
       ${fade ? `transformed *= 1.0 - smoothstep(${fade[0].toFixed(1)}, ${fade[1].toFixed(1)}, distance(ip, uCam.xz));` : ''}
       ${fadeIn ? `transformed *= smoothstep(${fadeIn[0].toFixed(1)}, ${fadeIn[1].toFixed(1)}, distance(ip, uCam.xz));` : ''}`);
+    // bent-over blades show their paler side: the gust reads as a light wave moving through
+    sh.fragmentShader = 'varying float vGust;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      diffuseColor.rgb *= 1.0 + vGust * ${sheen.toFixed(3)};`);
   };
-  mat.customProgramCacheKey = () => 'wind' + k + (fade ? '-fade' + fade.join('-') : '') + (fadeIn ? '-in' + fadeIn.join('-') : '');
+  mat.customProgramCacheKey = () => 'wind' + k + '-' + sheen + (fade ? '-fade' + fade.join('-') : '') + (fadeIn ? '-in' + fadeIn.join('-') : '');
   return mat;
 }
 

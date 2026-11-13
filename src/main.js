@@ -1,5 +1,6 @@
 // Stillwater Meadow: boot, build the world in a fixed order, and run the frame loop.
 import './style.css';
+import { updateAtmosphere } from './core/atmosphere.js'; // patches the fog shader; keep first
 import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
@@ -14,7 +15,7 @@ import { buildWater, waterU } from './world/water.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
 import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows } from './world/props.js';
-import { buildClouds, buildFireflies, buildButterflies, updateAmbientLife, cloudMat, ffMat, fireflies, butterflies } from './world/ambient.js';
+import { buildClouds, buildFireflies, buildButterflies, buildPollen, updateAmbientLife, cloudMat, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
 import { buildEffects, updateEffects } from './world/effects.js';
 import { player, buildPlayer, updatePlayer } from './characters/player.js';
 import { animals, buildAnimals, updateAnimal, separateAnimals, shakeDogs } from './characters/animals.js';
@@ -74,6 +75,7 @@ buildLamps();
 buildClouds();
 buildFireflies();
 buildButterflies();
+buildPollen();
 buildPlayer();
 buildAnimals();
 buildBoat();
@@ -141,6 +143,7 @@ function applySky() {
   scene.fog.color.copy(cur.horizon);
   scene.fog.near = cur.fogNear; scene.fog.far = cur.fogFar;
   waterU.fogColor.value.copy(cur.horizon);
+  waterU.fogGlow.value.copy(cur.glow); waterU.fogSun.value.copy(sunDir);
   waterU.fogNear.value = cur.fogNear; waterU.fogFar.value = cur.fogFar;
   waterU.deep.value.copy(cur.deep); waterU.shallow.value.copy(cur.shallow);
   waterU.sunDir.value.copy(lightDir);
@@ -158,6 +161,10 @@ function applySky() {
   fireflies.visible = cur.eve > 0.02 && seasonState.bugs > 0.05;
   const showBf = cur.day > 0.5 && seasonState.bugs > 0.5 && wx.rain < 0.2 && wx.snow < 0.3 && wx.fog < 0.6 && wx.storm < 0.1;
   butterflies.forEach((b) => { b.g.visible = showBf; });
+  // pollen glints in clear daylight, most of all in low golden sun
+  const pollenAmt = cur.day * (1 - wx.rain) * (1 - wx.snow) * (1 - wx.fog * 0.8) * (1 - wx.cloud * 0.6) * (0.3 + 0.7 * seasonState.bugs);
+  pollenMat.opacity = pollenAmt * (0.45 + 0.35 * (1 - smooth(10, 40, solar.sunElev)));
+  pollen.visible = pollenAmt > 0.03;
   post.bloom = smooth(0.2, 0.8, cur.eve) * (1 - wx.fog * 0.6);
   setClockLabel(periodName(timeCtl.hour) + ' · ' + formatHour(timeCtl.hour) + (timeCtl.live ? ' · live' : '') + (seasonState.name ? ' · ' + seasonState.name : '') + (WX_LABEL[wx.type] ? ' · ' + WX_LABEL[wx.type] : ''));
 }
@@ -192,6 +199,7 @@ export function tick(dt) {
   sun.position.set(camTarget.x + lightDir.x * 140, camTarget.y - 1.55 + lightDir.y * 140, camTarget.z + lightDir.z * 140);
   sun.target.position.set(camTarget.x, camTarget.y - 1.55, camTarget.z);
   safe('detail', () => updateDetail(camera, camTarget));
+  updateAtmosphere(camera, sunDir, cur.glow, 1);
   actionTimer -= dt;
   if (actionTimer <= 0) { actionTimer = 0.1; safe('prompts', () => renderPrompts(evaluateActions())); }
   updateHud(dt);
@@ -220,7 +228,7 @@ requestAnimationFrame(frame);
 
 // A small handle for automated tests and the debug panel.
 window.__meadow = {
-  get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, solar, rng, get renderer() { return renderer; },
+  get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
   fishing: fishingState, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, toast,
   geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, bench: () => seats.find((s) => s.name === 'bench') },

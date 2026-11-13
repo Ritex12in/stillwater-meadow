@@ -16,7 +16,8 @@ const UNDERGROWTH_FADE = [40, 55];
 const FAR_KEEP = 0.4; // share of leaf cards a far tree keeps
 
 const tex = (n) => kit.tex[n];
-const leafStd = (map, extra = {}) => weatherize(std('#ffffff', Object.assign({ map, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true }, extra)), 'std');
+/** Tree crowns: the leaf material, swaying a little at the top and rustling as gusts pass. */
+const crownStd = (map) => weatherize(addWind(std('#ffffff', { map, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true }), 0.0022, null, null, 0.07), 'std');
 const pieces = (name) => kit.models[name];
 const first = (parts, re) => Object.entries(parts).find(([k]) => re.test(k))[1];
 /** The kit keeps wind weights in its vertex colours; give small plants a root-to-tip shade instead. */
@@ -117,7 +118,7 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
   const pineModels = [1, 2, 3, 4, 5].map((i) => fit(pieces('Pine_' + i), 6.4, 0.15));
   const roundModels = [1, 2, 3, 4, 5].map((i) => fit(pieces('CommonTree_' + i), 6.2, 0.15));
   const bark = weatherize(std('#ffffff', { map: tex('bark'), flatShading: false, vertexColors: true }), 'std');
-  const pineLeaf = leafStd(tex('leaves_pine')), roundLeaf = leafStd(tex('leaves_round'));
+  const pineLeaf = crownStd(tex('leaves_pine')), roundLeaf = crownStd(tex('leaves_round'));
   const pineKind = (t) => variantAt(t.x, t.z, 5, 3), roundKind = (t) => variantAt(t.x, t.z, 5, 8);
   const pl = pineModels.map((m) => first(m, /Leaves/)), rl = roundModels.map((m) => first(m, /Leaves/));
   const pb = pineModels.map((m) => first(m, /Bark/)), rb = roundModels.map((m) => first(m, /Bark/));

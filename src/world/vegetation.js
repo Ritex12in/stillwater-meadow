@@ -1,8 +1,9 @@
 // Trees, rocks, grass, flowers, reeds and lily pads. Placement order and random draws are kept
 // exactly as before so the landscape looks the same; big sets are split into culled chunks.
 import * as THREE from 'three';
-import { TAU, rng, rand, pick, smooth, fbm, vnoise, angDiff } from '../core/math.js';
-import { height, lakeT, lakePoint, pathAmt, SPAWN, onDock, dockStart, DOCK_A, nearReserved, BENCH_SPOT } from '../core/shape.js';
+import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { TAU, rng, rand, pick, smooth, fbm, vnoise, angDiff, mulberry32 } from '../core/math.js';
+import { height, lakeT, lakeR, lakePoint, pathAmt, SPAWN, onDock, dockStart, DOCK_A, nearReserved, BENCH_SPOT, PATH_T, LAKE, WORLD_LIMIT } from '../core/shape.js';
 import { std, col, weatherize, addWind, bothSides, instanced, instancedChunks, instancedVariants, lodSet } from '../core/materials.js';
 import { pineFarGeos, crownFarGeos, pineTrunkFarGeos, crownTrunkFarGeos, pineGeos, crownGeos, grassTuftGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
 import { world, obstacles } from '../core/state.js';
@@ -110,6 +111,33 @@ export function buildGrass() {
   if (kit) kitGrass(blades);
 }
 
+/**
+ * Dense drifts of one flower along the path and just above the shore, where you walk and look.
+ * Own random stream, appended after the scattered flowers: nothing placed before them moves.
+ */
+function addDrifts(flowers, petals) {
+  const r = mulberry32(90417), first = flowers.length;
+  const spot = (x, z) => lakeT(x, z) >= 1.15 && pathAmt(x, z) <= 0.15 && !nearReserved(x, z, 1.4) && !onDock(x, z) && Math.hypot(x, z) < WORLD_LIMIT - 8;
+  const centres = [];
+  for (let i = 0; i < 40; i++) {
+    const a = r() * TAU, R = lakeR(a);
+    // two in three by the path (either side of it), the rest on the bank above the sand
+    const t = i % 3 < 2 ? PATH_T + (r() < 0.5 ? -1 : 1) * (3.4 + r() * 2.5) / R : 1.19 + r() * 0.07;
+    centres.push({ x: LAKE.x + Math.cos(a) * R * t, z: LAKE.z + Math.sin(a) * R * t, kind: Math.floor(r() * 64), size: 1.3 + r() * 1.3, n: 30 + Math.floor(r() * 26) });
+  }
+  for (const c of centres) {
+    if (!spot(c.x, c.z)) continue;
+    const colour = petals[c.kind % petals.length];
+    for (let k = 0; k < c.n; k++) {
+      const a = r() * TAU, d = c.size * Math.sqrt(r()) * (0.6 + 0.4 * r());
+      const x = c.x + Math.cos(a) * d * 1.4, z = c.z + Math.sin(a) * d; // drifts are a little long
+      if (!spot(x, z)) continue;
+      flowers.push({ x, z, y: height(x, z) - 0.02, s: 0.8 + r() * 0.6, ry: r() * TAU, color: r() < 0.9 ? colour : petals[Math.floor(r() * petals.length)], drift: c.kind });
+    }
+  }
+  world.driftCount = flowers.length - first;
+}
+
 export function buildFlowers() {
   const flowers = [];
   const petals = ['#ffffff', '#f6d65a', '#f19cb7', '#b7a3e6', '#ff9f7a', '#fdf0b0'].map(col);
@@ -121,12 +149,13 @@ export function buildFlowers() {
     const patch = Math.floor(vnoise(x * 0.15, z * 0.15) * petals.length) % petals.length;
     flowers.push({ x, z, y: height(x, z) - 0.02, s: rand(0.8, 1.4), ry: rng() * TAU, color: rng() < 0.8 ? petals[patch] : pick(petals) });
   }
+  addDrifts(flowers, petals);
   // kinds grow in drifts, with a few strays; stems vary in height
   // (with the kit there are two more kinds, 5 and 6, whose colour comes with the model)
   const kinds = kit ? FLOWER_KINDS.length + 2 : FLOWER_KINDS.length;
   flowers.forEach((f) => {
     const drift = Math.floor(vnoise(f.x * 0.12 + 7, f.z * 0.12 + 3) * kinds * 1.6) % kinds;
-    f.kind = variantAt(f.x, f.z, 10, 5) < 7 ? drift : variantAt(f.x, f.z, kinds, 6);
+    f.kind = f.drift !== undefined ? f.drift % kinds : variantAt(f.x, f.z, 10, 5) < 7 ? drift : variantAt(f.x, f.z, kinds, 6);
     if (KIT_FLOWER_COLOURS[f.kind]) f.color = KIT_FLOWER_COLOURS[f.kind];
     f.sy = f.s * (0.75 + 0.6 * variantAt(f.x, f.z, 100, 7) / 100);
   });
@@ -143,6 +172,21 @@ export function buildFlowers() {
   if (kit) parts.push(...kitFlowerParts(flowers));
   /** Every part of flower `i` shows or hides together. */
   world.flowerSet = { setVisibleAt(i, on) { parts.forEach((p) => p.setVisibleAt(i, on)); }, commit() { parts.forEach((p) => p.commit()); } };
+}
+
+/** A water lily: two rings of pointed petals opening into a cup round a golden centre. */
+function lilyGeo() {
+  const parts = [];
+  const paint = (g, c) => { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set(c, i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
+  [[8, 0.13, 0.5, 0], [7, 0.1, 0.95, 0.4]].forEach(([n, len, lift, turn]) => {
+    for (let i = 0; i < n; i++) {
+      const p = new THREE.SphereGeometry(1, 6, 4).scale(0.032, 0.009, len / 2).translate(0, 0, len / 2);
+      p.rotateX(-lift); p.rotateY((i / n) * TAU + turn);
+      parts.push(paint(p, [1, 1, 1]));
+    }
+  });
+  parts.push(paint(new THREE.SphereGeometry(0.035, 6, 4).scale(1, 0.7, 1).translate(0, 0.02, 0), [1.6, 1.2, 0.25]));
+  return BufferGeometryUtils.mergeBufferGeometries(parts.map((g) => g.toNonIndexed())).scale(1.5, 1.5, 1.5);
 }
 
 export function buildReedsAndPads() {
@@ -171,5 +215,5 @@ export function buildReedsAndPads() {
   }
   world.padItems = pads;
   world.padMesh = instanced(new THREE.CylinderGeometry(0.55, 0.55, 0.03, 9, 1, false, 0.35, TAU - 0.35), std('#ffffff'), pads, { receive: true });
-  world.bloomMesh = instanced(new THREE.IcosahedronGeometry(0.13, 0).scale(1, 0.6, 1), std('#ffffff', { emissive: '#3a2a30' }), blooms);
+  world.bloomMesh = instanced(lilyGeo(), std('#ffffff', { emissive: '#3a2a30', vertexColors: true, flatShading: false }), blooms);
 }

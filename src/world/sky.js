@@ -1,6 +1,7 @@
 // Gradient sky dome with sun, a phased moon, and stars.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
+import { GRADE_GLSL } from '../core/atmosphere.js';
 import { rng, rand, TAU } from '../core/math.js';
 
 export const skyU = {
@@ -30,7 +31,7 @@ export function buildSky() {
           vDir = position;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
-      fragmentShader: `
+      fragmentShader: GRADE_GLSL + `
         uniform vec3 topColor; uniform vec3 horizonColor; uniform vec3 sunColor; uniform vec3 sunDir;
         uniform vec3 moonDir; uniform float moonAmt; uniform float moonPhase;
         varying vec3 vDir;
@@ -41,7 +42,7 @@ export function buildSky() {
           vec3 c = mix(horizonColor, topColor, pow(smoothstep(0.0, 1.0, max(h, 0.0)), 0.5));
           c = mix(c, horizonColor * 0.92, smoothstep(0.0, -0.3, h));
           float s = max(dot(d, normalize(sunDir)), 0.0);
-          c += sunColor * (pow(s, 5.0) * 0.16 + pow(s, 40.0) * 0.3) * (1.0 - 0.4 * max(h, 0.0));
+          c += sunColor * (pow(s, 5.0) * 0.16 + pow(s, 40.0) * 0.3 + pow(s, 2.0) * 0.08) * (1.0 - 0.4 * max(h, 0.0)); // same glow as meadowHaze (core/atmosphere.js)
           c = mix(c, vec3(1.0, 0.97, 0.9) * (0.6 + 0.6 * sunColor), smoothstep(0.99935, 0.9997, s) * above);
           // moon: a disc lit from one side according to its phase
           vec3 md = normalize(moonDir);
@@ -60,7 +61,7 @@ export function buildSky() {
           float lit = smoothstep(-0.08, 0.08, dot(vec3(q, z), sunSide));
           vec3 moonCol = mix(vec3(0.16, 0.18, 0.24), vec3(0.97, 0.95, 0.87), lit);
           c = mix(c, moonCol, disc * moonAmt * above);
-          gl_FragColor = vec4(c, 1.0);
+          gl_FragColor = vec4(meadowGrade(c), 1.0);
         }`,
     })
   );

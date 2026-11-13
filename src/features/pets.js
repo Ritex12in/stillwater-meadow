@@ -88,13 +88,14 @@ export function initPets() {
 
   // the animal to feed: someone within reach by hand, else an untamed cat within a throw
   const target = () => {
-    let hand = null, hd = HAND, cat = null, cd = THROW;
+    let hand = null, hd = HAND, busy = null, cat = null, cd = THROW;
     for (const a of animals) {
       const d = Math.hypot(a.x - player.x, a.z - player.z);
-      if (d < hd && handFed(a)) { hd = d; hand = a; }
+      if (d < hd && handFed(a)) { if (a.kind === 'dog' && a.chewT > 0) busy = busy || a; else { hd = d; hand = a; } }
       if (!a.tamed && a.kind === 'cat' && !handFed(a) && d < cd && !food.some((f) => f.a === a)) { cd = d; cat = a; }
     }
-    return hand ? { a: hand, how: 'hand' } : cat ? { a: cat, how: 'throw' } : null;
+    // a dog still chewing never gets in the way of anyone else
+    return hand ? { a: hand, how: 'hand' } : cat ? { a: cat, how: 'throw' } : busy ? { a: busy, how: 'hand' } : null;
   };
   const haveFood = (a) => creel().length > 0 || (a.kind === 'dog' && !a.tamed); // a dog you're winning over takes bread too
 
@@ -220,7 +221,7 @@ export function initPets() {
       // it comes only while you keep your distance and stay still for a few seconds
       const near = Math.hypot(a.x - f.x, a.z - f.z) < 16;
       f.wait = still && pd >= safe && near ? f.wait + dt : 0;
-      if (f.wait > waitFor && a.state !== 'shelter') { a.goal = { x: f.x, z: f.z, faceX: f.x, faceZ: f.z + 0.01, src: 'food' }; a.state = 'goal'; }
+      if (f.wait > waitFor) { a.goal = { x: f.x, z: f.z, faceX: f.x, faceZ: f.z + 0.01, src: 'food' }; a.state = 'goal'; }
       if (f.age > 120) { drop(f); food.splice(i, 1); } // left too long: something else gets it
     }
     // markers face you and fade with distance

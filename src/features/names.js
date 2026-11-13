@@ -64,7 +64,7 @@ export function initNames() {
   const open = (a) => {
     if (naming || a.name || !activity.enter('dialog')) return;
     naming = a;
-    a.wantName = false;
+    a.wantName = false; a.nameAsked = true;
     const taken = new Set(animals.map((x) => x.name));
     const options = NAMES[a.kind].filter((n) => !taken.has(n));
     title.textContent = `Name this ${a.kind}`;
@@ -90,6 +90,8 @@ export function initNames() {
   hooks.frame.push(() => {
     for (const a of animals) {
       if (a.wantName && !naming && activity.free) open(a);
+      // skipped (or reloaded) before naming: offered again the next time you pet it, once a visit
+      if (a.petted && a.tamed && !a.name && !a.nameAsked && !naming && player.petAmt > 0.6) open(a);
       let t = tags.get(a);
       const label = a.name ? a.name + (a.bond > 0.6 ? ' ♥' : '') : '';
       if (!t || t.label !== label) {

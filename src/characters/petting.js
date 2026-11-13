@@ -10,9 +10,10 @@ import { spawnHeart } from '../world/effects.js';
 
 const PET_RANGE = 2.1, PET_SECONDS = 5;
 
-function nearestAnimal() {
+function nearestAnimal(tame = true) {
   let best = null, bd = PET_RANGE;
   for (const a of animals) {
+    if (tame && !a.tamed) continue; // an animal that isn't yours never blocks petting one that is
     const d = Math.hypot(a.x - player.x, a.z - player.z);
     if (d < bd) { bd = d; best = a; }
   }
@@ -134,14 +135,14 @@ export function registerPetting() {
   });
   registerAction({
     id: 'pet', key: 'KeyF', keyLabel: 'F',
-    available: () => activity.free && nearestAnimal() && nearestAnimal().a.tamed,
+    available: () => activity.free && nearestAnimal(),
     label: () => { const n = nearestAnimal(); return `Pet ${n.a.name || 'the ' + n.a.kind}`; },
     score: () => -nearestAnimal().d,
-    run: () => { const n = nearestAnimal(); if (n && n.a.tamed) startPet(n.a); },
+    run: () => { const n = nearestAnimal(); if (n) startPet(n.a); },
   });
   registerAction({
     id: 'pet-untamed', key: 'KeyF', keyLabel: 'F', score: () => -50,
-    available: () => activity.free && nearestAnimal() && !nearestAnimal().a.tamed,
+    available: () => activity.free && !nearestAnimal() && nearestAnimal(false),
     disabled: () => true,
     label: () => 'Not tame yet: try a fish (T)',
     run: () => {},

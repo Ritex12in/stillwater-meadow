@@ -27,7 +27,8 @@ async function worker() {
     await ctx.close();
   }
 }
-await Promise.all([worker(), worker(), worker()]);
+const workers = Math.max(1, +(process.env.MEADOW_WORKERS || 3)); // the software renderer is slow: fewer at once on a busy machine
+await Promise.all(Array.from({ length: workers }, worker));
 await browser.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

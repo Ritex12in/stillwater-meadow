@@ -1,4 +1,4 @@
-// Drifting clouds, fireflies at dusk, butterflies and pollen in the sunlight by day.
+// Drifting clouds, fireflies at dusk, butterflies, pollen in the sunlight and a flock of birds by day.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, rng, rand, wrap, mulberry32 } from '../core/math.js';
@@ -40,6 +40,48 @@ const pnGeo = new THREE.BufferGeometry();
 export const pollenMat = new THREE.PointsMaterial({ size: 0.11, map: glowTex, color: '#fff1c2', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
 export const pollen = new THREE.Points(pnGeo, pollenMat);
 let pnDrift = 0;
+
+// a flock in a loose V, wheeling round the valley; one dynamic mesh, rebuilt each frame
+const BIRDS = 13;
+const birdGeo = new THREE.BufferGeometry();
+export const birdMat = new THREE.MeshBasicMaterial({ color: '#2b2d3a', side: THREE.DoubleSide, transparent: true, opacity: 1 });
+export const birds = new THREE.Mesh(birdGeo, birdMat);
+const birdSeed = [];
+
+export function buildBirds() {
+  const r = mulberry32(3301);
+  for (let i = 0; i < BIRDS; i++) {
+    const row = Math.ceil(i / 2), side = i === 0 ? 0 : i % 2 ? 1 : -1;
+    birdSeed.push({ back: row * 2.6 + r() * 0.8, side: side * row * 2.2 + (r() - 0.5) * 0.6, up: (r() - 0.5) * 1.5, ph: r() * TAU, sp: 0.85 + r() * 0.3 });
+  }
+  birdGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(BIRDS * 4 * 3 * 3), 3));
+  birds.frustumCulled = false;
+  scene.add(birds);
+}
+const bv = new THREE.Vector3();
+function updateBirds(t) {
+  // the leader's path: a wide, slowly wandering loop over the valley
+  const a = t * 0.045, R = 85 + 25 * Math.sin(t * 0.017);
+  const cx = Math.cos(a) * R + 6, cz = Math.sin(a) * R * 0.75 - 20, cy = 48 + 6 * Math.sin(t * 0.05);
+  const hx = -Math.sin(a), hz = Math.cos(a) * 0.75, hl = Math.hypot(hx, hz), fx = hx / hl, fz = hz / hl; // heading
+  const arr = birdGeo.attributes.position.array;
+  let o = 0;
+  const put = (x, y, z) => { arr[o++] = x; arr[o++] = y; arr[o++] = z; };
+  for (const b of birdSeed) {
+    const px = cx - fx * b.back + fz * b.side, pz = cz - fz * b.back - fx * b.side, py = cy + b.up + Math.sin(t * 0.7 + b.ph) * 0.4;
+    const glide = Math.sin(t * 0.3 + b.ph) > 0.55; // now and then they glide
+    const flap = glide ? 0.12 : Math.sin(t * 9 * b.sp + b.ph) * 0.7;
+    const span = 0.9, tip = Math.sin(flap) * span, reach = Math.cos(flap) * span;
+    // body: a thin dart; wings: two triangles from the shoulders out to the tips
+    const sx = fz, sz = -fx; // to the bird's right
+    bv.set(px + fx * 0.45, py, pz + fz * 0.45);
+    put(bv.x, bv.y, bv.z); put(px - fx * 0.4 + sx * 0.06, py, pz - fz * 0.4 + sz * 0.06); put(px - fx * 0.4 - sx * 0.06, py, pz - fz * 0.4 - sz * 0.06);
+    put(px + fx * 0.25 + sx * 0.05, py, pz + fz * 0.25 + sz * 0.05); put(px - fx * 0.15, py, pz - fz * 0.15); put(px + sx * reach - fx * 0.2, py + tip, pz + sz * reach - fz * 0.2);
+    put(px + fx * 0.25 - sx * 0.05, py, pz + fz * 0.25 - sz * 0.05); put(px - fx * 0.15, py, pz - fz * 0.15); put(px - sx * reach - fx * 0.2, py + tip, pz - sz * reach - fz * 0.2);
+    put(px - fx * 0.4, py, pz - fz * 0.4); put(px - fx * 0.7 + sx * 0.15, py, pz - fz * 0.7 + sz * 0.15); put(px - fx * 0.7 - sx * 0.15, py, pz - fz * 0.7 - sz * 0.15); // tail
+  }
+  birdGeo.attributes.position.needsUpdate = true;
+}
 
 export function buildPollen() {
   const r = mulberry32(7741);
@@ -109,6 +151,7 @@ export function buildButterflies() {
 
 /** Fireflies and butterflies wrap around `center` so there are always some nearby. */
 export function updateAmbientLife(dt, t, center, dayLevel, wind) {
+  if (birds.visible) updateBirds(t);
   if (pollen.visible) {
     pnDrift += dt * (0.25 + wind * 1.6);
     const arr = pnGeo.attributes.position.array;

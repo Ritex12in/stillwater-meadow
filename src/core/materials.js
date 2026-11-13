@@ -193,6 +193,7 @@ export function instancedChunks(geo, mat, items, opts = {}) {
     mesh.castShadow = !!opts.cast;
     mesh.receiveShadow = opts.receive !== false;
     if (opts.depthMat) mesh.customDepthMaterial = opts.depthMat;
+    if (!opts.cast) mesh.layers.set(1); // small plants: drawn by the main camera, skipped by the lake's reflection
     scene.add(mesh);
     meshes.push(mesh);
   }

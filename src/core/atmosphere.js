@@ -64,7 +64,11 @@ if (!C.fog_fragment.includes('meadowHaze')) console.warn('Sun haze: fog shader c
 
 const v = new THREE.Vector3();
 /** Once a frame, after the camera has its final place: the sun as seen by the camera, its glow, and the lamps. */
+let last = null;
+/** The same again for another camera (the lake's mirrored one), with this frame's sun and lamps. */
+export function atmosphereFor(camera) { if (last) updateAtmosphere(camera, ...last); }
 export function updateAtmosphere(camera, sunDir, glowColor, amount, lamps = [], lampAmt = 0) {
+  last = [sunDir, glowColor, amount, lamps, lampAmt];
   for (let i = 0; i < MAX_LAMPS; i++) {
     if (lamps[i]) v.copy(lamps[i]).applyMatrix4(camera.matrixWorldInverse); else v.set(0, 0, 1e5);
     lampView[i * 3] = v.x; lampView[i * 3 + 1] = v.y; lampView[i * 3 + 2] = v.z;

@@ -3,8 +3,11 @@
 A calm, walkable low-poly lakeside world in the browser: real-time day and night, weather,
 seasons, cats and dogs to befriend, ducks, a bamboo boat with a skipper, fishing, a campfire,
 stargazing and a photo mode. Trees, grass, flowers, bushes and rocks use the free (CC0)
-[Stylized Nature MegaKit](https://quaternius.com/packs/stylizednaturemegakit.html) by Quaternius;
-everything else is built from code.
+[Stylized Nature MegaKit](https://quaternius.com/packs/stylizednaturemegakit.html) by Quaternius,
+and the bench, fences and vines come from his free (CC0)
+[Fantasy Props](https://quaternius.com/packs/fantasypropsmegakit.html) and
+[Medieval Village](https://quaternius.com/packs/medievalvillagemegakit.html) MegaKits; everything
+else (daisies, lupins, lamp posts, mountains, sky, clouds, water) is built from code.
 
 ## Run it
 
@@ -21,6 +24,7 @@ Other scripts:
 | `npm run preview` | Serve the production build on port 8080 |
 | `npm run lint` | ESLint over `src/` and `tests/` |
 | `npm test` | Playwright end-to-end tests (uses the installed Chrome) |
+| `npm run test:quick` | The same tests with a small built-in runner; `MEADOW_WORKERS=1` runs them one at a time (the software renderer used in headless Chrome is slow) |
 
 Open with `?debug` for a frame-time graph and live tuning panel. Other URL options:
 `?weather=rain|storm|fog|snow`, `?season=spring|summer|autumn|winter`, and a fixed time with
@@ -34,6 +38,9 @@ Stylized Nature MegaKit, CC0 1.0 (see `LICENSE.txt` there). `tools/prepare_natur
 that folder from the unzipped pack: it copies the models the meadow uses without their texture
 references, turns the leaf textures grey so the season colours can tint them, and downscales
 the textures. It needs Python with Pillow.
+
+`public/assets/props/` (bench, fence, vines) is built the same way by `tools/prepare_props.py`
+from the Fantasy Props and Medieval Village MegaKits (CC0; licences copied alongside).
 
 ## How the code is organised
 
@@ -80,6 +87,13 @@ Key ideas:
   Imported first in `main.js`, before anything is drawn.
 - **Wind** (`addWind` in `core/materials.js`): plants sway, and gusts roll across the meadow as
   bands that press the grass over and lighten it; tree crowns rustle with the same field.
+- **Scenery and light**: distant mountains with valley mist (`world/mountains.js`); painted
+  sprite clouds and a flock of birds (`world/ambient.js`); lamp light pools painted into the shared
+  lighting code (`core/atmosphere.js`), lamp streaks and a mirrored reflection on the lake
+  (`world/water.js`, drawn at a third of the resolution, refreshed every few frames, without the
+  small plants on layer 1; High and Medium only); screen-space sunbeams (`systems/post.js`, High).
+- **Wildflowers** (`world/wildflowers.js`): daisy and lupin clumps built in code, kit flower
+  clumps, wispy grass and pebbles, clustered along the path, round the bench and in the meadow.
 - **Performance**: grass, flowers, trees and rocks are split into culled chunks; rain, snow and
   leaves animate on the GPU; terrain height is baked into a grid matching the rendered mesh;
   quality tiers (shadow size and refresh rate, resolution, bloom) adapt to the frame rate.

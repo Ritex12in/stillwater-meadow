@@ -16,3 +16,4 @@ export function createRenderer() {
 export const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xcfe5f2, 50, 220);
 export const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1500);
+camera.layers.enable(1); // layer 1: small plants, which the lake's reflection leaves out

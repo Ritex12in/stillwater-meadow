@@ -1,6 +1,6 @@
 // Stillwater Meadow: boot, build the world in a fixed order, and run the frame loop.
 import './style.css';
-import { updateAtmosphere } from './core/atmosphere.js'; // patches the fog shader; keep first
+import { updateAtmosphere, atmosphereFor } from './core/atmosphere.js'; // patches the fog shader; keep first
 import * as THREE from 'three';
 import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug } from './core/env.js';
@@ -13,13 +13,13 @@ import { buildSky, sky, skyU, starMat } from './world/sky.js';
 import { buildMountains, tintMountains } from './world/mountains.js';
 import { buildLights, hemi, ambient, sun } from './world/lights.js';
 import { buildTerrain } from './world/terrain.js';
-import { buildWater, waterU } from './world/water.js';
+import { buildWater, waterU, renderReflection } from './world/water.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
 import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows, lampSpots } from './world/props.js';
 import { buildFences } from './world/kitprops.js';
 import { buildWildflowers } from './world/wildflowers.js';
-import { buildClouds, buildFireflies, buildButterflies, buildPollen, updateAmbientLife, tintClouds, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
+import { buildClouds, buildFireflies, buildButterflies, buildPollen, buildBirds, birds, birdMat, updateAmbientLife, tintClouds, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
 import { buildEffects, updateEffects } from './world/effects.js';
 import { player, buildPlayer, updatePlayer } from './characters/player.js';
 import { animals, buildAnimals, updateAnimal, separateAnimals, shakeDogs } from './characters/animals.js';
@@ -84,6 +84,7 @@ buildClouds();
 buildFireflies();
 buildButterflies();
 buildPollen();
+buildBirds();
 buildPlayer();
 buildAnimals();
 buildBoat();
@@ -138,6 +139,7 @@ onSave((s) => {
 
 // ── Apply the time-of-day palette to the scene ──
 const waterLight = cur.light.clone();
+const sunScreen = new THREE.Vector3();
 function applySky() {
   weatherModify(cur);
   skyU.sunDir.value.copy(sunDir);
@@ -176,7 +178,15 @@ function applySky() {
   const pollenAmt = cur.day * (1 - wx.rain) * (1 - wx.snow) * (1 - wx.fog * 0.8) * (1 - wx.cloud * 0.6) * (0.3 + 0.7 * seasonState.bugs);
   pollenMat.opacity = pollenAmt * (0.45 + 0.35 * (1 - smooth(10, 40, solar.sunElev)));
   pollen.visible = pollenAmt > 0.03;
+  birds.visible = cur.day > 0.25 && wx.rain < 0.3 && wx.snow < 0.3 && wx.storm < 0.1;
+  birdMat.color.copy(cur.hemiGround).multiplyScalar(0.55); // silhouettes, a little lifted by the haze
   post.bloom = smooth(0.2, 0.8, cur.eve) * (1 - wx.fog * 0.6);
+  // sunbeams when the sun is on screen (or just off it), strongest when it is low
+  sunScreen.copy(sunDir).multiplyScalar(500).add(camera.position).project(camera);
+  const onScreen = sunScreen.z < 1 && Math.abs(sunScreen.x) < 1.4 && Math.abs(sunScreen.y) < 1.4;
+  post.rays = onScreen ? cur.day * (1 - wx.cloud * 0.85) * (1 - wx.fog) * (1 - wx.rain) * (0.45 + 0.55 * (1 - smooth(8, 35, solar.sunElev))) * (1 - smooth(1.0, 1.4, Math.max(Math.abs(sunScreen.x), Math.abs(sunScreen.y)))) : 0;
+  post.sunPos.set(sunScreen.x * 0.5 + 0.5, sunScreen.y * 0.5 + 0.5);
+  post.raysTint.copy(cur.glow).lerp(cur.light, 0.4);
   setClockLabel(periodName(timeCtl.hour) + ' · ' + formatHour(timeCtl.hour) + (timeCtl.live ? ' · live' : '') + (seasonState.name ? ' · ' + seasonState.name : '') + (WX_LABEL[wx.type] ? ' · ' + WX_LABEL[wx.type] : ''));
 }
 
@@ -215,7 +225,11 @@ export function tick(dt) {
   if (actionTimer <= 0) { actionTimer = 0.1; safe('prompts', () => renderPrompts(evaluateActions())); }
   updateHud(dt);
 }
-function renderNow() { renderFrame(LEVELS[quality.level].bloom); }
+function renderNow() {
+  // the lake's mirror: every 4th frame on High, every 10th on Medium, none on Low
+  renderReflection(renderer, scene, camera, quality.level !== 'low', atmosphereFor, atmosphereFor, quality.level === 'high' ? 4 : 10);
+  renderFrame(LEVELS[quality.level].bloom);
+}
 
 let last = performance.now();
 function frame(now) {

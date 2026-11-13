@@ -9,7 +9,7 @@ import { col, weatherize, addWind, bothSides, instancedVariants } from '../core/
 import { kit, fit } from '../core/assets.js';
 import { world } from '../core/state.js';
 
-const FADE = [30, 52];
+const FADE = [22, 42];
 const paint = (g, c) => { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set(c, i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
 const merge = (parts) => BufferGeometryUtils.mergeBufferGeometries(parts.map((g) => {
   const n = g.index ? g.toNonIndexed() : g;
@@ -29,16 +29,16 @@ function greenByHeight(g) {
 function daisy(h, tilt, turn) {
   const stem = paint(new THREE.CylinderGeometry(0.006, 0.009, h, 3, 1, true).translate(0, h / 2, 0), GREEN);
   const head = [];
-  const petals = 13;
+  const petals = 10;
   for (let i = 0; i < petals; i++) {
     head.push(paint(new THREE.PlaneGeometry(0.022, 0.07).translate(0, 0.045, 0).rotateX(-Math.PI / 2 + 0.25).rotateY((i / petals) * TAU), [1.15, 1.15, 1.1]));
   }
-  head.push(paint(new THREE.SphereGeometry(0.02, 6, 3, 0, TAU, 0, Math.PI / 2).scale(1, 0.55, 1), [1.25, 0.9, 0.2]));
+  head.push(paint(new THREE.SphereGeometry(0.02, 5, 2, 0, TAU, 0, Math.PI / 2).scale(1, 0.55, 1), [1.25, 0.9, 0.2]));
   return merge([stem, merge(head).rotateX(tilt).rotateY(turn).translate(0, h, 0)]);
 }
 function daisyClump() {
   const r = mulberry32(811), parts = [];
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 6; i++) {
     const a = r() * TAU, d = Math.sqrt(r()) * 0.22;
     parts.push(daisy(0.22 + r() * 0.2, (r() - 0.5) * 0.4, r() * TAU).translate(Math.cos(a) * d, 0, Math.sin(a) * d));
   }
@@ -55,7 +55,7 @@ function lupinClump() {
   for (let i = 0; i < 3; i++) {
     const a = r() * TAU, d = r() * 0.16, ox = Math.cos(a) * d, oz = Math.sin(a) * d, h = 0.55 + r() * 0.3, turn = r() * TAU;
     greens.push(paint(new THREE.CylinderGeometry(0.008, 0.012, h, 3, 1, true).translate(ox, h / 2, oz), GREEN));
-    const rows = 11;
+    const rows = 8;
     for (let j = 0; j < rows; j++) {
       const t = j / (rows - 1), y = h * (0.5 + 0.5 * t), rad = 0.045 * (1 - t * 0.75), n = Math.max(3, Math.round(6 - t * 3));
       for (let k = 0; k < n; k++) {
@@ -92,13 +92,14 @@ export function buildWildflowers() {
       if (!free(x, z)) continue;
       let kind = R() < 0.6 ? fav : Math.floor(R() * 5);
       if (kind === 4) kind = 0; // (no broad plant: more daisies)
+      if (kind === 3) kind = R() < 0.5 ? 0 : 2; // the kit's yellow bells are too heavy (1,700 triangles) to scatter
       items.push({ x, z, y: height(x, z) - 0.02, s: r(0.8, 1.25), ry: r(0, TAU), kind, color: kind === 1 ? purples[Math.floor(R() * purples.length)] : null });
     }
   }
   // wispy grass tufts dotted through the meadow
-  for (let i = 0; i < 2200 && items.length < 2400; i++) {
+  for (let i = 0, n = 0; i < 2200 && n < 600; i++) {
     const a = R() * TAU, d = Math.sqrt(R()) * 100, x = Math.cos(a) * d, z = Math.sin(a) * d;
-    if (free(x, z) && fbm(x * 0.09 - 2, z * 0.09 + 4) > 0.5) items.push({ x, z, y: height(x, z) - 0.03, s: r(0.7, 1.2), ry: r(0, TAU), kind: 5, color: null });
+    if (free(x, z) && fbm(x * 0.09 - 2, z * 0.09 + 4) > 0.5) { items.push({ x, z, y: height(x, z) - 0.03, s: r(0.7, 1.2), ry: r(0, TAU), kind: 5, color: null }); n++; }
   }
   // pebbles in the sand round the lake
   const pebbles = [];
@@ -112,7 +113,7 @@ export function buildWildflowers() {
   const plain = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.25, FADE), 'lam'));
   const leaves = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ map: kit.tex.leaves, alphaTest: 0.5, vertexColors: true }), 0.4, FADE), 'lam'));
   const blooms = bothSides(addWind(new THREE.MeshLambertMaterial({ map: kit.tex.flowers, alphaTest: 0.5, vertexColors: true }), 0.4, FADE));
-  const grassMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ color: '#9cb85a', vertexColors: true }), 0.6, FADE), 'lam'));
+  const grassMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ color: '#9cb85a', vertexColors: true }), 0.6, [16, 34]), 'lam')); // dense model: kept near
   const o = { cell: 30, far: FADE[1] }, lupins = lupinClump();
   const sub = (k) => (it) => (it.kind === k ? 0 : -1);
   world.wild = [
@@ -122,7 +123,7 @@ export function buildWildflowers() {
     instancedVariants([lupins.greens], bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.15, FADE), 'lam')), items.map((it) => Object.assign({}, it, { color: null })), sub(1), o), // same sway as the florets
     instancedVariants([piece('Flower_3_Group', 0.5, /Leaves/)[0], piece('Flower_4_Group', 0.5, /Leaves/)[0]], leaves, items, (it) => (it.kind === 2 || it.kind === 3 ? it.kind - 2 : -1), o),
     instancedVariants([piece('Flower_3_Group', 0.5, /Flowers/)[0], piece('Flower_4_Group', 0.5, /Flowers/)[0]], blooms, items, (it) => (it.kind === 2 || it.kind === 3 ? it.kind - 2 : -1), o),
-    instancedVariants([greenByHeight(piece('Grass_Wispy_Tall', 0.55, /Grass/)[0])], grassMat, items, sub(5), o),
+    instancedVariants([greenByHeight(piece('Grass_Wispy_Tall', 0.55, /Grass/)[0])], grassMat, items, sub(5), { cell: 20, far: 34 }),
   ];
   const rockMat = weatherize(new THREE.MeshStandardMaterial({ map: kit.tex.pathrocks, roughness: 0.9, vertexColors: true }), 'std');
   instancedVariants(['Pebble_Round_1', 'Pebble_Round_2', 'Pebble_Round_3'].map((n) => piece(n, 0.12, /./)[0]), rockMat, pebbles, (p) => p.kind, { cell: 40, far: 60, cast: false });

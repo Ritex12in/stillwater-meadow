@@ -3,11 +3,17 @@
 import * as THREE from 'three';
 import { TAU, rng, rand, pick, smooth, fbm, vnoise, angDiff } from '../core/math.js';
 import { height, lakeT, lakePoint, pathAmt, SPAWN, onDock, dockStart, DOCK_A, nearReserved, BENCH_SPOT } from '../core/shape.js';
-import { std, col, weatherize, addWind, bothSides, instanced, instancedChunks, instancedVariants } from '../core/materials.js';
-import { pineGeos, crownGeos, grassTuftGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
+import { std, col, weatherize, addWind, bothSides, instanced, instancedChunks, instancedVariants, lodSet } from '../core/materials.js';
+import { pineFarGeos, crownFarGeos, pineTrunkFarGeos, crownTrunkFarGeos, pineGeos, crownGeos, grassTuftGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
 import { world, obstacles } from '../core/state.js';
 
 export const treeSpots = [];
+
+// how far from the camera things keep their full detail (metres)
+export const TREE_NEAR = 55;          // trees switch to a simple shape and stop casting shadows
+export const GRASS_FADE = [48, 64];   // grass shrinks away between these distances
+export const FLOWER_FADE = [52, 70];
+const SHADOW_RANGE = 60;              // other objects cast shadows only this close to you
 
 export function buildTrees() {
   let tries = 0;
@@ -45,10 +51,12 @@ export function buildTrees() {
   world.roundItems = rounds.map((t) => Object.assign({}, t, { color: t.type === 'blossom' ? pick(blossomCols) : pick(roundCols) }));
   const pg = pineGeos(), cg = crownGeos();
   const pineKind = (t) => variantAt(t.x, t.z, pg.length, 3), crownKind = (t) => variantAt(t.x, t.z, cg.length, 8);
-  instancedVariants(pg.map((g) => g.trunk), bark, pines, pineKind, { cast: true, cell: 90 });
-  instancedVariants(pg.map((g) => g.top), leaf, pineItems, pineKind, { cast: true, cell: 90 });
-  instancedVariants(cg.map((g) => g.trunk), bark, rounds, crownKind, { cast: true, cell: 90 });
-  world.roundTop = instancedVariants(cg.map((g) => g.top), leaf, world.roundItems, crownKind, { cast: true, cell: 90 });
+  // detailed (and shadow-casting) near the camera, a simple shape further out
+  const lod = { cast: true, near: TREE_NEAR, lift: 2.8, radius: 3.6 };
+  lodSet(pg.map((g) => g.trunk), pineTrunkFarGeos(), bark, pines, pineKind, lod);
+  lodSet(pg.map((g) => g.top), pineFarGeos(), leaf, pineItems, pineKind, lod);
+  lodSet(cg.map((g) => g.trunk), crownTrunkFarGeos(), bark, rounds, crownKind, lod);
+  world.roundTop = lodSet(cg.map((g) => g.top), crownFarGeos(), leaf, world.roundItems, crownKind, lod);
   treeSpots.forEach((t) => obstacles.push({ x: t.x, z: t.z, r: 0.32 * t.s }));
 }
 
@@ -67,7 +75,7 @@ export function buildRocks() {
     rocks.push({ x, z, y: height(x, z) - s * 0.25, s, sx: s * rand(0.9, 1.5), sy: s * rand(0.55, 0.9), sz: s * rand(0.9, 1.3), ry: rng() * TAU, rx: rand(-0.2, 0.2), color: pick(rockCols) });
     if (s > 0.6) obstacles.push({ x, z, r: s * 0.95 });
   }
-  instancedChunks(new THREE.IcosahedronGeometry(1, 0), weatherize(std('#ffffff'), 'std'), rocks, { cast: true, cell: 60 });
+  instancedChunks(new THREE.IcosahedronGeometry(1, 0), weatherize(std('#ffffff'), 'std'), rocks, { cast: true, cell: 60, shadowRange: SHADOW_RANGE });
 }
 
 export function buildGrass() {
@@ -86,10 +94,10 @@ export function buildGrass() {
     const s = rand(0.7, 1.35);
     blades.push({ x, z, y: h - 0.03, s, sy: s * rand(0.7, 1.15), ry: rng() * TAU, color: pick(grassCols) });
   }
-  world.grassMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.55), 'lam'));
+  world.grassMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.55, GRASS_FADE), 'lam'));
   // seed stalks gather in drifts; low clumps fill in between the upright ones
   const tuftKind = (it) => { const h = variantAt(it.x, it.z, 100, 21); return vnoise(it.x * 0.09 + 3, it.z * 0.09 - 7) > 0.62 && h < 45 ? 2 : h < 58 ? 0 : h < 90 ? 1 : 2; };
-  world.grass = instancedVariants(tufts, world.grassMat, blades, tuftKind, { cast: false, cell: 36 });
+  world.grass = instancedVariants(tufts, world.grassMat, blades, tuftKind, { cast: false, cell: 24, far: GRASS_FADE[1] });
 }
 
 export function buildFlowers() {
@@ -109,15 +117,15 @@ export function buildFlowers() {
     f.kind = variantAt(f.x, f.z, 10, 5) < 7 ? drift : variantAt(f.x, f.z, FLOWER_KINDS.length, 6);
     f.sy = f.s * (0.75 + 0.6 * variantAt(f.x, f.z, 100, 7) / 100);
   });
-  const stemMat = bothSides(addWind(new THREE.MeshLambertMaterial({ color: '#4f7a36', vertexColors: true }), 0.6));
-  const headMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), 0.6), 'lam'));
-  const centreMat = addWind(new THREE.MeshLambertMaterial({ color: '#ffffff' }), 0.6);
+  const stemMat = bothSides(addWind(new THREE.MeshLambertMaterial({ color: '#4f7a36', vertexColors: true }), 0.6, FLOWER_FADE));
+  const headMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), 0.6, FLOWER_FADE), 'lam'));
+  const centreMat = addWind(new THREE.MeshLambertMaterial({ color: '#ffffff' }), 0.6, FLOWER_FADE);
   const centres = flowers.map((f) => Object.assign({}, f, { color: FLOWER_CENTRE[FLOWER_KINDS[f.kind]] ? col(FLOWER_CENTRE[FLOWER_KINDS[f.kind]]) : null }));
   world.flowerItems = flowers;
   const parts = [
-    instancedChunks(flowerStemGeo(), stemMat, flowers.map((f) => Object.assign({}, f, { color: null })), { cell: 50 }),
-    instancedVariants(flowerHeadGeos(), headMat, flowers, (f) => f.kind, { cell: 50 }),
-    instancedVariants([flowerCentreGeo()], centreMat, centres, (f) => (f.color ? 0 : -1), { cell: 50 }),
+    instancedChunks(flowerStemGeo(), stemMat, flowers.map((f) => Object.assign({}, f, { color: null })), { cell: 50, far: FLOWER_FADE[1] }),
+    instancedVariants(flowerHeadGeos(), headMat, flowers, (f) => f.kind, { cell: 50, far: FLOWER_FADE[1] }),
+    instancedVariants([flowerCentreGeo()], centreMat, centres, (f) => (f.color ? 0 : -1), { cell: 50, far: FLOWER_FADE[1] }),
   ];
   /** Every part of flower `i` shows or hides together. */
   world.flowerSet = { setVisibleAt(i, on) { parts.forEach((p) => p.setVisibleAt(i, on)); }, commit() { parts.forEach((p) => p.commit()); } };

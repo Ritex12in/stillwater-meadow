@@ -5,16 +5,23 @@ import { scene } from './render.js';
 export const timeU = { value: 0 };                            // drives grass and reed sway
 export const windU = { value: 1 };                            // sway strength
 export const wxU = { snow: { value: 0 }, wet: { value: 0 } };  // snow cover and wetness on surfaces
+export const camU = { value: new THREE.Vector3() };            // camera position, for distance fades
 
 export const col = (hex) => new THREE.Color(hex);
 export const std = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ color, flatShading: true, roughness: 0.95, metalness: 0 }, extra || {}));
 
-/** Wind sway in the vertex shader; taller vertices move more. */
-export function addWind(mat, k) {
+/**
+ * Wind sway in the vertex shader; taller vertices move more. With `fade` ([near, far] metres),
+ * each instance shrinks into the ground between those distances from the camera, so small
+ * plants can stop being drawn far away without popping. (Lambert materials don't get three's
+ * own cameraPosition in r128, hence camU.)
+ */
+export function addWind(mat, k, fade = null) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = timeU;
     sh.uniforms.uWind = windU;
-    sh.vertexShader = 'uniform float uTime;\nuniform float uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    sh.uniforms.uCam = camU;
+    sh.vertexShader = 'uniform float uTime;\nuniform float uWind;\nuniform vec3 uCam;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       #ifdef USE_INSTANCING
         vec2 ip = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xz;
       #else
@@ -23,9 +30,10 @@ export function addWind(mat, k) {
       float wv = sin(uTime * 1.7 + ip.x * 0.31 + ip.y * 0.23) * 0.6 + sin(uTime * 3.1 + ip.x * 0.8 - ip.y * 0.5) * 0.25;
       float hh = max(position.y, 0.0);
       transformed.x += wv * hh * hh * ${k.toFixed(3)} * uWind;
-      transformed.z += wv * hh * hh * ${(k * 0.5).toFixed(3)} * uWind;`);
+      transformed.z += wv * hh * hh * ${(k * 0.5).toFixed(3)} * uWind;
+      ${fade ? `transformed *= 1.0 - smoothstep(${fade[0].toFixed(1)}, ${fade[1].toFixed(1)}, distance(ip, uCam.xz));` : ''}`);
   };
-  mat.customProgramCacheKey = () => 'wind' + k;
+  mat.customProgramCacheKey = () => 'wind' + k + (fade ? '-fade' + fade.join('-') : '');
   return mat;
 }
 
@@ -165,6 +173,7 @@ export function instancedChunks(geo, mat, items, opts = {}) {
     scene.add(mesh);
     meshes.push(mesh);
   }
+  if (opts.far || (opts.cast && opts.shadowRange)) ranged.push({ meshes, far: opts.far || 0, shadow: opts.cast ? opts.shadowRange || 0 : 0 });
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   const dirtyM = new Set(), dirtyC = new Set();
   return {
@@ -179,7 +188,7 @@ export function instancedChunks(geo, mat, items, opts = {}) {
       dirtyC.forEach((m) => { if (meshes[m].instanceColor) meshes[m].instanceColor.needsUpdate = true; });
       dirtyM.clear(); dirtyC.clear();
     },
-    set visible(v) { meshes.forEach((m) => { m.visible = v; }); },
+    set visible(v) { meshes.forEach((m) => { m.userData.off = !v; m.visible = v && !m.userData.far; }); },
   };
 }
 
@@ -199,4 +208,90 @@ export function instancedVariants(geos, mat, items, variantOf, opts = {}) {
     commit() { hs.forEach((h) => h && h.commit()); },
     set visible(v) { hs.forEach((h) => { if (h) h.visible = v; }); },
   };
+}
+
+// ───────────── distance: what gets drawn, and what casts shadows ─────────────
+const ranged = [], lodSets = [];
+const FR = new THREE.Frustum(), FM = new THREE.Matrix4(), SPH = new THREE.Sphere();
+
+/**
+ * Trees and other big things with two shapes: the detailed one near the camera (casting
+ * shadows), a simple one further away (no shadow, and skipped when off screen). Instances are
+ * re-sorted only when something crosses a boundary. The handle edits by index in `items`.
+ */
+export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
+  const near2 = (opts.near || 55) ** 2, lift = opts.lift || 3, radius = opts.radius || 3.5;
+  const n = items.length, kind = items.map(variantOf);
+  const mats = new Float32Array(n * 16);
+  items.forEach((it, i) => composeItem(it).toArray(mats, i * 16));
+  const colors = items.map((it) => (it.color ? it.color.clone() : null));
+  const counts = nearGeos.map((_, v) => kind.filter((k) => k === v).length);
+  const mk = (geo, cap, cast) => {
+    const m = new THREE.InstancedMesh(geo, mat, Math.max(cap, 1));
+    if (colors[0]) m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(cap, 1) * 3), 3);
+    m.count = 0; m.visible = false;
+    m.frustumCulled = false; // placement is handled here
+    m.castShadow = cast; m.receiveShadow = true;
+    scene.add(m);
+    return m;
+  };
+  const nearM = nearGeos.map((g, v) => mk(g, counts[v], !!opts.cast));
+  const farM = farGeos.map((g, v) => mk(g, counts[v], false));
+  const state = new Uint8Array(n).fill(255), fill = new Int32Array(nearGeos.length * 2);
+  let dirty = true, on = true;
+  const set = {
+    count: n,
+    material: mat,
+    update(cam) {
+      let changed = dirty;
+      for (let i = 0; i < n; i++) {
+        const it = items[i], dx = it.x - cam.x, dz = it.z - cam.z, sc = it.s || 1;
+        let st = 0;
+        if (on) {
+          if (dx * dx + dz * dz < near2) st = 1;
+          else { SPH.center.set(it.x, it.y + lift * sc, it.z); SPH.radius = radius * sc; st = FR.intersectsSphere(SPH) ? 2 : 0; }
+        }
+        if (st !== state[i]) { state[i] = st; changed = true; }
+      }
+      if (!changed) return;
+      dirty = false;
+      fill.fill(0);
+      for (let i = 0; i < n; i++) {
+        if (!state[i]) continue;
+        const slot = kind[i] * 2 + state[i] - 1, m = state[i] === 1 ? nearM[kind[i]] : farM[kind[i]], k = fill[slot]++;
+        m.instanceMatrix.array.set(mats.subarray(i * 16, i * 16 + 16), k * 16);
+        if (colors[i]) colors[i].toArray(m.instanceColor.array, k * 3);
+      }
+      [nearM, farM].forEach((list, f) => list.forEach((m, v) => {
+        m.count = fill[v * 2 + f];
+        m.visible = m.count > 0;
+        m.instanceMatrix.needsUpdate = true;
+        if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      }));
+    },
+    setColorAt(i, c) { colors[i].copy(c); dirty = true; },
+    commit() {},
+    set visible(v) { on = v; dirty = true; },
+  };
+  lodSets.push(set);
+  return set;
+}
+
+/**
+ * Once a frame, after the camera has moved: hide plant chunks beyond their fade distance,
+ * let only chunks near `focus` (the shadow box follows it) cast shadows, and re-sort trees.
+ */
+export function updateDetail(camera, focus) {
+  camU.value.copy(camera.position);
+  const cx = camera.position.x, cz = camera.position.z;
+  for (const r of ranged) {
+    for (const m of r.meshes) {
+      const s = m.geometry.boundingSphere, x = m.position.x + s.center.x, z = m.position.z + s.center.z;
+      if (r.far) { m.userData.far = Math.hypot(x - cx, z - cz) - s.radius > r.far; m.visible = !m.userData.off && !m.userData.far; }
+      if (r.shadow) m.castShadow = Math.hypot(x - focus.x, z - focus.z) - s.radius < r.shadow;
+    }
+  }
+  camera.updateMatrixWorld();
+  FR.setFromProjectionMatrix(FM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+  for (const l of lodSets) l.update(camera.position);
 }

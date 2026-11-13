@@ -203,3 +203,27 @@ export function crownGeos() { return CROWNS.map((v, i) => ({ top: crownTop(v, 50
 
 /** A stable pick in 0..n-1 for something standing at (x, z). */
 export const variantAt = (x, z, n, salt = 0) => Math.min(n - 1, Math.floor(hash(Math.round(x * 13) + salt, Math.round(z * 13) - salt) * n));
+
+// ───────────── simple far shapes (same size and colouring, a fraction of the triangles) ─────────────
+export function pineFarGeos() {
+  return PINES.map((v) => {
+    const b = new Builder(), H = v.top - v.bottom;
+    [[v.bottom - 0.25, v.bottom + H * 0.55, 1.62 * v.width], [v.bottom + H * 0.3, v.bottom + H * 0.8, 1.15 * v.width], [v.bottom + H * 0.6, v.top, 0.72]].forEach(([y0, y1, r]) => {
+      b.solid(new THREE.ConeGeometry(r, y1 - y0, 7).translate(0, (y0 + y1) / 2, 0), (x, y) => (y < y0 + 0.01 ? 0.55 : lerp(0.8, 1.1, Math.hypot(x, 0) / r)));
+    });
+    return b.build();
+  });
+}
+export function crownFarGeos() {
+  return CROWNS.map((v) => {
+    const b = new Builder();
+    let lo = Infinity, hi = -Infinity;
+    v.blobs.forEach(([, y, , r]) => { lo = Math.min(lo, y - r * 0.85); hi = Math.max(hi, y + r * 0.85); });
+    v.blobs.slice().sort((p, q) => q[3] - p[3]).slice(0, 4).forEach(([x, y, z, r]) => {
+      b.solid(new THREE.IcosahedronGeometry(r * 1.05, 0).scale(1, 0.86, 1).translate(x, y, z), (px, py) => lerp(0.68, 1.14, (py - lo) / (hi - lo)));
+    });
+    return b.build();
+  });
+}
+export function pineTrunkFarGeos() { return PINES.map((v) => new THREE.CylinderGeometry(0.06, 0.27, v.top - 0.9, 5).translate(0, (v.top - 0.9) / 2, 0)); }
+export function crownTrunkFarGeos() { return CROWNS.map((v) => new THREE.CylinderGeometry(0.17, 0.32, v.trunk + 0.5, 5).translate(0, (v.trunk + 0.5) / 2, 0)); }

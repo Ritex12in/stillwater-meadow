@@ -3,7 +3,7 @@ import './style.css';
 import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
-import { timeU } from './core/materials.js';
+import { timeU, updateDetail } from './core/materials.js';
 import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT } from './core/shape.js';
 import { hooks, seasonState, seats } from './core/state.js';
 import { clock } from './core/clock.js';
@@ -188,6 +188,7 @@ export function tick(dt) {
   sky.position.copy(camera.position);
   sun.position.set(camTarget.x + lightDir.x * 140, camTarget.y - 1.55 + lightDir.y * 140, camTarget.z + lightDir.z * 140);
   sun.target.position.set(camTarget.x, camTarget.y - 1.55, camTarget.z);
+  safe('detail', () => updateDetail(camera, camTarget));
   actionTimer -= dt;
   if (actionTimer <= 0) { actionTimer = 0.1; safe('prompts', () => renderPrompts(evaluateActions())); }
   updateHud(dt);
@@ -209,6 +210,7 @@ applySky();
 updateBoat(0, 0, cur.eve, cur.day);
 updatePlayer(0, updatePetting);
 updateCamera(0, player);
+updateDetail(camera, camTarget);
 renderer.shadowMap.needsUpdate = true;
 renderNow();
 requestAnimationFrame(frame);

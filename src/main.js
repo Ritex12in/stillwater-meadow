@@ -17,6 +17,7 @@ import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, bu
 import { loadKit, kit } from './core/assets.js';
 import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows, lampSpots } from './world/props.js';
 import { buildFences } from './world/kitprops.js';
+import { buildWildflowers } from './world/wildflowers.js';
 import { buildClouds, buildFireflies, buildButterflies, buildPollen, updateAmbientLife, cloudMat, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
 import { buildEffects, updateEffects } from './world/effects.js';
 import { player, buildPlayer, updatePlayer } from './characters/player.js';
@@ -72,6 +73,7 @@ buildGrass();
 buildFlowers();
 buildReedsAndPads();
 if (kit) buildUndergrowth(treeSpots);
+if (kit) buildWildflowers();
 buildDockAndBench();
 buildChairs();
 buildLamps();

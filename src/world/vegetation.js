@@ -7,7 +7,7 @@ import { height, lakeT, lakeR, lakePoint, pathAmt, SPAWN, onDock, dockStart, DOC
 import { std, col, weatherize, addWind, bothSides, instanced, instancedChunks, instancedVariants, lodSet } from '../core/materials.js';
 import { pineFarGeos, crownFarGeos, pineTrunkFarGeos, crownTrunkFarGeos, pineGeos, crownGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
 import { world, obstacles } from '../core/state.js';
-import { kit } from '../core/assets.js';
+import { kit, fit } from '../core/assets.js';
 import { kitTrees, kitRocks, kitFlowerParts, KIT_FLOWER_COLOURS } from './kitplants.js';
 import { buildGrassField } from './grassfield.js';
 export { buildUndergrowth } from './kitplants.js';
@@ -136,6 +136,28 @@ function addDrifts(flowers, petals) {
   world.driftCount = flowers.length - first;
 }
 
+/**
+ * The meadow pack's flower clumps (CC0) standing in for the five hand-built kinds, in the order
+ * daisy, tulip, poppy, lavender, allium; `colour` is what a picked one adds to the bouquet.
+ */
+const MEADOW_FLOWERS = [
+  { model: 'Flower_2_Clump', colour: col('#f3d36a') },  // yellow cosmos
+  { model: 'Flower_4_Clump', colour: col('#f3a6c4') },  // pink cosmos
+  { model: 'Flower_3_Clump', colour: col('#56c3d6') },  // cyan bloom
+  { model: 'Flower_5_Clump', colour: col('#b98ae6') },  // violet iris
+  { model: 'Flower_1_Clump', colour: col('#4aa9d0') },  // blue hydrangea
+];
+function meadowFlowerParts(flowers) {
+  const geos = MEADOW_FLOWERS.map(({ model }) => {
+    const parts = fit(Object.fromEntries(Object.entries(kit.models[model]).map(([k, g]) => [k, g.clone()])), model === 'Flower_1_Clump' ? 0.62 : 0.52);
+    const g = Object.values(parts)[0], n = g.attributes.normal;
+    for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0); // petals lit evenly from above, not edge-on dark
+    return g;
+  });
+  const mat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ map: kit.tex.meadow_flowers, alphaTest: 0.5, vertexColors: true }), 0.6, FLOWER_FADE), 'lam'));
+  return instancedVariants(geos, mat, flowers.map((f) => Object.assign({}, f, { color: null })), (f) => (f.kind < FLOWER_KINDS.length ? f.kind : -1), { cell: 50, far: FLOWER_FADE[1] });
+}
+
 export function buildFlowers() {
   const flowers = [];
   const petals = ['#ffffff', '#f6d65a', '#f19cb7', '#b7a3e6', '#ff9f7a', '#fdf0b0'].map(col);
@@ -151,10 +173,12 @@ export function buildFlowers() {
   // kinds grow in drifts, with a few strays; stems vary in height
   // (with the kit there are two more kinds, 5 and 6, whose colour comes with the model)
   const kinds = kit ? FLOWER_KINDS.length + 2 : FLOWER_KINDS.length;
+  const meadow = !!(kit && kit.models.Flower_1_Clump);
   flowers.forEach((f) => {
     const drift = Math.floor(vnoise(f.x * 0.12 + 7, f.z * 0.12 + 3) * kinds * 1.6) % kinds;
     f.kind = f.drift !== undefined ? f.drift % kinds : variantAt(f.x, f.z, 10, 5) < 7 ? drift : variantAt(f.x, f.z, kinds, 6);
     if (KIT_FLOWER_COLOURS[f.kind]) f.color = KIT_FLOWER_COLOURS[f.kind];
+    else if (meadow) f.color = MEADOW_FLOWERS[f.kind].colour; // the clump's own colour, for the bouquet
     f.sy = f.s * (0.75 + 0.6 * variantAt(f.x, f.z, 100, 7) / 100);
   });
   const stemMat = bothSides(addWind(new THREE.MeshLambertMaterial({ color: '#4f7a36', vertexColors: true }), 0.6, FLOWER_FADE));
@@ -162,7 +186,8 @@ export function buildFlowers() {
   const centreMat = addWind(new THREE.MeshLambertMaterial({ color: '#ffffff' }), 0.6, FLOWER_FADE);
   const centres = flowers.map((f) => Object.assign({}, f, { color: FLOWER_CENTRE[FLOWER_KINDS[f.kind]] ? col(FLOWER_CENTRE[FLOWER_KINDS[f.kind]]) : null }));
   world.flowerItems = flowers;
-  const parts = [
+  // the five hand-built kinds show as the meadow pack's flower clumps when it loaded
+  const parts = meadow ? [meadowFlowerParts(flowers)] : [
     instancedVariants([flowerStemGeo()], stemMat, flowers.map((f) => Object.assign({}, f, { color: null })), (f) => (f.kind < FLOWER_KINDS.length ? 0 : -1), { cell: 50, far: FLOWER_FADE[1] }),
     instancedVariants(flowerHeadGeos(), headMat, flowers, (f) => (f.kind < FLOWER_KINDS.length ? f.kind : -1), { cell: 50, far: FLOWER_FADE[1] }),
     instancedVariants([flowerCentreGeo()], centreMat, centres, (f) => (f.color ? 0 : -1), { cell: 50, far: FLOWER_FADE[1] }),

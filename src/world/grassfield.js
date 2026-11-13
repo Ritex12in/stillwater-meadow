@@ -89,7 +89,7 @@ function grassMaterial(map, tex) {
           float k = (1.0 - smoothstep(cut - 5.0, cut, d)) * smoothstep(0.25, 0.6, g.y) * smoothstep(uInner - 3.0, uInner, d);
           // meadow patches: taller, lusher grass in drifts, shorter turf between
           float drift = gh(floor(base / 7.0)) * 0.5 + gh(floor(base / 3.1) + 5.0) * 0.5;
-          float tall = mix(0.22, 0.62, h3 * 0.5 + drift * 0.5) * uScale * k;
+          float tall = mix(0.15, 0.42, h3 * 0.5 + drift * 0.5) * uScale * k;
           float ang = h1 * 6.2832;
           vec3 p = position;
           p.xz *= mix(0.8, 1.3, h2) * uScale * (1.0 + smoothstep(uFade.x, uFade.y, d) * 0.8);

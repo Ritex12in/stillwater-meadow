@@ -68,7 +68,8 @@ Key ideas:
   separate stream.
 - **Nature models** (`core/assets.js`, `world/kitplants.js`): loaded before the world is built and
   reduced to plain geometry, so the same placement, wind, distance fade and season tinting apply.
-  Detailed models are used near the camera; simple shapes take over further away.
+  Beyond 55 m a tree draws a thinned copy of its own model (fewer, larger leaf cards; trunk and
+  main boughs only), so it keeps its look at a third of the cost.
 - **Performance**: grass, flowers, trees and rocks are split into culled chunks; rain, snow and
   leaves animate on the GPU; terrain height is baked into a grid matching the rendered mesh;
   quality tiers (shadow size and refresh rate, resolution, bloom) adapt to the frame rate.

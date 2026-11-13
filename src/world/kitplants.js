@@ -7,12 +7,13 @@ import { TAU, lerp, mulberry32, fbm } from '../core/math.js';
 import { height, lakeT, pathAmt, SPAWN, nearReserved } from '../core/shape.js';
 import { std, col, weatherize, addWind, bothSides, instancedVariants, lodSet, cutoutDepth } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
-import { Builder, variantAt } from './detail.js';
+import { variantAt } from './detail.js';
 import { world } from '../core/state.js';
 
 export const KIT_GRASS_FADE = [12, 20];  // detailed grass near you; the light tufts take over beyond
 export const KIT_FLOWER_FADE = [38, 52];
 const UNDERGROWTH_FADE = [40, 55];
+const FAR_KEEP = 0.4; // share of leaf cards a far tree keeps
 
 const tex = (n) => kit.tex[n];
 const leafStd = (map, extra = {}) => weatherize(std('#ffffff', Object.assign({ map, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true }, extra)), 'std');
@@ -42,39 +43,89 @@ function roundNormals(geo) {
 }
 
 // ───────────── trees ─────────────
-// simple far shapes sized to each model, with vertex colours so they share the tint
-function farPine(leaf) {
-  const b = new Builder(), bb = leaf.boundingBox, H = bb.max.y - bb.min.y;
-  const r = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) * 0.45;
-  [[bb.min.y, bb.min.y + H * 0.55, r], [bb.min.y + H * 0.3, bb.min.y + H * 0.8, r * 0.72], [bb.min.y + H * 0.6, bb.max.y, r * 0.45]].forEach(([y0, y1, rr]) => {
-    b.solid(new THREE.ConeGeometry(rr, y1 - y0, 7).translate(0, (y0 + y1) / 2, 0), (x, y) => (y < y0 + 0.01 ? 0.55 : lerp(0.78, 1.05, Math.hypot(x, 0) / rr)));
-  });
-  return b.build();
+// Far trees are the same models, thinned: the crown keeps a share of its leaf cards, each grown
+// so the crown stays as full, and the trunk keeps only what shows below and through the leaves.
+// Same textures and material as up close, so a tree doesn't change look when it switches.
+function subset(geo, keepTri, move) {
+  const idx = geo.index.array, src = geo.attributes, out = new THREE.BufferGeometry();
+  const tris = [];
+  for (let t = 0; t < idx.length / 3; t++) if (keepTri(t)) tris.push(t);
+  const remap = new Map(), order = [];
+  const index = [];
+  tris.forEach((t) => { for (let k = 0; k < 3; k++) { const v = idx[t * 3 + k]; if (!remap.has(v)) { remap.set(v, order.length); order.push(v); } index.push(remap.get(v)); } });
+  for (const name of ['position', 'normal', 'uv', 'color']) {
+    const a = src[name];
+    if (!a) continue;
+    const arr = new Float32Array(order.length * a.itemSize);
+    order.forEach((v, i) => { for (let c = 0; c < a.itemSize; c++) arr[i * a.itemSize + c] = a.array[v * a.itemSize + c]; });
+    out.setAttribute(name, new THREE.BufferAttribute(arr, a.itemSize));
+  }
+  out.setIndex(index);
+  if (move) move(out.attributes.position, order);
+  out.computeBoundingBox(); out.computeBoundingSphere();
+  return out;
 }
-function farCrown(leaf) {
-  const b = new Builder(), bb = leaf.boundingBox, c = new THREE.Vector3(), e = new THREE.Vector3();
-  bb.getCenter(c); bb.getSize(e).multiplyScalar(0.5);
-  const r = Math.min(e.x, e.z) * 0.68; // the kit crowns are airy; a solid blob that size looks heavier
-  [[0, 0, 0, 1], [0.45, -0.15, 0.2, 0.7], [-0.45, -0.1, -0.2, 0.7], [0.05, 0.4, -0.05, 0.65]].forEach(([dx, dy, dz, k]) => {
-    b.solid(new THREE.IcosahedronGeometry(r * k, 0).scale(1, e.y / Math.max(e.x, e.z) * 1.1, 1).translate(c.x + dx * e.x, c.y + dy * e.y, c.z + dz * e.z), (x, y) => lerp(0.68, 1.1, (y - bb.min.y) / (bb.max.y - bb.min.y)));
-  });
-  return b.build();
+/**
+ * The separate pieces of a model (leaf cards, or trunk and branches), as triangle lists.
+ * `weld` also joins vertices that share a position (split only for their texture seams).
+ */
+function pieces3(geo, weld) {
+  const idx = geo.index.array, p = geo.attributes.position, parent = new Int32Array(p.count).map((_, i) => i);
+  const find = (v) => { while (parent[v] !== v) v = parent[v] = parent[parent[v]]; return v; };
+  if (weld) {
+    const at = new Map();
+    for (let i = 0; i < p.count; i++) {
+      const k = Math.round(p.getX(i) * 1e4) + ',' + Math.round(p.getY(i) * 1e4) + ',' + Math.round(p.getZ(i) * 1e4);
+      if (at.has(k)) parent[find(i)] = find(at.get(k)); else at.set(k, i);
+    }
+  }
+  for (let t = 0; t < idx.length; t += 3) { const a = find(idx[t]); parent[find(idx[t + 1])] = a; parent[find(idx[t + 2])] = a; }
+  const byRoot = new Map();
+  for (let t = 0; t < idx.length / 3; t++) { const r = find(idx[t * 3]); if (!byRoot.has(r)) byRoot.set(r, []); byRoot.get(r).push(t); }
+  return [...byRoot.values()];
 }
-const farTrunk = (leaf) => { const top = leaf.boundingBox.min.y + 0.8; return new THREE.CylinderGeometry(0.1, 0.28, top, 5).translate(0, top / 2, 0); };
+function farLeaves(leaf, keep) {
+  const list = pieces3(leaf, false), p = leaf.attributes.position, idx = leaf.index.array;
+  const grow = 1 / Math.sqrt(keep); // same total leaf area
+  const kept = new Set(), centre = new Map();
+  list.forEach((tris, i) => {
+    if (((i * 2654435761) >>> 0) / 4294967296 >= keep) return;
+    const c = new THREE.Vector3(), seen = new Set();
+    tris.forEach((t) => { for (let k = 0; k < 3; k++) { const v = idx[t * 3 + k]; if (!seen.has(v)) { seen.add(v); c.x += p.getX(v); c.y += p.getY(v); c.z += p.getZ(v); } } });
+    c.divideScalar(seen.size);
+    tris.forEach((t) => { kept.add(t); for (let k = 0; k < 3; k++) centre.set(idx[t * 3 + k], c); });
+  });
+  return subset(leaf, (t) => kept.has(t), (pos, order) => {
+    order.forEach((v, i) => {
+      const c = centre.get(v);
+      pos.setXYZ(i, c.x + (pos.getX(i) - c.x) * grow, c.y + (pos.getY(i) - c.y) * grow, c.z + (pos.getZ(i) - c.z) * grow);
+    });
+  });
+}
+/**
+ * The trunk (one piece in these models) and its `boughs` biggest branches. Leafy crowns are
+ * airy, so a few boughs show through them; a pine's are hidden by its needles.
+ */
+function farBark(bark, boughs) {
+  const list = pieces3(bark, true).sort((a, b) => b.length - a.length).slice(0, 1 + boughs);
+  const kept = new Set(list.flat());
+  return subset(bark, (t) => kept.has(t));
+}
 
 /** Kit trees in place of the hand-built ones. Returns the leaf handle seasons recolour. */
-export function kitTrees(pines, pineItems, rounds, roundItems, lod, procLeaf, procBark) {
+export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
   const pineModels = [1, 2, 3, 4, 5].map((i) => fit(pieces('Pine_' + i), 6.4, 0.15));
   const roundModels = [1, 2, 3, 4, 5].map((i) => fit(pieces('CommonTree_' + i), 6.2, 0.15));
   const bark = weatherize(std('#ffffff', { map: tex('bark'), flatShading: false, vertexColors: true }), 'std');
   const pineLeaf = leafStd(tex('leaves_pine')), roundLeaf = leafStd(tex('leaves_round'));
   const pineKind = (t) => variantAt(t.x, t.z, 5, 3), roundKind = (t) => variantAt(t.x, t.z, 5, 8);
   const pl = pineModels.map((m) => first(m, /Leaves/)), rl = roundModels.map((m) => first(m, /Leaves/));
+  const pb = pineModels.map((m) => first(m, /Bark/)), rb = roundModels.map((m) => first(m, /Bark/));
   const L = Object.assign({}, lod, { lift: 3.2, radius: 4 });
-  lodSet(pineModels.map((m) => first(m, /Bark/)), pl.map(farTrunk), bark, pines, pineKind, Object.assign({}, L, { farMat: procBark }));
-  lodSet(pl, pl.map(farPine), pineLeaf, pineItems, pineKind, Object.assign({}, L, { farMat: procLeaf, depthMat: cutoutDepth(tex('leaves_pine')) }));
-  lodSet(roundModels.map((m) => first(m, /Bark/)), rl.map(farTrunk), bark, rounds, roundKind, Object.assign({}, L, { farMat: procBark }));
-  return lodSet(rl, rl.map(farCrown), roundLeaf, roundItems, roundKind, Object.assign({}, L, { farMat: procLeaf, depthMat: cutoutDepth(tex('leaves_round')) }));
+  lodSet(pb, pb.map((b) => farBark(b, 0)), bark, pines, pineKind, L);
+  lodSet(pl, pl.map((l) => farLeaves(l, FAR_KEEP)), pineLeaf, pineItems, pineKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_pine')) }));
+  lodSet(rb, rb.map((b) => farBark(b, 3)), bark, rounds, roundKind, L);
+  return lodSet(rl, rl.map((l) => farLeaves(l, FAR_KEEP)), roundLeaf, roundItems, roundKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_round')) }));
 }
 
 // ───────────── rocks ─────────────

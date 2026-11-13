@@ -26,9 +26,6 @@ export const waterU = {
   uLight: { value: 1 },
   lampW: { value: [] },          // lamp lanterns, world space (set in main.js)
   lampAmt: { value: 0 },
-  tRefl: { value: null },        // the mirrored scene (High quality), see renderReflection
-  reflMat: { value: new THREE.Matrix4() },
-  reflAmt: { value: 0 },
 };
 
 export function buildWater() {
@@ -37,13 +34,10 @@ export function buildWater() {
   const water = new THREE.Mesh(geo, new THREE.ShaderMaterial({
     uniforms: waterU,
     vertexShader: `
-      uniform mat4 reflMat;
       varying vec3 vWP;
-      varying vec4 vRefl;
       void main() {
         vec4 wp = modelMatrix * vec4(position, 1.0);
         vWP = wp.xyz;
-        vRefl = reflMat * wp;
         gl_Position = projectionMatrix * viewMatrix * wp;
       }`,
     fragmentShader: GRADE_GLSL + HAZE_GLSL + `
@@ -52,7 +46,6 @@ export function buildWater() {
       uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun;
       uniform float fogNear; uniform float fogFar; uniform vec2 lakeC;
       uniform vec3 lampW[12]; uniform float lampAmt;
-      uniform sampler2D tRefl; uniform float reflAmt; varying vec4 vRefl;
       varying vec3 vWP;
       vec2 wave(vec2 p, vec2 d, float f, float s, float a) {
         return d * cos(dot(p, d) * f + uTime * s) * f * a;
@@ -107,17 +100,19 @@ export function buildWater() {
         float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
         vec3 r = reflect(-v, n);
         vec3 skyc = mix(skyHorizon, skyTop, pow(clamp(r.y, 0.0, 1.0), 0.5));
-        if (reflAmt > 0.0) {
-          // the shore, trees and hills mirrored in the lake, wobbling with the waves
-          vec4 ru = vRefl;
-          ru.xy += g * ru.w * 0.06;
-          skyc = mix(skyc, texture2DProj(tRefl, ru).rgb, reflAmt);
-        }
         float t = lakeT(p);
         vec3 base = mix(deep, shallow, smoothstep(0.5, 0.95, t));
         vec3 c = mix(base, skyc, clamp(fres * 0.85 + 0.12, 0.0, 1.0));
         float sp = pow(max(dot(r, normalize(sunDir)), 0.0), 220.0);
         c += sunColor * sp * 1.8;
+        // the sun's or moon's glitter path: a long, broken streak of light running toward you
+        {
+          vec3 sd = normalize(sunDir);
+          vec3 rq = normalize(vec3(r.x, r.y * 0.3, r.z)), sq = normalize(vec3(sd.x, sd.y * 0.3, sd.z));
+          float path = pow(max(dot(rq, sq), 0.0), 700.0);
+          float sparkle = 0.55 + 0.45 * sin(dot(p, vec2(7.3, 5.1)) + uTime * 2.3 + g.x * 40.0);
+          c += sunColor * path * sparkle * 1.1 * (1.0 - uIce * 0.6);
+        }
         vec3 lampGlint = vec3(0.0);
         // the lamps' reflections: long wavering streaks of warm light across the water
         if (lampAmt > 0.01) {
@@ -149,64 +144,4 @@ export function buildWater() {
   water.position.set(LAKE.x, 0.02, LAKE.z);
   water.receiveShadow = false;
   scene.add(water);
-  waterMesh = water;
-}
-
-// ── Reflections (after three's Reflector): the scene drawn from a camera mirrored in the water,
-// into a texture the lake samples. Kept cheap: a third of the screen's resolution, no small plants
-// (layer 1), and only redrawn every few frames (more often while the camera turns quickly). The
-// waves wobble it anyway, so a slightly stale mirror can't be told apart. ──
-let waterMesh = null, reflTarget = null, reflAge = 99;
-const lastQ = new THREE.Quaternion(), lastP = new THREE.Vector3();
-const virtual = new THREE.PerspectiveCamera(), plane = new THREE.Plane(), clip = new THREE.Vector4(), q = new THREE.Vector4();
-const N = new THREE.Vector3(0, 1, 0), P = new THREE.Vector3(), camP = new THREE.Vector3(), look = new THREE.Vector3(), tgt = new THREE.Vector3(), rot = new THREE.Matrix4();
-const FRU = new THREE.Frustum(), FMAT = new THREE.Matrix4(), LAKE_S = new THREE.Sphere(new THREE.Vector3(LAKE.x, 0, LAKE.z), 50);
-
-/** Draw the reflection if the lake is on screen; `before`/`after` let lighting follow the mirrored view. */
-export function renderReflection(renderer, scene, camera, on, before, after, every = 4) {
-  waterU.reflAmt.value = 0;
-  if (!on || !waterMesh) return;
-  FRU.setFromProjectionMatrix(FMAT.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-  if (!FRU.intersectsSphere(LAKE_S) || camera.position.y < 0.02) return;
-  // skip this frame if the last mirror is recent and the camera has hardly moved
-  const turned = 1 - Math.abs(lastQ.dot(camera.quaternion)), moved = lastP.distanceToSquared(camera.position);
-  if (reflTarget && ++reflAge < every && turned < 2e-4 && moved < 0.25) { waterU.reflAmt.value = 0.9; return; }
-  reflAge = 0; lastQ.copy(camera.quaternion); lastP.copy(camera.position);
-  const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-  const w = Math.max(2, Math.floor(size.x / 3)), h = Math.max(2, Math.floor(size.y / 3));
-  if (!reflTarget) { reflTarget = new THREE.WebGLRenderTarget(w, h); reflTarget.texture.generateMipmaps = false; waterU.tRefl.value = reflTarget.texture; }
-  if (reflTarget.width !== w || reflTarget.height !== h) reflTarget.setSize(w, h);
-  P.set(LAKE.x, 0.02, LAKE.z);
-  camP.setFromMatrixPosition(camera.matrixWorld);
-  rot.extractRotation(camera.matrixWorld);
-  look.set(0, 0, -1).applyMatrix4(rot).add(camP);
-  // mirror the camera and the point it looks at in the (horizontal) water plane
-  tgt.copy(look); tgt.y = 2 * P.y - look.y;
-  virtual.position.set(camP.x, 2 * P.y - camP.y, camP.z);
-  virtual.up.set(0, 1, 0).applyMatrix4(rot).reflect(N);
-  virtual.lookAt(tgt);
-  virtual.far = camera.far; virtual.near = camera.near;
-  virtual.updateMatrixWorld();
-  virtual.projectionMatrix.copy(camera.projectionMatrix);
-  virtual.layers.set(0);
-  const m = waterU.reflMat.value;
-  m.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
-  m.multiply(virtual.projectionMatrix).multiply(virtual.matrixWorldInverse);
-  // oblique near plane at the water, so nothing below it is drawn
-  plane.setFromNormalAndCoplanarPoint(N, P).applyMatrix4(virtual.matrixWorldInverse);
-  clip.set(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
-  const e = virtual.projectionMatrix.elements;
-  q.set((Math.sign(clip.x) + e[8]) / e[0], (Math.sign(clip.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
-  clip.multiplyScalar(2 / clip.dot(q));
-  e[2] = clip.x; e[6] = clip.y; e[10] = clip.z + 1; e[14] = clip.w;
-  waterMesh.visible = false;
-  if (before) before(virtual);
-  const prev = renderer.getRenderTarget();
-  renderer.setRenderTarget(reflTarget);
-  renderer.clear();
-  renderer.render(scene, virtual);
-  renderer.setRenderTarget(prev);
-  if (after) after(camera);
-  waterMesh.visible = true;
-  waterU.reflAmt.value = 0.9;
 }

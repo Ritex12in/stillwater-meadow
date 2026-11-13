@@ -148,8 +148,10 @@ function fuse(root) {
 
 /** The cherry trees: the kit's twisted trees in blossom, or simple pink crowns without the kit. */
 function cherries(group, spots, mats) {
-  const pinks = ['#ffc4d8', '#ffb3cd', '#ffd3e2', '#f9a8c6', '#ffe1ea'].map((c) => new THREE.Color(c));
+  // hot pinks, as vivid as blossom against a blue sky
+  const pinks = ['#ff5c93', '#ff77a8', '#ff4d88', '#ff8fb6', '#ff6ea0', '#ffa6c6'].map((c) => new THREE.Color(c));
   const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
+  const white = new THREE.Color(1, 1, 1);
   const place = (geo, mat, list, depth) => {
     if (!list.length) return;
     const m = new THREE.InstancedMesh(geo, mat, list.length);
@@ -159,29 +161,66 @@ function cherries(group, spots, mats) {
     });
     m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false;
     if (depth) m.customDepthMaterial = depth;
-    m.layers.set(1); // not in the lake's mirror: the grove is far from the water
     group.add(m);
   };
   spots.forEach((t, i) => { t.color = pinks[i % pinks.length]; });
-  if (kit && kit.models.TwistedTree_1) {
-    const leaf = weatherize(addWind(std('#ffffff', { map: kit.tex.leaves_bush, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true, emissive: '#ff9ec2', emissiveIntensity: 0 }), 0.0022, null, null, 0.07), 'std');
-    const bark = weatherize(std('#ffffff', { map: kit.tex.bark_twisted, flatShading: false, vertexColors: true }), 'std');
-    leaf.color.setRGB(1.75, 1.42, 1.56); // the leaf texture is a mid grey: lift it to a bright blossom pink
-    mats.blossom = leaf;
-    const depth = cutoutDepth(kit.tex.leaves_bush);
-    const white = new THREE.Color(1, 1, 1);
-    for (let v = 1; v <= 5; v++) {
-      const parts = kit.models['TwistedTree_' + v], list = spots.filter((t) => t.v === v);
-      const find = (re) => Object.entries(parts).find(([k]) => re.test(k))[1];
-      place(find(/Leaves/), leaf, list, depth);
-      place(find(/Bark/), bark, list.map((t) => Object.assign({}, t, { color: white })), null);
-    }
+  mats.blossoms = [];
+  if (kit && kit.models.CommonTree_1) {
+    // tall, full crowns: the kit's dense common trees and (with the meadow pack) spreading maples
+    const families = [{ prefix: 'CommonTree_', leaves: 'leaves_round', bark: 'bark', share: kit.models.MapleTree_1 ? 0.6 : 1 }];
+    if (kit.models.MapleTree_1) families.push({ prefix: 'MapleTree_', leaves: 'maple_leaves', bark: 'maple_bark', share: 1 });
+    spots.forEach((t) => { t.fam = t.pick < families[0].share ? 0 : 1; });
+    families.forEach((f, fi) => {
+      const leaf = weatherize(addWind(std('#ffffff', { map: kit.tex[f.leaves], alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true, emissive: '#ff5c93', emissiveIntensity: 0 }), 0.0022, null, null, 0.07), 'std');
+      leaf.color.setRGB(1.5, 1.24, 1.34); // lift the grey leaf texture so the pinks stay bright
+      const bark = weatherize(std('#8a7a78', { map: kit.tex[f.bark], flatShading: false, vertexColors: true }), 'std');
+      mats.blossoms.push(leaf);
+      const depth = cutoutDepth(kit.tex[f.leaves]);
+      for (let v = 1; v <= 5; v++) {
+        const parts = kit.models[f.prefix + v], list = spots.filter((t) => t.fam === fi && t.v === v);
+        const find = (re) => Object.entries(parts).find(([k]) => re.test(k))[1];
+        place(find(/Leaves/), leaf, list, depth);
+        place(find(/Bark/), bark, list.map((t) => Object.assign({}, t, { color: white })), null);
+      }
+    });
   } else {
-    const leaf = weatherize(std('#ffffff', { emissive: '#ff9ec2', emissiveIntensity: 0 }), 'std');
-    mats.blossom = leaf;
+    const leaf = weatherize(std('#ffffff', { emissive: '#ff5c93', emissiveIntensity: 0 }), 'std');
+    mats.blossoms.push(leaf);
     place(new THREE.IcosahedronGeometry(2.3, 1).scale(1.2, 0.8, 1.2).translate(0, 4.6, 0), leaf, spots, null);
-    place(new THREE.CylinderGeometry(0.16, 0.3, 3.4, 6).translate(0, 1.7, 0), std('#5a4038'), spots.map((t) => Object.assign({}, t, { color: new THREE.Color(1, 1, 1) })), null);
+    place(new THREE.CylinderGeometry(0.16, 0.3, 3.4, 6).translate(0, 1.7, 0), std('#5a4038'), spots.map((t) => Object.assign({}, t, { color: white })), null);
   }
+}
+
+/**
+ * The flower carpet: clumps of pink and pale blossom crowding the ground under the trees, from
+ * the meadow pack. Small plants (layer 1, no shadows), shown only while you are in or near the grove.
+ */
+function flowerCarpet(s, R) {
+  const g = new THREE.Group();
+  if (!kit || !kit.models.Flower_4_Clump) return g;
+  const mat = new THREE.MeshLambertMaterial({ map: kit.tex.meadow_flowers, alphaTest: 0.5, side: THREE.DoubleSide });
+  const spots = [[], []];
+  for (let i = 0; i < 6000 && spots[0].length + spots[1].length < 1500; i++) {
+    const a = R() * TAU, d = Math.sqrt(R()) * (GROVE_R + 5), x = s.x + Math.cos(a) * d, z = s.z + Math.sin(a) * d;
+    if (onShrineGround(x, z) || d > GROVE_R + 5 - R() * 5) continue;
+    spots[R() < 0.72 ? 0 : 1].push({ x, z, s: 0.75 + R() * 0.7, ry: R() * TAU });
+  }
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), Y = new THREE.Vector3(0, 1, 0), c = new THREE.Color();
+  [['Flower_4_Clump', [1.25, 0.85, 1.0]], ['Flower_2_Clump', [1.5, 1.5, 1.7]]].forEach(([name, tint], k) => {
+    const geo = Object.values(kit.models[name])[0].clone();
+    geo.computeBoundingBox();
+    const b = geo.boundingBox, sc = 0.36 / (b.max.y - Math.max(b.min.y, 0));
+    geo.translate(0, -Math.max(b.min.y, 0), 0).scale(sc, sc, sc);
+    const n = geo.attributes.normal; for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0); // lit evenly from above
+    const m = new THREE.InstancedMesh(geo, mat, spots[k].length);
+    spots[k].forEach((t, i) => {
+      m.setMatrixAt(i, M.compose(new THREE.Vector3(t.x, heightAt(t.x, t.z) - 0.02, t.z), Q.setFromAxisAngle(Y, t.ry), new THREE.Vector3(t.s * 1.5, t.s, t.s * 1.5)));
+      m.setColorAt(i, c.setRGB(tint[0], tint[1] * (0.85 + 0.3 * ((i * 7) % 10) / 10), tint[2]));
+    });
+    m.frustumCulled = false; m.receiveShadow = true; m.layers.set(1);
+    g.add(m);
+  });
+  return g;
 }
 
 /** Petals lying on the ground: a draped sheet of pink specks, thickest under the trees. */
@@ -254,7 +293,7 @@ export function buildShrine(lampSpots) {
   const mats = {
     red: weatherize(std('#c93a2c', { flatShading: false, roughness: 0.6 }), 'std'), dark: std('#22201f', { flatShading: false }),
     wood: weatherize(std('#7a5236', { roughness: 0.8 }), 'std'), white: std('#f1ece0'), stone: weatherize(std('#8f918c'), 'std'),
-    roof: weatherize(std('#35474c', { flatShading: false, roughness: 0.7 }), 'std'), gold: std('#d9b24a', { metalness: 0.5, roughness: 0.4 }), rope: std('#cdb98a'),
+    roof: weatherize(std('#3a4f55', { flatShading: false, roughness: 0.7, side: THREE.DoubleSide }), 'std'), gold: std('#d9b24a', { metalness: 0.5, roughness: 0.4 }), rope: std('#cdb98a'),
     light: new THREE.MeshStandardMaterial({ color: '#fff1cf', emissive: '#ffb45e', emissiveIntensity: 0 }),
   };
   const group = new THREE.Group();
@@ -267,7 +306,8 @@ export function buildShrine(lampSpots) {
   for (const [a, c] of [[0, 0], [2.8, 3.5], [2.8, -3.5], [-2.8, 3.5], [-2.8, -3.5]]) { const p = at(a, c); base = Math.min(base, heightAt(p.x, p.z)); }
   hall.position.set(s.x, base - 0.1, s.z); hall.rotation.y = yaw;
   group.add(hall);
-  for (const [a, c] of [[0, -2], [0, 0], [0, 2], [-1.6, -2], [-1.6, 2], [1.6, -2.6], [1.6, 2.6]]) { const p = at(a, c); obstacles.push({ x: p.x, z: p.z, r: 1.5 }); }
+  // the hall and its steps are solid: a close grid of blockers over the whole footprint
+  for (let a = -2.3; a <= 3.5; a += 0.95) for (let c = -3.1; c <= 3.11; c += 1.03) { if (a > 2.6 && Math.abs(c) > 1.3) continue; const p = at(a, c); obstacles.push({ x: p.x, z: p.z, r: 0.8 }); }
 
   // the path: stepping stones, three torii growing toward the entrance, lanterns in pairs
   const stoneGeo = new THREE.CylinderGeometry(0.42, 0.46, 0.1, 7), stones = [];
@@ -293,17 +333,20 @@ export function buildShrine(lampSpots) {
   fuse(group); // hall, gates and lanterns become one mesh per material
   // cherry trees: two loose rings round the hall, leaving the path open
   const spots = [];
-  for (let i = 0; i < 400 && spots.length < 16; i++) {
+  { const p = at(-7.5, 0); spots.push({ x: p.x, z: p.z, y: heightAt(p.x, p.z) - 0.15, s: 2.1, ry: 1.1, v: 1, pick: 0 }); } // the great tree behind the hall
+  for (let i = 0; i < 400 && spots.length < 13; i++) {
     const a = rr(0, TAU), d = rr(6.5, GROVE_R), x = s.x + Math.cos(a) * d, z = s.z + Math.sin(a) * d;
     const dx = x - s.x, dz = z - s.z, along = dx * s.fx + dz * s.fz, across = Math.abs(-dx * s.fz + dz * s.fx);
     if ((along > -2 && across < 3.4) || (Math.abs(along) < 5 && across < 6)) continue;
-    if (spots.some((t) => Math.hypot(t.x - x, t.z - z) < 5.2)) continue;
-    spots.push({ x, z, y: heightAt(x, z) - 0.15, s: rr(0.85, 1.25), ry: rr(0, TAU), v: 1 + Math.floor(R() * 5) });
+    if (spots.some((t) => Math.hypot(t.x - x, t.z - z) < 6.5)) continue;
+    spots.push({ x, z, y: heightAt(x, z) - 0.15, s: rr(1.15, 1.65), ry: rr(0, TAU), v: 1 + Math.floor(R() * 5), pick: R() });
   }
   spots.forEach((t) => obstacles.push({ x: t.x, z: t.z, r: 0.4 * t.s }));
   cherries(group, spots, mats);
   petalCarpet(group, s);
   scene.add(group);
+  const flowers = flowerCarpet(s, R);
+  scene.add(flowers);
   const petals = petalFall(s);
 
   const casters = []; group.traverse((o) => { if (o.isMesh && o.castShadow) casters.push(o); });
@@ -311,7 +354,7 @@ export function buildShrine(lampSpots) {
   // far away, none of it is drawn or animated
   hooks.frame.push((dt, t, camera) => {
     const d = Math.hypot(camera.position.x - s.x, camera.position.z - s.z), near = d < HIDE, detail = d < DETAIL;
-    group.visible = near; petals.mesh.visible = detail;
+    group.visible = near; petals.mesh.visible = flowers.visible = detail;
     if (!near) return;
     if (detail !== wasDetail) { wasDetail = detail; casters.forEach((m) => { m.castShadow = detail; }); }
     if (!detail) return;
@@ -320,6 +363,6 @@ export function buildShrine(lampSpots) {
     petals.u.uSize.value = window.innerHeight * 1.2;
     mats.light.emissiveIntensity = cur.eve * 2.2;
     glowMat.opacity = cur.eve * 0.8;
-    mats.blossom.emissiveIntensity = cur.eve * 0.16; // the blossom holds a faint glow after dark
+    mats.blossoms.forEach((b) => { b.emissiveIntensity = cur.eve * 0.14; }); // the blossom holds a faint glow after dark
   });
 }

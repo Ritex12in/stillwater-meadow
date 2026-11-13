@@ -101,9 +101,8 @@ Key ideas:
   bands that press the grass over and lighten it; tree crowns rustle with the same field.
 - **Scenery and light**: distant mountains with valley mist (`world/mountains.js`); painted
   sprite clouds and a flock of birds (`world/ambient.js`); lamp light pools painted into the shared
-  lighting code (`core/atmosphere.js`), lamp streaks and a mirrored reflection on the lake
-  (`world/water.js`, drawn at a third of the resolution, refreshed every few frames, without the
-  small plants on layer 1; High and Medium only); screen-space sunbeams (`systems/post.js`, High).
+  lighting code (`core/atmosphere.js`), and light on the lake (`world/water.js`): lamp streaks and the
+  sun's or moon's glitter path, with no mirrored scene; screen-space sunbeams (`systems/post.js`, High).
 - **Grass** (`world/grassfield.js`): made on the GPU in two draw calls. A tuft shape is drawn
   many times on grids that follow the camera; the vertex shader places each copy at a stable spot
   in its world cell, reads height and where grass grows from a baked map, thins it with distance

@@ -137,7 +137,7 @@ function field(geo, map, color, { grid, spacing, inner, fade, scale, tex }) {
   mat.customProgramCacheKey = () => 'grassfield-' + spacing + (tex ? '-tex' : '');
   const m = new THREE.Mesh(g, mat);
   m.frustumCulled = false; // placed in the shader round the camera
-  m.layers.set(1);         // small plants: the lake's reflection leaves them out
+  m.layers.set(1);         // small plants live on layer 1
   m.receiveShadow = true;
   scene.add(m);
   return mat;

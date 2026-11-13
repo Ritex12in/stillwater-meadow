@@ -1,6 +1,6 @@
 // Stillwater Meadow: boot, build the world in a fixed order, and run the frame loop.
 import './style.css';
-import { updateAtmosphere, atmosphereFor } from './core/atmosphere.js'; // patches the fog shader; keep first
+import { updateAtmosphere } from './core/atmosphere.js'; // patches the fog shader; keep first
 import * as THREE from 'three';
 import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug } from './core/env.js';
@@ -13,7 +13,7 @@ import { buildSky, sky, skyU, starMat } from './world/sky.js';
 import { buildMountains, tintMountains } from './world/mountains.js';
 import { buildLights, hemi, ambient, sun } from './world/lights.js';
 import { buildTerrain, groundU } from './world/terrain.js';
-import { buildWater, waterU, renderReflection } from './world/water.js';
+import { buildWater, waterU } from './world/water.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
 import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows, lampSpots } from './world/props.js';
@@ -242,8 +242,6 @@ export function tick(dt) {
   updateHud(dt);
 }
 function renderNow() {
-  // the lake's mirror, redrawn every n-th frame by the reflections setting (0: off)
-  renderReflection(renderer, scene, camera, quality.opts.reflections > 0, atmosphereFor, atmosphereFor, quality.opts.reflections);
   renderFrame(quality.opts.effects);
 }
 

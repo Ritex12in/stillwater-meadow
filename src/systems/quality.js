@@ -1,5 +1,5 @@
 // Graphics quality. A preset (Low … Ultra) is a set of separate options: resolution, shadows,
-// lake reflections, glow and sunbeams, grass density, wildflowers and the distant forest; any of
+// glow and sunbeams, grass density, wildflowers and the distant forest; any of
 // them can also be set on its own ("Custom"). "Auto" moves between Low, Medium and High by the
 // frame rate: down when frames take too long, back up when there is room.
 import { setShadowSize, sun } from '../world/lights.js';
@@ -8,17 +8,16 @@ import { setShadowSize, sun } from '../world/lights.js';
 export const OPTIONS = {
   resolution: { label: 'Resolution', choices: { low: ['Low', 1], medium: ['Medium', 1.5], high: ['High', 2], ultra: ['Full', 3] } },           // cap on device pixels per CSS pixel
   shadows: { label: 'Shadows', choices: { off: ['Off', null], low: ['Low', [1024, 4]], medium: ['Medium', [1536, 3]], high: ['High', [2048, 2]], ultra: ['Ultra', [4096, 1]] } }, // [map size, refresh every n frames]
-  reflections: { label: 'Lake reflections', choices: { off: ['Off', 0], low: ['Low', 10], high: ['High', 4], ultra: ['Ultra', 2] } },             // redraw every n frames
   effects: { label: 'Glow and sunbeams', choices: { off: ['Off', false], on: ['On', true] } },
   grass: { label: 'Grass', choices: { low: ['Sparse', 0.35], medium: ['Medium', 0.65], high: ['Dense', 1] } },
   flowers: { label: 'Wildflowers', choices: { off: ['Off', false], on: ['On', true] } },
   forest: { label: 'Distant forest', choices: { off: ['Off', false], on: ['On', true] } },
 };
 export const PRESETS = {
-  low: { label: 'Low', resolution: 'low', shadows: 'low', reflections: 'off', effects: 'off', grass: 'low', flowers: 'off', forest: 'on' },
-  medium: { label: 'Medium', resolution: 'medium', shadows: 'medium', reflections: 'low', effects: 'off', grass: 'medium', flowers: 'on', forest: 'on' },
-  high: { label: 'High', resolution: 'high', shadows: 'high', reflections: 'high', effects: 'on', grass: 'high', flowers: 'on', forest: 'on' },
-  ultra: { label: 'Ultra', resolution: 'ultra', shadows: 'ultra', reflections: 'ultra', effects: 'on', grass: 'high', flowers: 'on', forest: 'on' },
+  low: { label: 'Low', resolution: 'low', shadows: 'low', effects: 'off', grass: 'low', flowers: 'off', forest: 'on' },
+  medium: { label: 'Medium', resolution: 'medium', shadows: 'medium', effects: 'off', grass: 'medium', flowers: 'on', forest: 'on' },
+  high: { label: 'High', resolution: 'high', shadows: 'high', effects: 'on', grass: 'high', flowers: 'on', forest: 'on' },
+  ultra: { label: 'Ultra', resolution: 'ultra', shadows: 'ultra', effects: 'on', grass: 'high', flowers: 'on', forest: 'on' },
 };
 const AUTO_ORDER = ['low', 'medium', 'high'];
 const KEYS = Object.keys(OPTIONS);

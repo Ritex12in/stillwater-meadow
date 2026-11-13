@@ -125,8 +125,17 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
   const L = Object.assign({}, lod, { lift: 3.2, radius: 4 });
   lodSet(pb, pb.map((b) => farBark(b, 0)), bark, pines, pineKind, L);
   lodSet(pl, pl.map((l) => farLeaves(l, FAR_KEEP)), pineLeaf, pineItems, pineKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_pine')) }));
-  lodSet(rb, rb.map((b) => farBark(b, 3)), bark, rounds, roundKind, L);
-  return lodSet(rl, rl.map((l) => farLeaves(l, FAR_KEEP)), roundLeaf, roundItems, roundKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_round')) }));
+  // blossom trees are the kit's twisted trees: gnarled trunks under wide, airy crowns
+  const commonKind = (t) => (t.type === 'blossom' ? -1 : roundKind(t)), blossomKind = (t) => (t.type === 'blossom' ? variantAt(t.x, t.z, 5, 9) : -1);
+  lodSet(rb, rb.map((b) => farBark(b, 3)), bark, rounds, commonKind, L);
+  const common = lodSet(rl, rl.map((l) => farLeaves(l, FAR_KEEP)), roundLeaf, roundItems, commonKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_round')) }));
+  const twisted = [1, 2, 3, 4, 5].map((i) => fit(pieces('TwistedTree_' + i), 6.6, 0.15));
+  const tl = twisted.map((m) => first(m, /Leaves/)), tb = twisted.map((m) => first(m, /Bark/));
+  const twistedBark = weatherize(std('#ffffff', { map: tex('bark_twisted'), flatShading: false, vertexColors: true }), 'std');
+  lodSet(tb, tb.map((b) => farBark(b, 3)), twistedBark, rounds, blossomKind, L);
+  const blossom = lodSet(tl, tl.map((l) => farLeaves(l, FAR_KEEP)), crownStd(tex('leaves_bush')), roundItems, blossomKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_bush')) }));
+  // one handle for the seasons, whichever set draws each tree
+  return { count: roundItems.length, material: roundLeaf, setColorAt(i, c) { common.setColorAt(i, c); blossom.setColorAt(i, c); }, commit() {}, set visible(v) { common.visible = v; blossom.visible = v; } };
 }
 
 // ───────────── rocks ─────────────

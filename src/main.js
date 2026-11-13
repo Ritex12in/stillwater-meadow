@@ -9,12 +9,14 @@ import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT } from '
 import { hooks, seasonState, seats, world } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU, starMat } from './world/sky.js';
+import { buildMountains, tintMountains } from './world/mountains.js';
 import { buildLights, hemi, ambient, sun } from './world/lights.js';
 import { buildTerrain } from './world/terrain.js';
 import { buildWater, waterU } from './world/water.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
-import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows } from './world/props.js';
+import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows, lampSpots } from './world/props.js';
+import { buildFences } from './world/kitprops.js';
 import { buildClouds, buildFireflies, buildButterflies, buildPollen, updateAmbientLife, cloudMat, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
 import { buildEffects, updateEffects } from './world/effects.js';
 import { player, buildPlayer, updatePlayer } from './characters/player.js';
@@ -60,6 +62,7 @@ try {
 // ── Build the world. The order matters: it fixes where every tree and flower grows. ──
 await loadKit(); // nature models; the meadow falls back to hand-built shapes without them
 buildSky();
+buildMountains();
 buildLights();
 buildTerrain();
 buildWater();
@@ -72,6 +75,7 @@ if (kit) buildUndergrowth(treeSpots);
 buildDockAndBench();
 buildChairs();
 buildLamps();
+buildFences();
 buildClouds();
 buildFireflies();
 buildButterflies();
@@ -140,6 +144,7 @@ function applySky() {
   skyU.horizonColor.value.copy(cur.horizon);
   skyU.sunColor.value.copy(cur.glow);
   starMat.opacity = cur.stars;
+  tintMountains(cur, sunDir, seasonState.coverFloor || 0);
   scene.fog.color.copy(cur.horizon);
   scene.fog.near = cur.fogNear; scene.fog.far = cur.fogFar;
   waterU.fogColor.value.copy(cur.horizon);

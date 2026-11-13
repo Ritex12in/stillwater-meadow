@@ -22,6 +22,9 @@ MODELS = [
     "Grass_Common_Short", "Grass_Common_Tall", "Flower_3_Single", "Flower_4_Single",
     "Bush_Common", "Bush_Common_Flowers", "Fern_1", "Clover_1", "Mushroom_Common",
     "Rock_Medium_1", "Rock_Medium_2", "Rock_Medium_3",
+    *[f"TwistedTree_{i}" for i in range(1, 6)], "Flower_3_Group", "Flower_4_Group", "Plant_7",
+    "Grass_Wispy_Tall", "RockPath_Round_Small_1", "RockPath_Round_Small_2", "RockPath_Round_Small_3",
+    "Pebble_Round_1", "Pebble_Round_2", "Pebble_Round_3",
 ]
 # output name: (source texture, size, grey?)
 TEXTURES = {
@@ -33,6 +36,8 @@ TEXTURES = {
     "leaves.png": ("Leaves.png", 512, False),
     "rocks.png": ("Rocks_Diffuse.png", 512, False),
     "mushrooms.png": ("Mushrooms.png", 256, False),
+    "bark_twisted.png": ("Bark_TwistedTree.png", 512, False),
+    "pathrocks.png": ("PathRocks_Diffuse.png", 512, False),
 }
 
 

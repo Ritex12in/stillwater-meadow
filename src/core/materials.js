@@ -271,7 +271,8 @@ export function lodFade(mat, band) {
  * Trees and other big things with two shapes: the detailed one near the camera (casting
  * shadows), a cheaper one further away (no shadow, and skipped when off screen). Across
  * `opts.band` both are drawn and cross-fade (see lodFade). Instances are re-sorted only when
- * something crosses a boundary. The handle edits by index in `items`.
+ * something crosses a boundary. The handle edits by index in `items`; `variantOf` may return -1
+ * for items this set doesn't draw.
  */
 export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
   const band = opts.band || [(opts.near || 55) - 10, (opts.near || 55) + 5];
@@ -313,7 +314,7 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
       for (let i = 0; i < n; i++) {
         const it = items[i], dx = it.x - cam.x, dz = it.z - cam.z, d2 = dx * dx + dz * dz, sc = it.s || 1;
         let st = 0;
-        if (on) {
+        if (on && kind[i] >= 0) {
           if (d2 < out2) st |= 1;
           if (d2 > in2) { SPH.center.set(it.x, it.y + lift * sc, it.z); SPH.radius = radius * sc; if (FR.intersectsSphere(SPH)) st |= 2; }
         }

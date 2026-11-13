@@ -1,12 +1,14 @@
 // Built things: the jetty, the bench, lawn chairs and the path lamps.
 import * as THREE from 'three';
+import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { TAU, rand, pick, angDiff } from '../core/math.js';
 import { height, LAKE, lakePoint, PATH_T, dockStart, dockDir, DOCK_A, DOCK_BACK, DOCK_LEN, DOCK_HALF, DOCK_Y, chairSpots, BENCH_SPOT } from '../core/shape.js';
 import { std, weatherize, glowTex } from '../core/materials.js';
 import { world, obstacles, seats } from '../core/state.js';
+import { kitBench } from './kitprops.js';
 
-export const lampMat = new THREE.MeshStandardMaterial({ color: '#fff4d6', emissive: '#ffbb55', emissiveIntensity: 0, flatShading: true });
+export const lampMat = new THREE.MeshStandardMaterial({ color: '#fff4d6', emissive: '#ffbb55', emissiveIntensity: 0, transparent: true, opacity: 0.85, roughness: 0.2 });
 export const lampGlows = [];
 
 export function buildDockAndBench() {
@@ -41,7 +43,7 @@ export function buildDockAndBench() {
   bench.position.set(bp.x, height(bp.x, bp.z), bp.z);
   bench.rotation.y = Math.atan2(LAKE.x - bp.x, LAKE.z - bp.z);
   const wood = weatherize(std('#8a6646'), 'std'), iron = std('#3a3f3f');
-  [
+  if (!kitBench(bench)) [
     [new THREE.BoxGeometry(1.9, 0.07, 0.5), wood, 0, 0.48, 0, 0],
     [new THREE.BoxGeometry(1.9, 0.36, 0.06), wood, 0, 0.8, -0.24, -0.18],
     [new THREE.BoxGeometry(0.08, 0.5, 0.48), iron, -0.85, 0.24, 0, 0],
@@ -94,27 +96,44 @@ export function buildChairs() {
   placeChair(dockStart.x + dockDir.x * s + dockDir.z * w, dockStart.z + dockDir.z * s - dockDir.x * w, DOCK_Y + 0.04, Math.atan2(dockDir.x, dockDir.z) - 0.35, '#d8a95e');
 }
 
+/** A classic park lamp: stepped base, slim fluted post, collar, and a glass lantern with a peaked roof. */
+function lampGeos() {
+  const iron = [], glass = [];
+  const add = (list, g) => list.push(g.toNonIndexed());
+  add(iron, new THREE.CylinderGeometry(0.17, 0.21, 0.16, 8).translate(0, 0.08, 0));
+  add(iron, new THREE.CylinderGeometry(0.11, 0.15, 0.22, 8).translate(0, 0.27, 0));
+  add(iron, new THREE.CylinderGeometry(0.045, 0.065, 1.75, 8).translate(0, 1.25, 0));
+  add(iron, new THREE.TorusGeometry(0.06, 0.018, 5, 10).rotateX(Math.PI / 2).translate(0, 0.5, 0));
+  add(iron, new THREE.CylinderGeometry(0.09, 0.05, 0.12, 8).translate(0, 2.16, 0));          // collar
+  add(iron, new THREE.CylinderGeometry(0.15, 0.13, 0.04, 4).rotateY(Math.PI / 4).translate(0, 2.24, 0)); // lantern floor
+  for (const [x, z] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) add(iron, new THREE.BoxGeometry(0.022, 0.36, 0.022).translate(x * 0.105, 2.44, z * 0.105));
+  add(iron, new THREE.ConeGeometry(0.21, 0.2, 4).rotateY(Math.PI / 4).translate(0, 2.72, 0));      // roof
+  add(iron, new THREE.SphereGeometry(0.035, 6, 4).translate(0, 2.85, 0));                          // finial
+  add(glass, new THREE.BoxGeometry(0.2, 0.34, 0.2).translate(0, 2.44, 0));
+  return { iron: BufferGeometryUtils.mergeBufferGeometries(iron), glass: BufferGeometryUtils.mergeBufferGeometries(glass) };
+}
+
+/** Where the lanterns hang (for the light they throw on the ground). */
+export const lampSpots = [];
+
 export function buildLamps() {
-  const postMat = std('#2f3534');
-  const postGeo = new THREE.CylinderGeometry(0.05, 0.08, 2.2, 6).translate(0, 1.1, 0);
-  const lampGeo = new THREE.BoxGeometry(0.24, 0.3, 0.24);
-  const capGeo = new THREE.ConeGeometry(0.22, 0.16, 4).rotateY(Math.PI / 4);
+  const postMat = std('#22282a', { flatShading: false, roughness: 0.55, metalness: 0.3 });
+  const { iron, glass } = lampGeos();
   const glowMat = new THREE.SpriteMaterial({ map: glowTex, color: '#ffc979', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * TAU + 0.2;
     if (Math.abs(angDiff(a, DOCK_A)) < 0.2) continue;
     const p = lakePoint(a, PATH_T + 0.085);
     const y = height(p.x, p.z);
-    const post = new THREE.Mesh(postGeo, postMat);
-    post.position.set(p.x, y, p.z); post.castShadow = true;
-    const lamp = new THREE.Mesh(lampGeo, lampMat);
-    lamp.position.set(p.x, y + 2.35, p.z);
-    const cap = new THREE.Mesh(capGeo, postMat);
-    cap.position.set(p.x, y + 2.58, p.z);
+    const post = new THREE.Mesh(iron, postMat);
+    post.position.set(p.x, y, p.z); post.rotation.y = a; post.castShadow = true;
+    const lamp = new THREE.Mesh(glass, lampMat);
+    lamp.position.copy(post.position); lamp.rotation.y = a;
     const glow = new THREE.Sprite(glowMat); // all lamps share one material: one opacity update per frame
-    glow.position.copy(lamp.position); glow.scale.set(2.2, 2.2, 1);
-    scene.add(post, lamp, cap, glow);
+    glow.position.set(p.x, y + 2.44, p.z); glow.scale.set(2.4, 2.4, 1);
+    scene.add(post, lamp, glow);
     lampGlows.push(glow);
+    lampSpots.push(new THREE.Vector3(p.x, y + 2.44, p.z));
     obstacles.push({ x: p.x, z: p.z, r: 0.2 });
   }
 }

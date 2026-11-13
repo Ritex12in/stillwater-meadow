@@ -7,15 +7,22 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { query } from './env.js';
 
-const BASE = (import.meta.env && import.meta.env.BASE_URL ? import.meta.env.BASE_URL : '/') + 'assets/nature/';
+const ROOT = (import.meta.env && import.meta.env.BASE_URL ? import.meta.env.BASE_URL : '/') + 'assets/';
+const BASE = ROOT + 'nature/', PROPS_BASE = ROOT + 'props/';
 const MODELS = [
   'CommonTree_1', 'CommonTree_2', 'CommonTree_3', 'CommonTree_4', 'CommonTree_5',
   'Pine_1', 'Pine_2', 'Pine_3', 'Pine_4', 'Pine_5',
   'Grass_Common_Short', 'Grass_Common_Tall', 'Flower_3_Single', 'Flower_4_Single',
   'Bush_Common', 'Bush_Common_Flowers', 'Fern_1', 'Clover_1', 'Mushroom_Common',
   'Rock_Medium_1', 'Rock_Medium_2', 'Rock_Medium_3',
+  'TwistedTree_1', 'TwistedTree_2', 'TwistedTree_3', 'TwistedTree_4', 'TwistedTree_5',
+  'Flower_3_Group', 'Flower_4_Group', 'Plant_7', 'Grass_Wispy_Tall',
+  'RockPath_Round_Small_1', 'RockPath_Round_Small_2', 'RockPath_Round_Small_3', 'Pebble_Round_1', 'Pebble_Round_2', 'Pebble_Round_3',
 ];
-const TEXTURES = ['leaves_round', 'leaves_pine', 'leaves_bush', 'bark', 'flowers', 'leaves', 'rocks', 'mushrooms'];
+const TEXTURES = ['leaves_round', 'leaves_pine', 'leaves_bush', 'bark', 'flowers', 'leaves', 'rocks', 'mushrooms', 'bark_twisted', 'pathrocks'];
+// built things (bench, fence, vines), from two more Quaternius kits; see public/assets/props
+const PROPS = ['Bench', 'Prop_WoodenFence_Single', 'Prop_WoodenFence_Extension1', 'Prop_Vine1', 'Prop_Vine4'];
+const PROP_TEXTURES = ['furniture', 'woodtrim', 'vine'];
 
 /** The loaded kit, or null when the meadow uses its hand-built shapes. */
 export let kit = null;
@@ -86,8 +93,12 @@ export async function loadKit() {
   const tex = new THREE.TextureLoader();
   try {
     const models = await Promise.all(MODELS.map((m) => loader.loadAsync(BASE + m + '.gltf').then((g) => [m, piecesOf(g.scene)])));
-    const textures = await Promise.all(TEXTURES.map((t) => tex.loadAsync(BASE + t + '.png').then((x) => [t, x])));
-    const out = { models: Object.fromEntries(models), tex: Object.fromEntries(textures) };
+    const props = await Promise.all(PROPS.map((m) => loader.loadAsync(PROPS_BASE + m + '.gltf').then((g) => [m, piecesOf(g.scene)])));
+    const textures = await Promise.all([
+      ...TEXTURES.map((t) => tex.loadAsync(BASE + t + '.png').then((x) => [t, x])),
+      ...PROP_TEXTURES.map((t) => tex.loadAsync(PROPS_BASE + t + '.png').then((x) => [t, x])),
+    ]);
+    const out = { models: Object.assign(Object.fromEntries(models), Object.fromEntries(props)), tex: Object.fromEntries(textures) };
     Object.values(out.tex).forEach((t) => { t.flipY = false; t.anisotropy = 4; }); // glTF texture coordinates
     kit = out;
   } catch (e) {

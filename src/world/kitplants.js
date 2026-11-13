@@ -119,7 +119,10 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
   const roundModels = [1, 2, 3, 4, 5].map((i) => fit(pieces('CommonTree_' + i), 6.2, 0.15));
   const bark = weatherize(std('#ffffff', { map: tex('bark'), flatShading: false, vertexColors: true }), 'std');
   const pineLeaf = crownStd(tex('leaves_pine')), roundLeaf = crownStd(tex('leaves_round'));
-  const pineKind = (t) => variantAt(t.x, t.z, 5, 3), roundKind = (t) => variantAt(t.x, t.z, 5, 8);
+  const meadow = !!kit.models.MapleTree_1, slim = !!kit.models.PineTree_1;
+  // two in five pines are the meadow pack's tall, slender ones (fixed hash: nothing moves)
+  [pines, pineItems].forEach((list) => list.forEach((t) => { t.family = slim && variantAt(t.x, t.z, 100, 16) < 40 ? 'slimpine' : 'pine'; }));
+  const pineKind = (t) => (t.family === 'pine' ? variantAt(t.x, t.z, 5, 3) : -1), roundKind = (t) => variantAt(t.x, t.z, 5, 8);
   const pl = pineModels.map((m) => first(m, /Leaves/)), rl = roundModels.map((m) => first(m, /Leaves/));
   const pb = pineModels.map((m) => first(m, /Bark/)), rb = roundModels.map((m) => first(m, /Bark/));
   const L = Object.assign({}, lod, { lift: 3.2, radius: 4 });
@@ -127,8 +130,12 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
   lodSet(pl, pl.map((l) => farLeaves(l, FAR_KEEP)), pineLeaf, pineItems, pineKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_pine')) }));
   // the round trees are a mix of three families (by a fixed hash, so nothing moves): the kit's
   // common trees, and maples and birches from the meadow pack; blossom trees are the twisted trees
-  const meadow = !!kit.models.MapleTree_1;
-  const family = (t) => { if (t.type === 'blossom') return 'blossom'; if (!meadow) return 'common'; const h = variantAt(t.x, t.z, 100, 13); return h < 38 ? 'common' : h < 72 ? 'maple' : 'birch'; };
+  const family = (t) => {
+    if (t.type === 'blossom') return 'blossom';
+    if (!meadow) return 'common';
+    const h = variantAt(t.x, t.z, 100, 13);
+    return h < 30 ? 'common' : h < 56 ? 'maple' : h < 76 ? 'birch' : kit.models.NormalTree_1 ? 'normal' : 'common';
+  };
   [rounds, roundItems].forEach((list) => list.forEach((t) => { t.family = family(t); }));
   const commonKind = (t) => (t.family === 'common' ? roundKind(t) : -1), blossomKind = (t) => (t.type === 'blossom' ? variantAt(t.x, t.z, 5, 9) : -1);
   lodSet(rb, rb.map((b) => farBark(b, 3)), bark, rounds, commonKind, L);
@@ -140,8 +147,10 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
   const blossom = lodSet(tl, tl.map((l) => farLeaves(l, FAR_KEEP)), crownStd(tex('leaves_bush')), roundItems, blossomKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_bush')) }));
   const crowns = [common, blossom];
   if (meadow) {
-    // maples (broad, spreading) and birches (tall, white-barked), leaves tinted by the seasons
-    [['MapleTree_', 6.6, 'maple', 14], ['BirchTree_', 7.4, 'birch', 15]].forEach(([prefix, h, fam, salt]) => {
+    // maples (broad, spreading), birches (tall, white-barked) and light, airy common trees
+    const fams = [['MapleTree_', 6.6, 'maple', 14], ['BirchTree_', 7.4, 'birch', 15]];
+    if (kit.models.NormalTree_1) fams.push(['NormalTree_', 6.8, 'normal', 17]);
+    fams.forEach(([prefix, h, fam, salt]) => {
       const models = [1, 2, 3, 4, 5].map((i) => fit(pieces(prefix + i), h, 0.15));
       const ml = models.map((m) => first(m, /Leaves/)), mb = models.map((m) => first(m, /Bark/));
       const kind = (t) => (t.family === fam ? variantAt(t.x, t.z, 5, salt) : -1);
@@ -149,6 +158,14 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
       lodSet(mb, mb.map((b) => farBark(b, 3)), barkMat, rounds, kind, L);
       crowns.push(lodSet(ml, ml.map((l) => farLeaves(l, FAR_KEEP)), crownStd(tex(fam + '_leaves')), roundItems, kind, Object.assign({}, L, { depthMat: cutoutDepth(tex(fam + '_leaves')) })));
     });
+  }
+  if (slim) {
+    // the slender pines: their own bark and needles, green from the pine palette like the others
+    const models = [1, 2, 3, 4, 5].map((i) => fit(pieces('PineTree_' + i), 7.6, 0.15));
+    const sl = models.map((m) => first(m, /Leaves/)), sb = models.map((m) => first(m, /Bark/));
+    const kind = (t) => (t.family === 'slimpine' ? variantAt(t.x, t.z, 5, 18) : -1);
+    lodSet(sb, sb.map((b) => farBark(b, 0)), weatherize(std('#ffffff', { map: tex('slimpine_bark'), flatShading: false, vertexColors: true }), 'std'), pines, kind, L);
+    lodSet(sl, sl.map((l) => farLeaves(l, FAR_KEEP)), crownStd(tex('slimpine_leaves')), pineItems, kind, Object.assign({}, L, { depthMat: cutoutDepth(tex('slimpine_leaves')) }));
   }
   // one handle for the seasons, whichever set draws each tree
   return { count: roundItems.length, material: roundLeaf, setColorAt(i, c) { crowns.forEach((h) => h.setColorAt(i, c)); }, commit() {}, set visible(v) { crowns.forEach((h) => { h.visible = v; }); } };
@@ -160,7 +177,14 @@ export function kitRocks(rocks, opts) {
   const mat = weatherize(std('#ffffff', { map: tex('rocks'), flatShading: false }), 'std');
   // the rock texture is dark and mossy; lift the per-rock greys so the shore reads as before
   const items = rocks.map((r) => Object.assign({}, r, { sx: r.sx * 0.95, sz: r.sz * 0.95, sy: r.sy * 1.2, color: r.color.clone().multiplyScalar(2.4) }));
-  instancedVariants(geos, mat, items, (r) => variantAt(r.x, r.z, 3, 11), opts);
+  if (!kit.models.Rock_1) { instancedVariants(geos, mat, items, (r) => variantAt(r.x, r.z, 3, 11), opts); return; }
+  // with the meadow pack, half the rocks are its light, craggy boulders
+  const pick = (r) => variantAt(r.x, r.z, 8, 11);
+  instancedVariants(geos, mat, items, (r) => (pick(r) < 3 ? pick(r) : -1), opts);
+  const crags = [1, 2, 3, 4, 5].map((i) => first(fit(pieces('Rock_' + i), 1.2), /Rock/));
+  const cragMat = weatherize(std('#ffffff', { map: tex('crag'), flatShading: false }), 'std');
+  const cragItems = rocks.map((r) => Object.assign({}, r, { color: r.color.clone().multiplyScalar(1.6) }));
+  instancedVariants(crags, cragMat, cragItems, (r) => (pick(r) >= 3 ? pick(r) - 3 : -1), opts);
 }
 
 // ───────────── grass near you ─────────────

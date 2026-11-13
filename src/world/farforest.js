@@ -20,6 +20,8 @@ const FAMILIES = [
   { name: 'maple', model: 'MapleTree_2', leaves: 'maple_leaves', bark: 'maple_bark' },
   { name: 'birch', model: 'BirchTree_2', leaves: 'birch_leaves', bark: 'birch_bark' },
   { name: 'blossom', model: 'TwistedTree_1', leaves: 'leaves_bush', bark: 'bark_twisted' },
+  { name: 'normal', model: 'NormalTree_2', leaves: 'normal_leaves', bark: 'normal_bark' },
+  { name: 'slimpine', model: 'PineTree_2', leaves: 'slimpine_leaves', bark: 'slimpine_bark' },
 ];
 
 /** Render each family's tree, side on, into one texture (grey leaves: the cards tint them). */
@@ -76,7 +78,7 @@ function cardMaterial(atlas, cells, distant) {
     sh.uniforms.uAutumn = groundU.autumn;
     if (distant) Object.assign(sh.uniforms, mountainU);
     sh.vertexShader = `uniform vec3 uCamF; uniform float uAutumn;
-      attribute vec3 aPos; attribute vec2 aSize; attribute float aCell; attribute float aRand;
+      attribute vec3 aPos; attribute vec2 aSize; attribute float aCell; attribute float aRand; attribute float aLeafy;
       ${distant ? 'varying vec3 vMW;' : ''}
     ` + sh.vertexShader
       .replace('#include <beginnormal_vertex>', `vec3 toCam = uCamF - aPos; toCam.y = 0.0; toCam = normalize(toCam + vec3(1e-4, 0.0, 0.0));
@@ -88,7 +90,7 @@ function cardMaterial(atlas, cells, distant) {
         vUv = vec2((aCell + uv.x) / ${cells.toFixed(1)}, uv.y);`)
       .replace('#include <color_vertex>', `#include <color_vertex>
         // autumn: the broadleaf trees (not pines) turn orange, red and gold
-        if (aCell > 0.5) vColor.rgb = mix(vColor.rgb, mix(vec3(0.85, 0.36, 0.14), vec3(0.95, 0.72, 0.26), aRand), uAutumn * 0.85);`);
+        if (aLeafy > 0.5) vColor.rgb = mix(vColor.rgb, mix(vec3(0.85, 0.36, 0.14), vec3(0.95, 0.72, 0.26), aRand), uAutumn * 0.85);`);
     if (distant) {
       sh.fragmentShader = 'uniform vec3 uHaze; uniform vec3 uGlow; uniform vec3 uSun;\nvarying vec3 vMW;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `
         vec3 fdir = vMW - cameraPosition;
@@ -105,14 +107,16 @@ function cards(list, atlas, cells, distant) {
   const g = new THREE.InstancedBufferGeometry();
   g.index = base.index;
   ['position', 'normal', 'uv'].forEach((k) => g.setAttribute(k, base.attributes[k]));
-  const n = list.length, pos = new Float32Array(n * 3), size = new Float32Array(n * 2), cell = new Float32Array(n), rand = new Float32Array(n), col = new Float32Array(n * 3);
+  const n = list.length, pos = new Float32Array(n * 3), size = new Float32Array(n * 2), cell = new Float32Array(n), rand = new Float32Array(n), leafy = new Float32Array(n), col = new Float32Array(n * 3);
   list.forEach((t, i) => {
     pos.set([t.x, t.y, t.z], i * 3); size.set([t.w, t.h], i * 2); cell[i] = t.cell; rand[i] = t.r; col.set([t.c.r, t.c.g, t.c.b], i * 3);
+    leafy[i] = /common|normal|maple|birch/.test(t.fam) ? 1 : 0; // these turn in autumn; pines and blossom don't
   });
   g.setAttribute('aPos', new THREE.InstancedBufferAttribute(pos, 3));
   g.setAttribute('aSize', new THREE.InstancedBufferAttribute(size, 2));
   g.setAttribute('aCell', new THREE.InstancedBufferAttribute(cell, 1));
   g.setAttribute('aRand', new THREE.InstancedBufferAttribute(rand, 1));
+  g.setAttribute('aLeafy', new THREE.InstancedBufferAttribute(leafy, 1));
   g.setAttribute('color', new THREE.InstancedBufferAttribute(col, 3));
   g.instanceCount = n;
   const m = new THREE.Mesh(g, weatherize(cardMaterial(atlas, cells, distant), 'lam'));
@@ -127,7 +131,7 @@ export function buildFarForest(renderer) {
   const { texture, fams, aspects } = bakeAtlas(renderer);
   const idx = Object.fromEntries(fams.map((f, i) => [f.name, i]));
   const r = mulberry32(80021), c = new THREE.Color();
-  const greens = { pine: ['#3d6b45', '#4a7a4c', '#355f40'], common: ['#6fa04a', '#7fb050', '#5d9142'], maple: ['#76a64c', '#86b356'], birch: ['#9cc061', '#8db857'], blossom: ['#f0b8c8', '#e9a6bc'] };
+  const greens = { pine: ['#3d6b45', '#4a7a4c', '#355f40'], slimpine: ['#3f6e47', '#4b7d4e'], common: ['#6fa04a', '#7fb050', '#5d9142'], normal: ['#7aab4e', '#8ab85a'], maple: ['#76a64c', '#86b356'], birch: ['#9cc061', '#8db857'], blossom: ['#f0b8c8', '#e9a6bc'] };
   const pickFam = (mix) => { const x = r(); let acc = 0; for (const [k, p] of mix) { acc += p; if (x < acc && idx[k] !== undefined) return k; } return 'pine'; };
   const tree = (x, y, z, h, mix) => {
     const fam = pickFam(mix), cell = idx[fam];
@@ -147,7 +151,7 @@ export function buildFarForest(renderer) {
     const rim = smooth(140, 176, Math.max(Math.abs(x), Math.abs(z)));
     if (fbm(x * 0.035 + 9, z * 0.035 - 4) < 0.42 + 0.08 * Math.sin(x * 0.01) + rim * 0.3) continue;
     const h = 5 + r() * 5;
-    hills.push(tree(x, y - 0.4, z, h, [['pine', 0.45], ['common', 0.25], ['maple', 0.12], ['birch', 0.1], ['blossom', 0.08]]));
+    hills.push(tree(x, y - 0.4, z, h, [['pine', 0.25], ['slimpine', 0.22], ['common', 0.14], ['normal', 0.12], ['maple', 0.11], ['birch', 0.09], ['blossom', 0.07]]));
   }
   cards(hills, texture, fams.length, false);
 
@@ -162,7 +166,7 @@ export function buildFarForest(renderer) {
       const rr = R.radius + t * R.depth, h = (k === 0 ? 22 : 15) * (0.75 + r() * 0.5);
       const fade = 1 - smooth(R.height * 0.2, R.height * 0.45, y); // fewer, and more pines, up the slope
       if (r() > 0.35 + 0.65 * fade) continue;
-      list.push(tree(Math.cos(a) * rr, y - 1.5, Math.sin(a) * rr, h, fade < 0.5 ? [['pine', 0.9], ['birch', 0.1]] : [['pine', 0.55], ['common', 0.2], ['maple', 0.15], ['birch', 0.1]]));
+      list.push(tree(Math.cos(a) * rr, y - 1.5, Math.sin(a) * rr, h, fade < 0.5 ? [['slimpine', 0.55], ['pine', 0.35], ['birch', 0.1]] : [['slimpine', 0.3], ['pine', 0.25], ['common', 0.15], ['normal', 0.1], ['maple', 0.12], ['birch', 0.08]]));
     }
     cards(list, texture, fams.length, true);
   });

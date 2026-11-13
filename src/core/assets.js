@@ -27,8 +27,10 @@ const PROP_TEXTURES = ['furniture', 'woodtrim', 'vine'];
 const GROUND = ['grass_lush', 'grass_flowers', 'grass_fine', 'soil', 'bloom_violet', 'bloom_orange'];
 // grass and flower clumps from Quaternius' Ultimate Stylized Nature Pack (CC0; public/assets/meadow)
 const MEADOW = ['Grass_Small', 'Grass_Large', 'Flower_1_Clump', 'Flower_2_Clump', 'Flower_3_Clump', 'Flower_4_Clump', 'Flower_5_Clump',
-  'BirchTree_1', 'BirchTree_2', 'BirchTree_3', 'BirchTree_4', 'BirchTree_5', 'MapleTree_1', 'MapleTree_2', 'MapleTree_3', 'MapleTree_4', 'MapleTree_5'];
-const MEADOW_TEXTURES = ['meadow_grass', 'meadow_flowers', 'birch_bark', 'birch_leaves', 'maple_bark', 'maple_leaves'];
+  'BirchTree_1', 'BirchTree_2', 'BirchTree_3', 'BirchTree_4', 'BirchTree_5', 'MapleTree_1', 'MapleTree_2', 'MapleTree_3', 'MapleTree_4', 'MapleTree_5',
+  'NormalTree_1', 'NormalTree_2', 'NormalTree_3', 'NormalTree_4', 'NormalTree_5', 'PineTree_1', 'PineTree_2', 'PineTree_3', 'PineTree_4', 'PineTree_5',
+  'Rock_1', 'Rock_2', 'Rock_3', 'Rock_4', 'Rock_5'];
+const MEADOW_TEXTURES = ['meadow_grass', 'meadow_flowers', 'birch_bark', 'birch_leaves', 'maple_bark', 'maple_leaves', 'normal_bark', 'normal_leaves', 'slimpine_bark', 'slimpine_leaves', 'crag'];
 
 /** The loaded kit, or null when the meadow uses its hand-built shapes. */
 export let kit = null;

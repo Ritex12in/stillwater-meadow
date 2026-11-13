@@ -1,7 +1,8 @@
 """Copy the meadow's grass, flower clumps, birches and maples from Quaternius' Ultimate Stylized Nature Pack
 (CC0, https://quaternius.com/packs/ultimatestylizednature.html) into public/assets/meadow.
 
-    python3 tools/prepare_meadow.py "<folder with the pack's glTF files and textures>"
+    node tools/obj_to_gltf.mjs <folder> <pack>/OBJ/NormalTree_*.obj <pack>/OBJ/PineTree_*.obj <pack>/OBJ/Rock_*.obj
+    python3 tools/prepare_meadow.py "<folder with the pack's glTF files, the converted ones and the textures>"
 
 Needs Pillow. Texture references are dropped from the models (the game builds its own
 materials) and the two textures are downscaled to 512 px.
@@ -14,11 +15,16 @@ import sys
 from PIL import Image
 
 MODELS = ["Grass_Small", "Grass_Large", "Flower_1_Clump", "Flower_2_Clump", "Flower_3_Clump", "Flower_4_Clump", "Flower_5_Clump",
-          *[f"BirchTree_{i}" for i in range(1, 6)], *[f"MapleTree_{i}" for i in range(1, 6)]]
+          *[f"BirchTree_{i}" for i in range(1, 6)], *[f"MapleTree_{i}" for i in range(1, 6)],
+          # these three only come as OBJ in the pack: convert them first with tools/obj_to_gltf.mjs
+          *[f"NormalTree_{i}" for i in range(1, 6)], *[f"PineTree_{i}" for i in range(1, 6)], *[f"Rock_{i}" for i in range(1, 6)]]
 # output name: (source, grey?) -- leaves go grey so the seasons can tint them
 TEXTURES = {"meadow_grass.png": ("Grass.png", False), "meadow_flowers.png": ("Flowers.png", False),
             "birch_bark.png": ("BirchTree_Bark.jpg", False), "birch_leaves.png": ("BirchTree_Leaves.png", True),
-            "maple_bark.png": ("MapleTree_Bark.jpg", False), "maple_leaves.png": ("MapleTree_Leaves_BW.png", True)}
+            "maple_bark.png": ("MapleTree_Bark.jpg", False), "maple_leaves.png": ("MapleTree_Leaves_BW.png", True),
+            "normal_bark.png": ("NormalTree_Bark.png", False), "normal_leaves.png": ("NormalTree_Leaves.png", True),
+            "slimpine_bark.png": ("PineTree_Bark.png", False), "slimpine_leaves.png": ("PineTree_Leaves.png", True),
+            "crag.png": ("Rocks.png", False)}
 
 
 def grey(im):

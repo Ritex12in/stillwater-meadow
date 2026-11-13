@@ -10,7 +10,8 @@ and the bench, fences and vines come from his free (CC0)
 uses hand-painted CC0 grass and soil textures by [Cethiel](https://opengameart.org/users/cethiel).
 Grass clumps, flower clumps, maples and birches come from his free (CC0)
 [Ultimate Stylized Nature Pack](https://quaternius.com/packs/ultimatestylizednature.html)
-(`tools/prepare_meadow.py` -> `public/assets/meadow`). Everything else (daisies, lupins, lamp
+(`tools/prepare_meadow.py` -> `public/assets/meadow`); its common trees, slender pines and
+rocks only ship as OBJ, so `tools/obj_to_gltf.mjs` converts them first. Everything else (daisies, lupins, lamp
 posts, mountains, sky, clouds, water, the autumn leaf litter and the snow) is built from code.
 
 ## Run it

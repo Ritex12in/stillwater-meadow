@@ -27,7 +27,7 @@ export function height(x, z) {
 // After the terrain mesh is built we keep its vertex heights and sample them with the same
 // triangle split the mesh uses. Feet and paws then sit exactly on the rendered surface, and a
 // lookup costs a few multiplies instead of eight noise evaluations.
-export const TERRAIN = { size: 360, seg: 200 };
+export const TERRAIN = { size: 360, seg: 300 };
 let baked = null;
 export function bakeHeights(positionAttr) {
   const n = TERRAIN.seg + 1;

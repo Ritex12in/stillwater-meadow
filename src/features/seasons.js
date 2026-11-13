@@ -94,7 +94,8 @@ export function initSeasons() {
   palettes = {
     spring: items.map((it) => (it.type === 'blossom' || rnd() < 0.3 ? pickFrom(['#f4c1d0', '#f7d6e0', '#ffffff', '#eeb0c4']) : pickFrom(['#86c25a', '#9ccd62', '#7ab84e']))),
     summer: items.map((it) => it.color.clone()),
-    autumn: items.map(() => pickFrom(['#d9822b', '#e3a33b', '#c4542d', '#e8c547', '#b0452a', '#cf6a2c', '#9aa040'])),
+    // maples blaze red and orange, birches turn gold, the rest a mix
+    autumn: items.map((it) => pickFrom(it.family === 'maple' ? ['#c4422a', '#d9582b', '#b8352c', '#e0722e'] : it.family === 'birch' ? ['#e8c547', '#f0d35a', '#e3b03b'] : ['#d9822b', '#e3a33b', '#c4542d', '#e8c547', '#b0452a', '#cf6a2c', '#9aa040'])),
     winter: items.map(() => pickFrom(['#7d7264', '#6f665a', '#857a6a'])),
   };
   shown = items.map((it) => it.color.clone());

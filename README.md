@@ -8,8 +8,10 @@ and the bench, fences and vines come from his free (CC0)
 [Fantasy Props](https://quaternius.com/packs/fantasypropsmegakit.html) and
 [Medieval Village](https://quaternius.com/packs/medievalvillagemegakit.html) MegaKits; the ground
 uses hand-painted CC0 grass and soil textures by [Cethiel](https://opengameart.org/users/cethiel).
-Everything else (daisies, lupins, lamp posts, mountains, sky, clouds, water, the autumn leaf
-litter and the snow) is built from code.
+Grass clumps, flower clumps, maples and birches come from his free (CC0)
+[Ultimate Stylized Nature Pack](https://quaternius.com/packs/ultimatestylizednature.html)
+(`tools/prepare_meadow.py` -> `public/assets/meadow`). Everything else (daisies, lupins, lamp
+posts, mountains, sky, clouds, water, the autumn leaf litter and the snow) is built from code.
 
 ## Run it
 
@@ -101,6 +103,13 @@ Key ideas:
   lighting code (`core/atmosphere.js`), lamp streaks and a mirrored reflection on the lake
   (`world/water.js`, drawn at a third of the resolution, refreshed every few frames, without the
   small plants on layer 1; High and Medium only); screen-space sunbeams (`systems/post.js`, High).
+- **Grass** (`world/grassfield.js`): made on the GPU in two draw calls. A tuft shape is drawn
+  many times on grids that follow the camera; the vertex shader places each copy at a stable spot
+  in its world cell, reads height and where grass grows from a baked map, thins it with distance
+  and sways it. Near: grass clumps from the meadow pack; far: simple tufts.
+- **Far forest** (`world/farforest.js`): thousands of trees on the hills past the walkable edge
+  and on the mountains' lower slopes, each a camera-facing card showing a picture of a real tree
+  model rendered into a texture at startup; three draw calls in all.
 - **Wildflowers** (`world/wildflowers.js`): daisy and lupin clumps built in code, kit flower
   clumps, wispy grass and pebbles, clustered along the path, round the bench and in the meadow.
 - **Performance**: grass, flowers, trees and rocks are split into culled chunks; rain, snow and

@@ -26,8 +26,9 @@ const PROP_TEXTURES = ['furniture', 'woodtrim', 'vine'];
 // hand-painted ground (CC0, Cethiel on OpenGameArt; see public/assets/ground), tiled in world space
 const GROUND = ['grass_lush', 'grass_flowers', 'grass_fine', 'soil', 'bloom_violet', 'bloom_orange'];
 // grass and flower clumps from Quaternius' Ultimate Stylized Nature Pack (CC0; public/assets/meadow)
-const MEADOW = ['Grass_Small', 'Grass_Large', 'Flower_1_Clump', 'Flower_2_Clump', 'Flower_3_Clump', 'Flower_4_Clump', 'Flower_5_Clump'];
-const MEADOW_TEXTURES = ['meadow_grass', 'meadow_flowers'];
+const MEADOW = ['Grass_Small', 'Grass_Large', 'Flower_1_Clump', 'Flower_2_Clump', 'Flower_3_Clump', 'Flower_4_Clump', 'Flower_5_Clump',
+  'BirchTree_1', 'BirchTree_2', 'BirchTree_3', 'BirchTree_4', 'BirchTree_5', 'MapleTree_1', 'MapleTree_2', 'MapleTree_3', 'MapleTree_4', 'MapleTree_5'];
+const MEADOW_TEXTURES = ['meadow_grass', 'meadow_flowers', 'birch_bark', 'birch_leaves', 'maple_bark', 'maple_leaves'];
 
 /** The loaded kit, or null when the meadow uses its hand-built shapes. */
 export let kit = null;

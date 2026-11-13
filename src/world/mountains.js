@@ -28,6 +28,19 @@ function ridge(a) {
   return h;
 }
 
+/** Height of a range's surface at angle `a` and depth `t` (0 front foot .. 1 back), as the mesh is built. */
+export function rangeHeight(R, a, t) {
+  const top = ridge(a + R.tone) * R.height;
+  const prof = Math.sin(Math.PI * Math.min(t * 1.25, 1)) ** 0.7;
+  const gully = (fbm(Math.cos(a) * 9 + t * 3 + R.tone, Math.sin(a) * 9 - t * 2) - 0.5) * 0.5 * top;
+  return -8 + prof * (top + 8 + gully);
+}
+/** The two ranges: the high snowy peaks behind, nearer lower hills in front. */
+export const RANGES = [
+  { radius: 560, depth: 160, height: 190, seg: 360, tone: 0, haze: 0.42 },
+  { radius: 400, depth: 90, height: 85, seg: 300, tone: 2.1, haze: 0.3 },
+];
+
 function range(radius, depth, height, seg, tone) {
   const rows = 16, pos = [], col = [], idx = [];
   const rock = new THREE.Color('#7d8794'), forest = new THREE.Color('#3f5a46'), snow = new THREE.Color('#f4f6fa'), c = new THREE.Color();
@@ -109,8 +122,7 @@ export const mistMat = new THREE.ShaderMaterial({
 
 export function buildMountains() {
   // two ranges: nearer, lower and hazier hills in front of the high snowy peaks
-  scene.add(new THREE.Mesh(range(560, 160, 190, 360, 0), mountainMat(0.42)));
-  scene.add(new THREE.Mesh(range(400, 90, 85, 300, 2.1), mountainMat(0.3)));
+  RANGES.forEach((R) => scene.add(new THREE.Mesh(range(R.radius, R.depth, R.height, R.seg, R.tone), mountainMat(R.haze))));
   mistMat.uniforms.map.value = mistTexture();
   [[385, 26, 0.9], [540, 40, 1]].forEach(([rad, h, k]) => {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, h, 96, 1, true).translate(0, h / 2 - 6, 0), mistMat);

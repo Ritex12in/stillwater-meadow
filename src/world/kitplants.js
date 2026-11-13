@@ -125,8 +125,12 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
   const L = Object.assign({}, lod, { lift: 3.2, radius: 4 });
   lodSet(pb, pb.map((b) => farBark(b, 0)), bark, pines, pineKind, L);
   lodSet(pl, pl.map((l) => farLeaves(l, FAR_KEEP)), pineLeaf, pineItems, pineKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_pine')) }));
-  // blossom trees are the kit's twisted trees: gnarled trunks under wide, airy crowns
-  const commonKind = (t) => (t.type === 'blossom' ? -1 : roundKind(t)), blossomKind = (t) => (t.type === 'blossom' ? variantAt(t.x, t.z, 5, 9) : -1);
+  // the round trees are a mix of three families (by a fixed hash, so nothing moves): the kit's
+  // common trees, and maples and birches from the meadow pack; blossom trees are the twisted trees
+  const meadow = !!kit.models.MapleTree_1;
+  const family = (t) => { if (t.type === 'blossom') return 'blossom'; if (!meadow) return 'common'; const h = variantAt(t.x, t.z, 100, 13); return h < 38 ? 'common' : h < 72 ? 'maple' : 'birch'; };
+  [rounds, roundItems].forEach((list) => list.forEach((t) => { t.family = family(t); }));
+  const commonKind = (t) => (t.family === 'common' ? roundKind(t) : -1), blossomKind = (t) => (t.type === 'blossom' ? variantAt(t.x, t.z, 5, 9) : -1);
   lodSet(rb, rb.map((b) => farBark(b, 3)), bark, rounds, commonKind, L);
   const common = lodSet(rl, rl.map((l) => farLeaves(l, FAR_KEEP)), roundLeaf, roundItems, commonKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_round')) }));
   const twisted = [1, 2, 3, 4, 5].map((i) => fit(pieces('TwistedTree_' + i), 6.6, 0.15));
@@ -134,8 +138,20 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
   const twistedBark = weatherize(std('#ffffff', { map: tex('bark_twisted'), flatShading: false, vertexColors: true }), 'std');
   lodSet(tb, tb.map((b) => farBark(b, 3)), twistedBark, rounds, blossomKind, L);
   const blossom = lodSet(tl, tl.map((l) => farLeaves(l, FAR_KEEP)), crownStd(tex('leaves_bush')), roundItems, blossomKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_bush')) }));
+  const crowns = [common, blossom];
+  if (meadow) {
+    // maples (broad, spreading) and birches (tall, white-barked), leaves tinted by the seasons
+    [['MapleTree_', 6.6, 'maple', 14], ['BirchTree_', 7.4, 'birch', 15]].forEach(([prefix, h, fam, salt]) => {
+      const models = [1, 2, 3, 4, 5].map((i) => fit(pieces(prefix + i), h, 0.15));
+      const ml = models.map((m) => first(m, /Leaves/)), mb = models.map((m) => first(m, /Bark/));
+      const kind = (t) => (t.family === fam ? variantAt(t.x, t.z, 5, salt) : -1);
+      const barkMat = weatherize(std('#ffffff', { map: tex(fam + '_bark'), flatShading: false, vertexColors: true }), 'std');
+      lodSet(mb, mb.map((b) => farBark(b, 3)), barkMat, rounds, kind, L);
+      crowns.push(lodSet(ml, ml.map((l) => farLeaves(l, FAR_KEEP)), crownStd(tex(fam + '_leaves')), roundItems, kind, Object.assign({}, L, { depthMat: cutoutDepth(tex(fam + '_leaves')) })));
+    });
+  }
   // one handle for the seasons, whichever set draws each tree
-  return { count: roundItems.length, material: roundLeaf, setColorAt(i, c) { common.setColorAt(i, c); blossom.setColorAt(i, c); }, commit() {}, set visible(v) { common.visible = v; blossom.visible = v; } };
+  return { count: roundItems.length, material: roundLeaf, setColorAt(i, c) { crowns.forEach((h) => h.setColorAt(i, c)); }, commit() {}, set visible(v) { crowns.forEach((h) => { h.visible = v; }); } };
 }
 
 // ───────────── rocks ─────────────

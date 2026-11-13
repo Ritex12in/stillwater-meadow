@@ -215,5 +215,5 @@ export function buildReedsAndPads() {
   }
   world.padItems = pads;
   world.padMesh = instanced(new THREE.CylinderGeometry(0.55, 0.55, 0.03, 9, 1, false, 0.35, TAU - 0.35), std('#ffffff'), pads, { receive: true });
-  world.bloomMesh = instanced(lilyGeo(), std('#ffffff', { emissive: '#3a2a30', vertexColors: true, flatShading: false }), blooms);
+  world.bloomMesh = instanced(lilyGeo(), std('#ffffff', { emissive: '#4a2a3e', vertexColors: true, flatShading: false }), blooms);
 }

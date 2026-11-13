@@ -1,6 +1,7 @@
 // Stillwater Meadow: boot, build the world in a fixed order, and run the frame loop.
 import './style.css';
 import { updateAtmosphere } from './core/atmosphere.js'; // patches the fog shader; keep first
+import * as THREE from 'three';
 import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
@@ -18,7 +19,7 @@ import { loadKit, kit } from './core/assets.js';
 import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows, lampSpots } from './world/props.js';
 import { buildFences } from './world/kitprops.js';
 import { buildWildflowers } from './world/wildflowers.js';
-import { buildClouds, buildFireflies, buildButterflies, buildPollen, updateAmbientLife, cloudMat, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
+import { buildClouds, buildFireflies, buildButterflies, buildPollen, updateAmbientLife, tintClouds, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
 import { buildEffects, updateEffects } from './world/effects.js';
 import { player, buildPlayer, updatePlayer } from './characters/player.js';
 import { animals, buildAnimals, updateAnimal, separateAnimals, shakeDogs } from './characters/animals.js';
@@ -78,6 +79,7 @@ buildDockAndBench();
 buildChairs();
 buildLamps();
 buildFences();
+waterU.lampW.value = Array.from({ length: 12 }, (_, i) => lampSpots[i] || new THREE.Vector3(0, -1e4, 0));
 buildClouds();
 buildFireflies();
 buildButterflies();
@@ -151,6 +153,8 @@ function applySky() {
   scene.fog.near = cur.fogNear; scene.fog.far = cur.fogFar;
   waterU.fogColor.value.copy(cur.horizon);
   waterU.fogGlow.value.copy(cur.glow); waterU.fogSun.value.copy(sunDir);
+  waterU.lampAmt.value = cur.eve;
+  if (world.bloomMesh) world.bloomMesh.material.emissiveIntensity = 1 + cur.eve * 4; // lilies glow softly at night
   waterU.fogNear.value = cur.fogNear; waterU.fogFar.value = cur.fogFar;
   waterU.deep.value.copy(cur.deep); waterU.shallow.value.copy(cur.shallow);
   waterU.sunDir.value.copy(lightDir);
@@ -160,7 +164,7 @@ function applySky() {
   sun.color.copy(cur.light); sun.intensity = cur.lightI;
   hemi.color.copy(cur.hemiSky); hemi.groundColor.copy(cur.hemiGround); hemi.intensity = cur.hemiI;
   ambient.intensity = cur.amb;
-  cloudMat.color.copy(cur.cloud); cloudMat.emissive.copy(cur.cloud);
+  tintClouds(cur.cloud, cur.glow, sunDir, camera.position);
   lampMat.emissiveIntensity = cur.eve * 1.6;
   if (lampGlows.length) lampGlows[0].material.opacity = cur.eve * 0.75; // the lamps share one glow material
   lampGlows.forEach((g) => { g.visible = cur.eve > 0.02; });
@@ -206,7 +210,7 @@ export function tick(dt) {
   sun.position.set(camTarget.x + lightDir.x * 140, camTarget.y - 1.55 + lightDir.y * 140, camTarget.z + lightDir.z * 140);
   sun.target.position.set(camTarget.x, camTarget.y - 1.55, camTarget.z);
   safe('detail', () => updateDetail(camera, camTarget));
-  updateAtmosphere(camera, sunDir, cur.glow, 1);
+  updateAtmosphere(camera, sunDir, cur.glow, 1, lampSpots, cur.eve);
   actionTimer -= dt;
   if (actionTimer <= 0) { actionTimer = 0.1; safe('prompts', () => renderPrompts(evaluateActions())); }
   updateHud(dt);

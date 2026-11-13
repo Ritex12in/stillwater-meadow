@@ -5,9 +5,27 @@ import { TAU, rng, rand, wrap, mulberry32 } from '../core/math.js';
 import { heightAt } from '../core/shape.js';
 import { std, glowTex } from '../core/materials.js';
 
-export const cloudMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.45, flatShading: true, roughness: 1, fog: false });
+// clouds: soft painted puffs (sprites) gathered into banks; each bank is tinted by the sky and
+// glows warm when it sits near a low sun
 const clouds = [];
-
+function puffTexture(seed) {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 160;
+  const ctx = cv.getContext('2d'), r = mulberry32(seed);
+  for (let i = 0; i < 26; i++) {
+    const x = 40 + r() * 176, y = 70 + (r() - 0.3) * 50 - Math.sin((x / 256) * Math.PI) * 30, rad = 18 + r() * 34;
+    const g = ctx.createRadialGradient(x, y, rad * 0.2, x, y, rad);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.6, 'rgba(255,255,255,0.75)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.fill();
+  }
+  // shade the underside blue-grey, keeping the shape
+  ctx.globalCompositeOperation = 'source-atop';
+  const v = ctx.createLinearGradient(0, 30, 0, 140);
+  v.addColorStop(0, 'rgba(255,255,255,0)'); v.addColorStop(0.55, 'rgba(200,210,228,0.35)'); v.addColorStop(1, 'rgba(140,152,178,0.85)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, 256, 160);
+  const t = new THREE.CanvasTexture(cv);
+  return t;
+}
 const FF = 170;
 const ffSeed = [];
 const ffGeo = new THREE.BufferGeometry();
@@ -32,20 +50,38 @@ export function buildPollen() {
 }
 
 export function buildClouds() {
-  for (let i = 0; i < 16; i++) {
+  // the old low-poly clouds drew from the layout stream; take the same draws so everything
+  // built after them stays where it was, and lay the new clouds out from their own stream
+  for (let i = 0; i < 16; i++) { const n = 4 + Math.floor(rng() * 4); for (let k = 0; k < n * 4 + 4; k++) rng(); }
+  const R = mulberry32(5150), cr = (a, b) => a + (b - a) * R();
+  const texs = [11, 23, 37, 41].map(puffTexture);
+  for (let i = 0; i < 18; i++) {
     const g = new THREE.Group();
-    const n = 4 + Math.floor(rng() * 4);
+    const mat = new THREE.SpriteMaterial({ map: texs[i % texs.length], transparent: true, depthWrite: false, fog: false });
+    const n = 2 + Math.floor(R() * 3), w = cr(45, 80);
     for (let k = 0; k < n; k++) {
-      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(5, 9), 1), cloudMat);
-      m.position.set(k * rand(5, 7) - n * 3, rand(-1, 2), rand(-3, 3));
-      m.scale.y = 0.55;
-      g.add(m);
+      const sp = new THREE.Sprite(mat);
+      sp.position.set((k - (n - 1) / 2) * w * 0.45 + cr(-6, 6), cr(-3, 4), cr(-8, 8));
+      const s = w * cr(0.7, 1.1);
+      sp.scale.set(s, s * 0.62, 1);
+      g.add(sp);
     }
-    const a = rng() * TAU, r = rand(170, 300);
-    g.position.set(Math.cos(a) * r, rand(75, 120), Math.sin(a) * r);
-    g.rotation.y = rand(-0.3, 0.3);
+    const a = R() * TAU, r = cr(200, 320);
+    g.position.set(Math.cos(a) * r, cr(70, 115), Math.sin(a) * r);
+    g.userData.mat = mat;
     scene.add(g);
     clouds.push(g);
+  }
+}
+
+const cTmp = new THREE.Vector3(), cCol = new THREE.Color();
+/** Once a frame: clouds take the sky's cloud colour, glowing warm on the side of a low sun. */
+export function tintClouds(cloudColor, glow, sunDir, camPos) {
+  for (const c of clouds) {
+    cTmp.copy(c.position).sub(camPos).normalize();
+    const near = Math.pow(Math.max(0, cTmp.dot(sunDir)), 3);
+    cCol.copy(cloudColor).lerp(glow, near * 0.6).multiplyScalar(1 + near * 0.35);
+    c.userData.mat.color.copy(cCol);
   }
 }
 

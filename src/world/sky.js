@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { GRADE_GLSL } from '../core/atmosphere.js';
-import { rng, rand, TAU } from '../core/math.js';
+import { rng, rand, TAU, mulberry32 } from '../core/math.js';
 
 export const skyU = {
   topColor: { value: new THREE.Color() },
@@ -48,13 +48,13 @@ export function buildSky() {
           vec3 md = normalize(moonDir);
           float m = max(dot(d, md), 0.0);
           float illum = 0.5 - 0.5 * cos(moonPhase * 6.2831853);
-          c += vec3(0.5, 0.58, 0.8) * (pow(m, 60.0) * 0.22 + pow(m, 8.0) * 0.05) * moonAmt * above * (0.25 + 0.75 * illum);
+          c += vec3(0.55, 0.64, 0.9) * (pow(m, 400.0) * 0.5 + pow(m, 60.0) * 0.3 + pow(m, 8.0) * 0.08) * moonAmt * above * (0.25 + 0.75 * illum);
           vec3 right = normalize(cross(md, vec3(0.0, 1.0, 0.0)));
           vec3 up = cross(right, md);
           vec3 off = d - md * dot(d, md);
-          float R = 0.027;                        // angular radius of the disc drawn below
+          float R = 0.042;                        // angular radius of the disc drawn below
           vec2 q = vec2(dot(off, right), dot(off, up)) / R;
-          float disc = smoothstep(0.99955, 0.99975, m);
+          float disc = smoothstep(0.99905, 0.99918, m);
           float z = sqrt(max(0.0, 1.0 - dot(q, q)));
           float a = moonPhase * 6.2831853;
           vec3 sunSide = vec3(sin(a), 0.0, -cos(a));  // lit hemisphere turns as the phase advances
@@ -81,6 +81,24 @@ export function buildSky() {
   const stars = new THREE.Points(g, starMat);
   stars.frustumCulled = false;
   sky.add(stars);
+  // a second, fainter field (its own random stream, so the layout stream is untouched), denser in
+  // a band across the sky like the Milky Way
+  const r = mulberry32(9001), p2 = [], c2 = [];
+  for (let i = 0; i < 3500; i++) {
+    let x = r() * 2 - 1, y = r(), z = r() * 2 - 1;
+    if (i % 2) { const t = r() * TAU; x = Math.cos(t); z = Math.sin(t) * 0.35 + (r() - 0.5) * 0.25; y = 0.25 + Math.abs(Math.sin(t)) * 0.7 + (r() - 0.5) * 0.15; }
+    const l = Math.hypot(x, y, z) || 1;
+    if (y / l < 0.03) continue;
+    p2.push(x / l * 640, y / l * 640, z / l * 640);
+    const b = 0.25 + r() * r() * 0.6;
+    c2.push(b * 0.92, b * 0.95, b);
+  }
+  const g2 = new THREE.BufferGeometry();
+  g2.setAttribute('position', new THREE.Float32BufferAttribute(p2, 3));
+  g2.setAttribute('color', new THREE.Float32BufferAttribute(c2, 3));
+  const faint = new THREE.Points(g2, starMat);
+  faint.frustumCulled = false;
+  sky.add(faint);
 }
 
 /** Moon phase for a date: 0 = new, 0.5 = full. */

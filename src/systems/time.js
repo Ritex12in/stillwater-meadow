@@ -7,17 +7,17 @@ import { reduceMotion } from '../core/env.js';
 import { seasonState } from '../core/state.js';
 import { moonPhaseOn } from '../world/sky.js';
 
-const NIGHT = { top: '#0a1330', horizon: '#1b2747', glow: '#000000', light: '#9fb6ff', lightI: 0.34, hemiSky: '#2b3b6b', hemiGround: '#14181f', hemiI: 0.34, amb: 0.1, deep: '#0a1a2e', shallow: '#1a3350', cloud: '#2b3654', fogNear: 30, fogFar: 170, day: 0, eve: 1, stars: 1 };
+const NIGHT = { top: '#081646', horizon: '#20356e', glow: '#000000', light: '#a9c0ff', lightI: 0.46, hemiSky: '#3a5596', hemiGround: '#1c2c26', hemiI: 0.44, amb: 0.1, deep: '#0b1c3a', shallow: '#1d3a66', cloud: '#34457a', fogNear: 40, fogFar: 210, day: 0, eve: 1, stars: 1 };
 // Keyframes on the solar clock, where sunrise is 06:00 and sunset 19:00.
 const KEYFRAMES = [
   Object.assign({ h: 0 }, NIGHT),
   Object.assign({ h: 4.8 }, NIGHT),
   { h: 5.9, top: '#2e3f73', horizon: '#d98a8a', glow: '#ff9a7a', light: '#ffb08a', lightI: 0.4, hemiSky: '#6a6a9a', hemiGround: '#3a3a38', hemiI: 0.4, amb: 0.1, deep: '#22305a', shallow: '#7a5a78', cloud: '#d99aa0', fogNear: 30, fogFar: 180, day: 0.3, eve: 0.5, stars: 0.35 },
-  { h: 7.2, top: '#86b4e2', horizon: '#f2d0b6', glow: '#ffc68c', light: '#ffd49e', lightI: 1.08, hemiSky: '#c9dcf2', hemiGround: '#857a52', hemiI: 0.52, amb: 0.13, deep: '#2e6276', shallow: '#6aa3a6', cloud: '#ffe7d8', fogNear: 32, fogFar: 210, day: 1, eve: 0, stars: 0 },
-  { h: 12.5, top: '#4a8fd8', horizon: '#d6e6ee', glow: '#ffe4b4', light: '#fff0d4', lightI: 0.9, hemiSky: '#cfe0f0', hemiGround: '#7b7b4a', hemiI: 0.4, amb: 0.1, deep: '#1b6a85', shallow: '#4cb0b7', cloud: '#ffffff', fogNear: 40, fogFar: 250, day: 1, eve: 0, stars: 0 },
-  { h: 16.3, top: '#5a92d6', horizon: '#e8dcbc', glow: '#ffcc88', light: '#ffdba2', lightI: 1.02, hemiSky: '#d4e2ee', hemiGround: '#7f7a48', hemiI: 0.48, amb: 0.11, deep: '#1d6480', shallow: '#5aa8ac', cloud: '#fff2dc', fogNear: 38, fogFar: 235, day: 1, eve: 0, stars: 0 },
-  { h: 18.4, top: '#36427e', horizon: '#f39a6b', glow: '#ff9a5c', light: '#ff9a5c', lightI: 1.05, hemiSky: '#8f7db8', hemiGround: '#4f4436', hemiI: 0.52, amb: 0.15, deep: '#27315c', shallow: '#9a6478', cloud: '#ffb08c', fogNear: 35, fogFar: 190, day: 0.15, eve: 0.85, stars: 0 },
-  { h: 19.4, top: '#1c2452', horizon: '#7a5a8a', glow: '#ff7a5a', light: '#8a8ac8', lightI: 0.34, hemiSky: '#4a4a80', hemiGround: '#22222a', hemiI: 0.38, amb: 0.1, deep: '#141c3a', shallow: '#3a3a5a', cloud: '#5a4a70', fogNear: 30, fogFar: 170, day: 0, eve: 1, stars: 0.5 },
+  { h: 7.2, top: '#86b4e2', horizon: '#f2d0b6', glow: '#ffc68c', light: '#ffd49e', lightI: 1.08, hemiSky: '#c9dcf2', hemiGround: '#857a52', hemiI: 0.52, amb: 0.13, deep: '#2e6276', shallow: '#6aa3a6', cloud: '#ffe7d8', fogNear: 45, fogFar: 230, day: 1, eve: 0, stars: 0 },
+  { h: 12.5, top: '#4a8fd8', horizon: '#d6e6ee', glow: '#ffe4b4', light: '#fff0d4', lightI: 0.9, hemiSky: '#cfe0f0', hemiGround: '#7b7b4a', hemiI: 0.4, amb: 0.1, deep: '#1b6a85', shallow: '#4cb0b7', cloud: '#ffffff', fogNear: 55, fogFar: 270, day: 1, eve: 0, stars: 0 },
+  { h: 16.3, top: '#4f8ad6', horizon: '#eed8b0', glow: '#ffc47a', light: '#ffdba2', lightI: 1.02, hemiSky: '#d4e2ee', hemiGround: '#7f7a48', hemiI: 0.48, amb: 0.11, deep: '#1d6480', shallow: '#5aa8ac', cloud: '#fff2dc', fogNear: 55, fogFar: 260, day: 1, eve: 0, stars: 0 },
+  { h: 18.4, top: '#3a5aa0', horizon: '#f6a26a', glow: '#ff9a52', light: '#ff9a5c', lightI: 1.05, hemiSky: '#8f7db8', hemiGround: '#4f4436', hemiI: 0.52, amb: 0.15, deep: '#27315c', shallow: '#9a6478', cloud: '#ffb08c', fogNear: 35, fogFar: 190, day: 0.15, eve: 0.85, stars: 0 },
+  { h: 19.4, top: '#17266a', horizon: '#8a5f92', glow: '#ff7a5a', light: '#8f92d8', lightI: 0.42, hemiSky: '#4d5394', hemiGround: '#262a2e', hemiI: 0.42, amb: 0.1, deep: '#141c3a', shallow: '#3a3a5a', cloud: '#5a4a70', fogNear: 30, fogFar: 170, day: 0, eve: 1, stars: 0.5 },
   Object.assign({ h: 20.6 }, NIGHT),
   Object.assign({ h: 24 }, NIGHT),
 ];

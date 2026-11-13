@@ -12,7 +12,7 @@ export function buildTerrain() {
   geo.rotateX(-Math.PI / 2);
   const p = geo.attributes.position;
   const colors = new Float32Array(p.count * 3);
-  const g1 = col('#6e9a48'), g2 = col('#9dbf5d'), g3 = col('#4b7a3a'), sand = col('#dcc895'), bed = col('#7a7856');
+  const g1 = col('#5c9040'), g2 = col('#86b44e'), g3 = col('#3d7034'), sand = col('#dcc895'), bed = col('#7a7856');
   const dirt = col('#c4ab7c'), moss = col('#5c7444'), rock = col('#8d8b7d');
   const c = new THREE.Color();
   for (let i = 0; i < p.count; i++) {

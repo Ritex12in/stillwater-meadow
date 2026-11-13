@@ -24,6 +24,8 @@ export const waterU = {
   uIceLight: { value: 1 },
   uSnowIce: { value: 0 },
   uLight: { value: 1 },
+  lampW: { value: [] },          // lamp lanterns, world space (set in main.js)
+  lampAmt: { value: 0 },
 };
 
 export function buildWater() {
@@ -43,6 +45,7 @@ export function buildWater() {
       uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyTop; uniform vec3 skyHorizon;
       uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun;
       uniform float fogNear; uniform float fogFar; uniform vec2 lakeC;
+      uniform vec3 lampW[12]; uniform float lampAmt;
       varying vec3 vWP;
       vec2 wave(vec2 p, vec2 d, float f, float s, float a) {
         return d * cos(dot(p, d) * f + uTime * s) * f * a;
@@ -88,6 +91,16 @@ export function buildWater() {
         vec3 c = mix(base, skyc, clamp(fres * 0.85 + 0.12, 0.0, 1.0));
         float sp = pow(max(dot(r, normalize(sunDir)), 0.0), 220.0);
         c += sunColor * sp * 1.8;
+        // the lamps' reflections: long wavering streaks of warm light across the water
+        if (lampAmt > 0.01) {
+          vec3 rs = normalize(vec3(r.x, r.y * 0.35, r.z)); // squashed: the streaks run toward you
+          for (int i = 0; i < 12; i++) {
+            vec3 L = lampW[i] - vWP;
+            vec3 Ls = normalize(vec3(L.x, L.y * 0.35, L.z));
+            float k = pow(max(dot(rs, Ls), 0.0), 3000.0);
+            c += vec3(1.0, 0.66, 0.32) * k * 1.3 * lampAmt * (1.0 - uIce);
+          }
+        }
         // gentle foam where the water laps the shore
         float band = smoothstep(0.86, 0.95, t) * (1.0 - smoothstep(0.985, 1.03, t));
         float lap = 0.55 + 0.45 * sin(t * 140.0 - uTime * 1.3 + sin(p.x * 0.7 + p.y * 0.5) * 2.0);

@@ -25,6 +25,9 @@ const PROPS = ['Bench', 'Prop_WoodenFence_Single', 'Prop_WoodenFence_Extension1'
 const PROP_TEXTURES = ['furniture', 'woodtrim', 'vine'];
 // hand-painted ground (CC0, Cethiel on OpenGameArt; see public/assets/ground), tiled in world space
 const GROUND = ['grass_lush', 'grass_flowers', 'grass_fine', 'soil', 'bloom_violet', 'bloom_orange'];
+// grass and flower clumps from Quaternius' Ultimate Stylized Nature Pack (CC0; public/assets/meadow)
+const MEADOW = ['Grass_Small', 'Grass_Large', 'Flower_1_Clump', 'Flower_2_Clump', 'Flower_3_Clump', 'Flower_4_Clump', 'Flower_5_Clump'];
+const MEADOW_TEXTURES = ['meadow_grass', 'meadow_flowers'];
 
 /** The loaded kit, or null when the meadow uses its hand-built shapes. */
 export let kit = null;
@@ -96,11 +99,13 @@ export async function loadKit() {
   try {
     const models = await Promise.all(MODELS.map((m) => loader.loadAsync(BASE + m + '.gltf').then((g) => [m, piecesOf(g.scene)])));
     const props = await Promise.all(PROPS.map((m) => loader.loadAsync(PROPS_BASE + m + '.gltf').then((g) => [m, piecesOf(g.scene)])));
+    const meadow = await Promise.all(MEADOW.map((m) => loader.loadAsync(ROOT + 'meadow/' + m + '.gltf').then((g) => [m, piecesOf(g.scene)])));
     const textures = await Promise.all([
       ...TEXTURES.map((t) => tex.loadAsync(BASE + t + '.png').then((x) => [t, x])),
       ...PROP_TEXTURES.map((t) => tex.loadAsync(PROPS_BASE + t + '.png').then((x) => [t, x])),
+      ...MEADOW_TEXTURES.map((t) => tex.loadAsync(ROOT + 'meadow/' + t + '.png').then((x) => [t, x])),
     ]);
-    const out = { models: Object.assign(Object.fromEntries(models), Object.fromEntries(props)), tex: Object.fromEntries(textures) };
+    const out = { models: Object.assign(Object.fromEntries(models), Object.fromEntries(props), Object.fromEntries(meadow)), tex: Object.fromEntries(textures) };
     Object.values(out.tex).forEach((t) => { t.flipY = false; t.anisotropy = 4; }); // glTF texture coordinates
     const ground = await Promise.all(GROUND.map((t) => tex.loadAsync(ROOT + 'ground/' + t + '.jpg').then((x) => [t, x])));
     ground.push(['leaves_litter', await tex.loadAsync(ROOT + 'ground/leaves.png')]); // painted by tools/paint_leaves.py

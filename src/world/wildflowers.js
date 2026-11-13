@@ -96,8 +96,8 @@ export function buildWildflowers() {
       items.push({ x, z, y: height(x, z) - 0.02, s: r(0.8, 1.25), ry: r(0, TAU), kind, color: kind === 1 ? purples[Math.floor(R() * purples.length)] : null });
     }
   }
-  // wispy grass tufts dotted through the meadow
-  for (let i = 0, n = 0; i < 2200 && n < 600; i++) {
+  // (the wispy grass tufts are gone: the GPU grass field covers the meadow)
+  for (let i = 0, n = 0; i < 0 && n < 600; i++) {
     const a = R() * TAU, d = Math.sqrt(R()) * 100, x = Math.cos(a) * d, z = Math.sin(a) * d;
     if (free(x, z) && fbm(x * 0.09 - 2, z * 0.09 + 4) > 0.5) { items.push({ x, z, y: height(x, z) - 0.03, s: r(0.7, 1.2), ry: r(0, TAU), kind: 5, color: null }); n++; }
   }

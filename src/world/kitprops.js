@@ -2,7 +2,6 @@
 // the wooden bench, and split-rail fences with climbing vines along stretches of the lake path.
 // Placement uses its own random stream, so nothing else in the meadow moves.
 import * as THREE from 'three';
-import { scene } from '../core/render.js';
 import { TAU, mulberry32, angDiff } from '../core/math.js';
 import { height, LAKE, lakeR, PATH_T, DOCK_A, chairSpots, FIRE_SPOT, BENCH_SPOT } from '../core/shape.js';
 import { std, weatherize, bothSides, instanced } from '../core/materials.js';

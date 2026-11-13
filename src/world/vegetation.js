@@ -5,10 +5,11 @@ import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtil
 import { TAU, rng, rand, pick, smooth, fbm, vnoise, angDiff, mulberry32 } from '../core/math.js';
 import { height, lakeT, lakeR, lakePoint, pathAmt, SPAWN, onDock, dockStart, DOCK_A, nearReserved, BENCH_SPOT, PATH_T, LAKE, WORLD_LIMIT } from '../core/shape.js';
 import { std, col, weatherize, addWind, bothSides, instanced, instancedChunks, instancedVariants, lodSet } from '../core/materials.js';
-import { pineFarGeos, crownFarGeos, pineTrunkFarGeos, crownTrunkFarGeos, pineGeos, crownGeos, grassTuftGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
+import { pineFarGeos, crownFarGeos, pineTrunkFarGeos, crownTrunkFarGeos, pineGeos, crownGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
-import { kitTrees, kitRocks, kitGrass, kitFlowerParts, KIT_FLOWER_COLOURS, KIT_GRASS_FADE } from './kitplants.js';
+import { kitTrees, kitRocks, kitFlowerParts, KIT_FLOWER_COLOURS } from './kitplants.js';
+import { buildGrassField } from './grassfield.js';
 export { buildUndergrowth } from './kitplants.js';
 
 export const treeSpots = [];
@@ -90,7 +91,6 @@ export function buildRocks() {
 export function buildGrass() {
   const blades = [];
   for (let i = 0; i < 12; i++) rng(); // the old tuft shape used twelve layout draws; keep the stream in step
-  const tufts = grassTuftGeos();
 
   const grassCols = ['#6f9c45', '#83ad4f', '#5d8a3e', '#9bb957', '#77a24a'].map(col);
   for (let i = 0; i < 26000; i++) {
@@ -103,12 +103,10 @@ export function buildGrass() {
     const s = rand(0.7, 1.35);
     blades.push({ x, z, y: h - 0.03, s, sy: s * rand(0.7, 1.15), ry: rng() * TAU, color: pick(grassCols) });
   }
-  // with the kit, detailed grass grows close to you and these light tufts only further out
-  world.grassMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.55, GRASS_FADE, kit ? [KIT_GRASS_FADE[0] - 2, KIT_GRASS_FADE[1] - 2] : null), 'lam'));
-  // seed stalks gather in drifts; low clumps fill in between the upright ones
-  const tuftKind = (it) => { const h = variantAt(it.x, it.z, 100, 21); return vnoise(it.x * 0.09 + 3, it.z * 0.09 - 7) > 0.62 && h < 45 ? 2 : h < 58 ? 0 : h < 90 ? 1 : 2; };
-  world.grass = instancedVariants(tufts, world.grassMat, blades, tuftKind, { cast: false, cell: 24, far: GRASS_FADE[1] });
-  if (kit) kitGrass(blades);
+  // The grass itself is made on the GPU (world/grassfield.js): two draw calls instead of tens of
+  // thousands of placed tufts. The loop above still runs, so the layout stream stays in step.
+  void blades;
+  world.grassMat = buildGrassField();
 }
 
 /**

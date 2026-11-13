@@ -15,8 +15,8 @@ export const treeSpots = [];
 
 // how far from the camera things keep their full detail (metres)
 export const TREE_NEAR = 55;          // trees switch to a thinned-out copy and stop casting shadows
-export const GRASS_FADE = [48, 64];   // grass shrinks away between these distances
-export const FLOWER_FADE = [52, 70];
+export const GRASS_FADE = [18, 66];   // grass thins out gradually between these distances
+export const FLOWER_FADE = [30, 70];
 const SHADOW_RANGE = 60;              // other objects cast shadows only this close to you
 
 export function buildTrees() {

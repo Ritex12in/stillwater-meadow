@@ -10,8 +10,8 @@ import { kit, fit } from '../core/assets.js';
 import { variantAt } from './detail.js';
 import { world } from '../core/state.js';
 
-export const KIT_GRASS_FADE = [12, 20];  // detailed grass near you; the light tufts take over beyond
-export const KIT_FLOWER_FADE = [38, 52];
+export const KIT_GRASS_FADE = [6, 22];   // detailed grass thins out from near you; the light tufts fill in
+export const KIT_FLOWER_FADE = [26, 54];
 const UNDERGROWTH_FADE = [40, 55];
 const FAR_KEEP = 0.4; // share of leaf cards a far tree keeps
 
@@ -200,7 +200,7 @@ export function buildUndergrowth(treeSpots) {
   Object.values(bushFl).forEach(roundNormals);
   const leafMat = (map) => weatherize(wind(std('#ffffff', { map, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true }), 0.05), 'std');
   // the two bushes are laid out on different leaf textures
-  const o = { cast: true, shadowRange: 40, cell: 40, far: UNDERGROWTH_FADE[1] };
+  const o = { cast: true, shadowRange: UNDERGROWTH_FADE[1], cell: 40, far: UNDERGROWTH_FADE[1] };
   world.bushes = instancedVariants([bushPlain], leafMat(tex('leaves_bush')), bushes, (b) => (b.flowers ? -1 : 0), Object.assign({ depthMat: cutoutDepth(tex('leaves_bush')) }, o));
   world.bushesInBloom = instancedVariants([first(bushFl, /Leaves/)], leafMat(tex('leaves_round')), bushes, (b) => (b.flowers ? 0 : -1), Object.assign({ depthMat: cutoutDepth(tex('leaves_round')) }, o));
   const bloom = bothSides(wind(new THREE.MeshLambertMaterial({ map: tex('flowers'), alphaTest: 0.5, vertexColors: true }), 0.05));

@@ -69,7 +69,11 @@ Key ideas:
 - **Nature models** (`core/assets.js`, `world/kitplants.js`): loaded before the world is built and
   reduced to plain geometry, so the same placement, wind, distance fade and season tinting apply.
   Beyond 55 m a tree draws a thinned copy of its own model (fewer, larger leaf cards; trunk and
-  main boughs only), so it keeps its look at a third of the cost.
+  main boughs only), so it keeps its look at a third of the cost. Between 45 and 60 m the two
+  cross-fade as a fine dither (`lodFade`), shadow included, so nothing switches in one frame.
+- **Distance thinning**: grass and flowers thin out gradually with distance, each plant vanishing
+  at its own distance (`addWind` fade), and shadows fade out over the outer 18 m of the shadow
+  area (`world/lights.js`) instead of ending at a line.
 - **Atmosphere** (`core/atmosphere.js`): patches three's fog so the haze glows toward the sun,
   matching the sky's horizon, and adds a gentle colour grade (soft highlights, warm shade) to
   every surface; the sky and lake shaders call the same functions so the horizon stays seamless.

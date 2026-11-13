@@ -36,8 +36,21 @@ export function addWind(mat, k, fade = null, fadeIn = null, sheen = 0.2) {
       float hh = max(position.y, 0.0);
       transformed.x += (wv + gust * 1.8) * hh * hh * ${k.toFixed(4)} * uWind;
       transformed.z += (wv + gust * 1.8) * hh * hh * ${(k * 0.5).toFixed(4)} * uWind;
-      ${fade ? `transformed *= 1.0 - smoothstep(${fade[0].toFixed(1)}, ${fade[1].toFixed(1)}, distance(ip, uCam.xz));` : ''}
-      ${fadeIn ? `transformed *= smoothstep(${fadeIn[0].toFixed(1)}, ${fadeIn[1].toFixed(1)}, distance(ip, uCam.xz));` : ''}`);
+      ${fade || fadeIn ? `
+        float pd = distance(ip, uCam.xz);
+        float ph = fract(sin(dot(ip, vec2(12.9898, 78.233))) * 43758.5453);` : ''}
+      ${fade ? `
+        // thinning with distance: each plant has its own cut-off between the two distances
+        // (more of them reach the far end), shrinking away over the last few metres before it;
+        // the ones still standing grow a little wider so the ground stays covered
+        float pCut = mix(${fade[0].toFixed(1)}, ${fade[1].toFixed(1)}, sqrt(ph));
+        float pFar = smoothstep(${fade[0].toFixed(1)}, ${fade[1].toFixed(1)}, pd);
+        transformed *= 1.0 - smoothstep(pCut - 5.0, pCut, pd);
+        transformed.xz *= 1.0 + pFar * 0.6;` : ''}
+      ${fadeIn ? `
+        // filling in with distance, the reverse: each plant appears at its own distance
+        float pIn = mix(${fadeIn[0].toFixed(1)}, ${fadeIn[1].toFixed(1)}, ph);
+        transformed *= smoothstep(pIn - 3.0, pIn, pd);` : ''}`);
     // bent-over blades show their paler side: the gust reads as a light wave moving through
     sh.fragmentShader = 'varying float vGust;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       diffuseColor.rgb *= 1.0 + vGust * ${sheen.toFixed(3)};`);
@@ -222,23 +235,64 @@ export function instancedVariants(geos, mat, items, variantOf, opts = {}) {
 
 // ───────────── distance: what gets drawn, and what casts shadows ─────────────
 const ranged = [], lodSets = [];
+const faded = new WeakMap(); // materials already given a cross-fade (several sets share one)
 const FR = new THREE.Frustum(), FM = new THREE.Matrix4(), SPH = new THREE.Sphere();
 
 /**
+ * Cross-fade between a detailed shape and a cheaper one across a distance band, as a fine
+ * dither: the near shape thins out while the far one fills in, so nothing switches in one frame.
+ * Far geometries carry a `lodSide` attribute of 1; near ones have none (it reads as 0). Wraps any
+ * shader changes the material already has, and works on depth materials too, so shadows fade.
+ */
+export function lodFade(mat, band) {
+  const prev = mat.onBeforeCompile, baseKey = mat.customProgramCacheKey();
+  mat.onBeforeCompile = (sh, r) => {
+    prev.call(mat, sh, r);
+    sh.uniforms.uLodCam = camU;
+    sh.vertexShader = 'uniform vec3 uLodCam;\nattribute float lodSide;\nvarying float vLodT;\nvarying float vLodSide;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+        vec2 lodIp = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xz;
+      #else
+        vec2 lodIp = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;
+      #endif
+      vLodT = smoothstep(${band[0].toFixed(1)}, ${band[1].toFixed(1)}, distance(lodIp, uLodCam.xz));
+      vLodSide = lodSide;`);
+    sh.fragmentShader = 'varying float vLodT;\nvarying float vLodSide;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+      {
+        float lodD = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+        if (vLodSide > 0.5 ? lodD >= vLodT : lodD < vLodT) discard;
+      }`);
+  };
+  mat.customProgramCacheKey = () => baseKey + '|lod' + band.join('-');
+  return mat;
+}
+
+/**
  * Trees and other big things with two shapes: the detailed one near the camera (casting
- * shadows), a simple one further away (no shadow, and skipped when off screen). Instances are
- * re-sorted only when something crosses a boundary. The handle edits by index in `items`.
+ * shadows), a cheaper one further away (no shadow, and skipped when off screen). Across
+ * `opts.band` both are drawn and cross-fade (see lodFade). Instances are re-sorted only when
+ * something crosses a boundary. The handle edits by index in `items`.
  */
 export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
-  const near2 = (opts.near || 55) ** 2, lift = opts.lift || 3, radius = opts.radius || 3.5;
+  const band = opts.band || [(opts.near || 55) - 10, (opts.near || 55) + 5];
+  const in2 = band[0] ** 2, out2 = band[1] ** 2, lift = opts.lift || 3, radius = opts.radius || 3.5;
   const n = items.length, kind = items.map(variantOf);
   const mats = new Float32Array(n * 16);
   items.forEach((it, i) => composeItem(it).toArray(mats, i * 16));
   const colors = items.map((it) => (it.color ? it.color.clone() : null));
   const counts = nearGeos.map((_, v) => kind.filter((k) => k === v).length);
+  const fade = (m) => {
+    const was = faded.get(m);
+    if (!was) { lodFade(m, band); faded.set(m, band.join()); } else if (was !== band.join()) console.warn('lodSet: one material, two fade bands');
+    return m;
+  };
+  const depth = fade(opts.depthMat || new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
+  fade(mat);
+  if (opts.farMat) fade(opts.farMat);
+  farGeos.forEach((g) => { if (!g.attributes.lodSide) g.setAttribute('lodSide', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(1), 1)); });
   const mk = (geo, cap, cast, material = mat) => {
     const m = new THREE.InstancedMesh(geo, material, Math.max(cap, 1));
-    if (cast && opts.depthMat) m.customDepthMaterial = opts.depthMat;
+    if (cast) m.customDepthMaterial = depth;
     if (colors[0]) m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(cap, 1) * 3), 3);
     m.count = 0; m.visible = false;
     m.frustumCulled = false; // placement is handled here
@@ -248,6 +302,7 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
   };
   const nearM = nearGeos.map((g, v) => mk(g, counts[v], !!opts.cast));
   const farM = farGeos.map((g, v) => mk(g, counts[v], false, opts.farMat || mat));
+  // state per item: bit 1 = near shape drawn, bit 2 = far shape drawn (both inside the band)
   const state = new Uint8Array(n).fill(255), fill = new Int32Array(nearGeos.length * 2);
   let dirty = true, on = true;
   const set = {
@@ -256,11 +311,11 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
     update(cam) {
       let changed = dirty;
       for (let i = 0; i < n; i++) {
-        const it = items[i], dx = it.x - cam.x, dz = it.z - cam.z, sc = it.s || 1;
+        const it = items[i], dx = it.x - cam.x, dz = it.z - cam.z, d2 = dx * dx + dz * dz, sc = it.s || 1;
         let st = 0;
         if (on) {
-          if (dx * dx + dz * dz < near2) st = 1;
-          else { SPH.center.set(it.x, it.y + lift * sc, it.z); SPH.radius = radius * sc; st = FR.intersectsSphere(SPH) ? 2 : 0; }
+          if (d2 < out2) st |= 1;
+          if (d2 > in2) { SPH.center.set(it.x, it.y + lift * sc, it.z); SPH.radius = radius * sc; if (FR.intersectsSphere(SPH)) st |= 2; }
         }
         if (st !== state[i]) { state[i] = st; changed = true; }
       }
@@ -268,10 +323,12 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
       dirty = false;
       fill.fill(0);
       for (let i = 0; i < n; i++) {
-        if (!state[i]) continue;
-        const slot = kind[i] * 2 + state[i] - 1, m = state[i] === 1 ? nearM[kind[i]] : farM[kind[i]], k = fill[slot]++;
-        m.instanceMatrix.array.set(mats.subarray(i * 16, i * 16 + 16), k * 16);
-        if (colors[i]) colors[i].toArray(m.instanceColor.array, k * 3);
+        for (let f = 0; f < 2; f++) {
+          if (!(state[i] & (f + 1))) continue;
+          const m = f === 0 ? nearM[kind[i]] : farM[kind[i]], k = fill[kind[i] * 2 + f]++;
+          m.instanceMatrix.array.set(mats.subarray(i * 16, i * 16 + 16), k * 16);
+          if (colors[i]) colors[i].toArray(m.instanceColor.array, k * 3);
+        }
       }
       [nearM, farM].forEach((list, f) => list.forEach((m, v) => {
         m.count = fill[v * 2 + f];

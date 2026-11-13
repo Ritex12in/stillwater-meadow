@@ -12,6 +12,9 @@ import { kit, fit } from '../core/assets.js';
 import { RANGES, rangeHeight, mountainU } from './mountains.js';
 import { groundU } from './terrain.js';
 
+/** The card meshes, so the distant-forest setting can hide them. */
+export const farForest = [];
+
 const CELL_W = 256, CELL_H = 512;
 // which model each atlas cell shows, its leaf texture and bark texture
 const FAMILIES = [
@@ -153,7 +156,7 @@ export function buildFarForest(renderer) {
     const h = 5 + r() * 5;
     hills.push(tree(x, y - 0.4, z, h, [['pine', 0.25], ['slimpine', 0.22], ['common', 0.14], ['normal', 0.12], ['maple', 0.11], ['birch', 0.09], ['blossom', 0.07]]));
   }
-  cards(hills, texture, fams.length, false);
+  farForest.push(cards(hills, texture, fams.length, false));
 
   // 2. the mountains' lower slopes, below the rock and snow: denser, bigger, hazier
   RANGES.forEach((R, k) => {
@@ -168,6 +171,6 @@ export function buildFarForest(renderer) {
       if (r() > 0.35 + 0.65 * fade) continue;
       list.push(tree(Math.cos(a) * rr, y - 1.5, Math.sin(a) * rr, h, fade < 0.5 ? [['slimpine', 0.55], ['pine', 0.35], ['birch', 0.1]] : [['slimpine', 0.3], ['pine', 0.25], ['common', 0.15], ['normal', 0.1], ['maple', 0.12], ['birch', 0.08]]));
     }
-    cards(list, texture, fams.length, true);
+    farForest.push(cards(list, texture, fams.length, true));
   });
 }

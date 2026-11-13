@@ -33,7 +33,9 @@ import { camState, initPointer } from './systems/input.js';
 import { updateCamera, camTarget } from './systems/camera.js';
 import { cur, sunDir, moonDir, lightDir, solar, timeCtl, advanceTime, periodName, formatHour, goLive, setManual, wrap24 } from './systems/time.js';
 import { wx, WX_LABEL, buildWeather, updateWeather, updatePrecip, weatherModify, cycleWeather, onRainStopped, restoreWeather, resizeWeather } from './systems/weather.js';
-import { quality, initQuality, tickQuality, LEVELS } from './systems/quality.js';
+import { quality, initQuality, tickQuality, onQualityChange } from './systems/quality.js';
+import { grassU } from './world/grassfield.js';
+import { farForest } from './world/farforest.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
 import { store, onSave } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
@@ -110,7 +112,12 @@ const resize = () => {
   resizers.forEach((fn) => fn(h));
 };
 initPost(renderer, scene, camera);
-initQuality(renderer, resize, store.settings.quality || 'auto');
+initQuality(renderer, resize, store.settings.quality || 'auto', store.settings.gfx || null);
+onQualityChange((o) => {
+  grassU.density.value = o.grass;
+  farForest.forEach((m) => { m.visible = o.forest; });
+  world.wildAllowed = o.flowers; world.wildOn = null; // re-applied with the season below
+});
 window.addEventListener('resize', resize);
 
 // ── Features, each isolated so one failing can't take down the rest ──
@@ -154,7 +161,7 @@ function applySky() {
   starMat.opacity = cur.stars;
   tintMountains(cur, sunDir, seasonState.coverFloor || 0);
   groundU.bloom.value = seasonState.flowerFrac ?? 1;
-  const wildOn = seasonState.name !== 'Winter'; // the wildflowers die back under the snow
+  const wildOn = seasonState.name !== 'Winter' && world.wildAllowed !== false; // the wildflowers die back under the snow (or are switched off)
   if (world.wild && world.wildOn !== wildOn) { world.wildOn = wildOn; world.wild.forEach((h) => { h.visible = wildOn; }); }
   groundU.autumn.value += ((seasonState.name === 'Autumn' ? 1 : 0) - groundU.autumn.value) * 0.02; // leaves gather and melt away slowly
   scene.fog.color.copy(cur.horizon);
@@ -232,9 +239,9 @@ export function tick(dt) {
   updateHud(dt);
 }
 function renderNow() {
-  // the lake's mirror: every 4th frame on High, every 10th on Medium, none on Low
-  renderReflection(renderer, scene, camera, quality.level !== 'low', atmosphereFor, atmosphereFor, quality.level === 'high' ? 4 : 10);
-  renderFrame(LEVELS[quality.level].bloom);
+  // the lake's mirror, redrawn every n-th frame by the reflections setting (0: off)
+  renderReflection(renderer, scene, camera, quality.opts.reflections > 0, atmosphereFor, atmosphereFor, quality.opts.reflections);
+  renderFrame(quality.opts.effects);
 }
 
 let last = performance.now();

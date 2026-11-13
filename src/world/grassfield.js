@@ -12,6 +12,9 @@ import { heightAt, lakeT, pathAmt, nearReserved, onDock, TERRAIN, BENCH_SPOT } f
 import { weatherize, bothSides, timeU, windU, camU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 
+/** Share of the tufts drawn (the grass-density setting). */
+export const grassU = { density: { value: 1 } };
+
 // ── the ground map: height and how grassy each spot is, on the terrain's own grid ──
 function groundMap() {
   const n = TERRAIN.seg + 1, half = TERRAIN.size / 2, step = TERRAIN.size / TERRAIN.seg;
@@ -62,7 +65,7 @@ function grassMaterial(map, tex) {
     Object.assign(sh.uniforms, { tGround: { value: map }, uTime: timeU, uWind: windU, uCamG: camU });
     sh.vertexShader = `
       uniform sampler2D tGround; uniform float uTime; uniform float uWind; uniform vec3 uCamG;
-      uniform float uSpacing; uniform float uInner; uniform vec2 uFade; uniform float uScale;
+      uniform float uSpacing; uniform float uInner; uniform vec2 uFade; uniform float uScale; uniform float uDensity;
       attribute vec2 aCell;
       varying float vGust;
       float gh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -87,6 +90,7 @@ function grassMaterial(map, tex) {
           // and leave the middle to the dense field
           float cut = mix(uFade.x, uFade.y, sqrt(h3));
           float k = (1.0 - smoothstep(cut - 5.0, cut, d)) * smoothstep(0.25, 0.6, g.y) * smoothstep(uInner - 3.0, uInner, d);
+          k *= step(gh(cell + 53.7), uDensity); // the grass-density setting keeps this share of the tufts
           // meadow patches: taller, lusher grass in drifts, shorter turf between
           float drift = gh(floor(base / 7.0)) * 0.5 + gh(floor(base / 3.1) + 5.0) * 0.5;
           float tall = mix(0.15, 0.42, h3 * 0.5 + drift * 0.5) * uScale * k;
@@ -110,6 +114,7 @@ function grassMaterial(map, tex) {
     sh.fragmentShader = 'varying float vGust;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
       diffuseColor.rgb *= 1.0 + vGust * 0.2;`);
     sh.uniforms.uSpacing = { value: mat.userData.spacing };
+    sh.uniforms.uDensity = grassU.density;
     sh.uniforms.uInner = { value: mat.userData.inner };
     sh.uniforms.uFade = { value: new THREE.Vector2(...mat.userData.fade) };
     sh.uniforms.uScale = { value: mat.userData.scale };

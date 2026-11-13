@@ -2,7 +2,7 @@
 // a frame-rate readout, and forgetting the saved meadow.
 import { audio, setSoundEnabled, setVolume, onSoundChange } from '../systems/audio.js';
 import { camState } from '../systems/input.js';
-import { quality, setQuality, LEVELS } from '../systems/quality.js';
+import { quality, setQuality, setOption, OPTIONS, PRESETS } from '../systems/quality.js';
 import { store, saveSoon, onSave, resetSave } from '../systems/save.js';
 
 const $ = (id) => document.getElementById(id);
@@ -44,11 +44,27 @@ export function initSettings() {
   sens.value = String(camState.sensitivity);
   sens.addEventListener('input', () => { camState.sensitivity = +sens.value; s.sensitivity = camState.sensitivity; saveSoon(); });
 
-  const qual = $('quality');
-  qual.value = s.quality || 'auto';
-  qual.addEventListener('change', () => { setQuality(qual.value); s.quality = qual.value; saveSoon(); });
+  // a preset list, and one control per option; changing an option makes the preset "Custom"
+  const qual = $('quality'), box = $('gfxOptions'), selects = {};
+  Object.entries(OPTIONS).forEach(([key, opt]) => {
+    const label = document.createElement('label'), sel = document.createElement('select');
+    label.textContent = opt.label + ' ';
+    Object.entries(opt.choices).forEach(([v, [name]]) => sel.add(new Option(name, v)));
+    sel.addEventListener('change', () => { s.gfx = setOption(key, sel.value); s.quality = 'custom'; sync(); saveSoon(); });
+    label.appendChild(sel); box.appendChild(label);
+    selects[key] = sel;
+  });
+  const sync = () => {
+    qual.value = quality.setting;
+    Object.entries(selects).forEach(([key, sel]) => { sel.value = quality.choice[key]; });
+  };
+  qual.addEventListener('change', () => { setQuality(qual.value, s.gfx || quality.choice); s.quality = qual.value; if (qual.value === 'custom') s.gfx = Object.assign({}, quality.choice); sync(); saveSoon(); });
+  sync();
   const qualNow = $('qualityNow');
-  setInterval(() => { qualNow.textContent = `${LEVELS[quality.level].label} · ${quality.fps} fps`; }, 1000);
+  setInterval(() => {
+    if (quality.setting === 'auto') sync(); // auto may have moved the options
+    qualNow.textContent = `${PRESETS[quality.level] ? PRESETS[quality.level].label : 'Custom'} · ${quality.fps} fps`;
+  }, 1000);
 
   const confirmBox = $('resetConfirm');
   $('resetBtn').addEventListener('click', () => { confirmBox.hidden = false; });

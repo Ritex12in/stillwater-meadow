@@ -20,6 +20,7 @@ import { wx } from '../systems/weather.js';
 import { spawnRipple, spawnHeart } from '../world/effects.js';
 import { toast, togglePanel, onPanel } from '../ui/hud.js';
 import { plop, meow } from './voices.js';
+import { hasRod } from './rod.js';
 
 const hour = () => timeCtl.hour;
 const isDawn = () => hour() > 4.8 && hour() < 8.5;
@@ -166,9 +167,16 @@ export function initFishing() {
   registerAction({ id: 'fish-hook', key: 'KeyR', keyLabel: 'R', score: () => 1000, urgent: () => true, available: () => F.state === 'bite', label: () => 'Hook it!', run: hook });
   registerAction({ id: 'fish-reel', key: 'KeyR', keyLabel: 'R', score: () => 900, available: () => F.state === 'wait', label: () => 'Reel in', run: () => stop('You reel in your line.') });
   let spotCache = null;
+  registerAction({ // at the water without a rod: say where to get one
+    id: 'fish-norod', key: 'KeyR', keyLabel: 'R', score: () => -1,
+    available: () => !hasRod() && F.state === 'idle' && canFish() && !moving() && spotCache,
+    disabled: () => true,
+    label: () => 'No rod yet: the skipper has one',
+    run: () => {},
+  });
   registerAction({
     id: 'fish-cast', key: 'KeyR', keyLabel: 'R', score: () => 0,
-    available: () => F.state === 'idle' && canFish() && !moving() && spotCache,
+    available: () => hasRod() && F.state === 'idle' && canFish() && !moving() && spotCache,
     label: () => (icy() ? 'Fish through the ice' : 'Cast a line'),
     run: startCast,
   });

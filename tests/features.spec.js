@@ -7,6 +7,7 @@ const side = (page) => page.evaluate(() => { const d = window.__meadow.geo.dockD
 test('fishing: cast, hook a bite, and the catch goes in the journal', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer', '#18');
   await step(page, 0.5);
+  await page.evaluate(() => { window.__meadow.store.rod = true; });
   const p = await page.evaluate(() => window.__meadow.geo.dockAt(5, 0));
   const s = await side(page);
   await teleport(page, p.x, p.z, s.x, s.z);
@@ -23,6 +24,33 @@ test('fishing: cast, hook a bite, and the catch goes in the journal', async ({ p
   const journal = await page.evaluate(() => window.__meadow.store.journal);
   expect(Object.keys(journal).length).toBe(1);
   await expect(page.locator('#toast')).toContainText('You caught');
+  noErrors(errors);
+});
+
+test('the skipper trades his rod for a full bouquet of three kinds, not before', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#11');
+  await step(page, 0.5);
+  const p = await page.evaluate(() => window.__meadow.geo.dockAt(5, 0));
+  const s = await side(page);
+  await teleport(page, p.x, p.z, s.x, s.z);
+  await step(page, 0.4);
+  expect((await actions(page)).map((a) => a.id)).not.toContain('fish-cast');
+  for (let k = 0; k < 12; k++) {
+    const f = await page.evaluate((k) => {
+      const m = window.__meadow, all = m.flowers().filter((it) => it.shown);
+      const kinds = [...new Set(all.map((it) => it.kind))].slice(0, 3), want = kinds[Math.floor(k / 4)];
+      return all.filter((it) => it.kind === want).sort((a, b) => Math.hypot(a.x - m.player.x, a.z - m.player.z) - Math.hypot(b.x - m.player.x, b.z - m.player.z))[0];
+    }, k);
+    await teleport(page, f.x + 0.4, f.z);
+    await press(page, 'KeyG', 0.7);
+  }
+  const bp = await page.evaluate(() => window.__meadow.BOARD_POINT);
+  await teleport(page, bp.x, bp.z);
+  await press(page, 'KeyG', 0.5);
+  expect(await page.evaluate(() => window.__meadow.rod().rod)).toBe(true);
+  await teleport(page, p.x, p.z, s.x, s.z);
+  await step(page, 0.4);
+  expect((await actions(page)).map((a) => a.id)).toContain('fish-cast');
   noErrors(errors);
 });
 

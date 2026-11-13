@@ -9,7 +9,8 @@ import { flowerHeadGeos, flowerCentreGeo, FLOWER_KINDS, FLOWER_CENTRE, BOUQUET_S
 import { clock } from '../core/clock.js';
 import { hooks, seats, seasonState, world } from '../core/state.js';
 import { player, hero } from '../characters/player.js';
-import { boat, ferry, sk, skipper } from '../characters/boat.js';
+import { boat, sk } from '../characters/boat.js';
+import { hasRod, judgeBouquet, nearSkipper, giveRod } from './rod.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
 import { store, saveSoon, onSave } from '../systems/save.js';
@@ -51,7 +52,7 @@ export function initFlowers() {
   const items = world.flowerItems, set = world.flowerSet;
   const picked = new Float32Array(items.length).fill(-1e9);
   const shownF = new Uint8Array(items.length).fill(1);
-  debugView = () => items.map((it, i) => ({ x: it.x, z: it.z, shown: !!shownF[i] }));
+  debugView = () => items.map((it, i) => ({ x: it.x, z: it.z, shown: !!shownF[i], kind: it.kind }));
   const keep = items.map((it) => ((Math.sin(it.x * 12.9898 + it.z * 78.233) * 43758.5453) % 1 + 1) % 1); // stable per flower
   const setShown = (i, on) => {
     if (shownF[i] === on) return;
@@ -96,8 +97,6 @@ export function initFlowers() {
   if (store.boatBouquet) placeOnBoat(store.boatBouquet);
   onSave((s) => { s.bouquet = bouquet.slice(); });
 
-  const skipperPos = new THREE.Vector3();
-  const nearSkipper = () => { skipper.root.getWorldPosition(skipperPos); return ferry.state === 'docked' && Math.hypot(skipperPos.x - player.x, skipperPos.z - player.z) < 3.2; };
   const nearBench = () => benchSeat && Math.hypot(benchSeat.x - player.x, benchSeat.z - player.z) < 2.3;
   let nearFlower = -1, nearDist = 9;
   const scan = () => {
@@ -114,8 +113,18 @@ export function initFlowers() {
   registerAction({
     id: 'give-skipper', key: 'KeyG', keyLabel: 'G', score: () => 10,
     available: () => activity.free && bouquet.length && nearSkipper(),
-    label: () => 'Give the bouquet to the skipper',
+    label: () => (hasRod() ? 'Give the bouquet to the skipper' : 'Offer the bouquet for the fishing rod'),
     run: () => {
+      if (!hasRod()) {
+        // without a rod, the bouquet is a trade: he only takes a proper one
+        const v = judgeBouquet(bouquet);
+        if (!v.ok) { sk.nod = 0.5; toast(`The skipper: ${v.why}`, 5); return; }
+        placeOnBoat(bouquet);
+        store.boatBouquet = bouquet.slice();
+        bouquet = []; rebuildHand();
+        giveRod('bouquet');
+        return;
+      }
       placeOnBoat(bouquet);
       store.boatBouquet = bouquet.slice();
       sk.nod = 0.9; sk.waveT = 1.6;
@@ -147,7 +156,7 @@ export function initFlowers() {
       bouquet.push('#' + items[i].color.getHexString() + ':' + items[i].kind);
       rebuildHand();
       player.pickT = 0.6;
-      if (bouquet.length === 1) toast('Picked a flower. Gather more, then give the bouquet to the skipper or leave it on the bench.', 4.5);
+      if (bouquet.length === 1) toast(hasRod() ? 'Picked a flower. Gather more, then give the bouquet to the skipper or leave it on the bench.' : 'Picked a flower. A full bouquet of three kinds or more could win you the skipper\'s fishing rod.', 4.5);
       if (bouquet.length === MAX) toast('Your hands are full of flowers.');
       scan();
     },

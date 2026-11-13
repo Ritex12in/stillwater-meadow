@@ -67,12 +67,14 @@ export function weatherize(mat, mode) {
     prev.call(mat, sh, r);
     sh.uniforms.uSnow = wxU.snow;
     sh.uniforms.uWet = wxU.wet;
+    // a material can paint its own snow by defining SNOW_COLOR (the ground does); otherwise plain white
+    sh.fragmentShader = sh.fragmentShader.replace('void main() {', '#ifndef SNOW_COLOR\n#define SNOW_COLOR vec3(0.93, 0.95, 0.99)\n#endif\nvoid main() {');
     sh.fragmentShader = 'uniform float uSnow;\nuniform float uWet;\n' + (mode === 'std'
       ? sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
           vec3 wN = inverseTransformDirection(normal, viewMatrix);
           float sAmt = uSnow * smoothstep(0.3, 0.75, wN.y);
-          diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - uWet * 0.38), vec3(0.93, 0.95, 0.99), sAmt);
+          diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - uWet * 0.38), SNOW_COLOR, sAmt);
           roughnessFactor = mix(roughnessFactor, 0.42, uWet * (1.0 - sAmt));
         }`)
       : sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>

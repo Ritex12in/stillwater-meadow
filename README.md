@@ -6,8 +6,10 @@ stargazing and a photo mode. Trees, grass, flowers, bushes and rocks use the fre
 [Stylized Nature MegaKit](https://quaternius.com/packs/stylizednaturemegakit.html) by Quaternius,
 and the bench, fences and vines come from his free (CC0)
 [Fantasy Props](https://quaternius.com/packs/fantasypropsmegakit.html) and
-[Medieval Village](https://quaternius.com/packs/medievalvillagemegakit.html) MegaKits; everything
-else (daisies, lupins, lamp posts, mountains, sky, clouds, water) is built from code.
+[Medieval Village](https://quaternius.com/packs/medievalvillagemegakit.html) MegaKits; the ground
+uses hand-painted CC0 grass and soil textures by [Cethiel](https://opengameart.org/users/cethiel).
+Everything else (daisies, lupins, lamp posts, mountains, sky, clouds, water, the autumn leaf
+litter and the snow) is built from code.
 
 ## Run it
 
@@ -41,6 +43,13 @@ the textures. It needs Python with Pillow.
 
 `public/assets/props/` (bench, fence, vines) is built the same way by `tools/prepare_props.py`
 from the Fantasy Props and Medieval Village MegaKits (CC0; licences copied alongside).
+
+`public/assets/ground/` holds the ground textures: `tools/prepare_ground.py` copies Cethiel's
+grass, flower-meadow and soil tiles (CC0, OpenGameArt) and `tools/paint_leaves.py` paints the
+autumn leaf litter. The terrain shader (`world/terrain.js`) blends them by per-vertex weights
+(sand by the lake, soil on the path, rock up high), tiles them in world space at two scales and
+angles so the repeat doesn't show, adds flower-meadow patches in spring and summer and fallen
+leaves in autumn, and paints its own snow (drifts, blue hollows, sparkle) through `SNOW_COLOR`.
 
 ## How the code is organised
 

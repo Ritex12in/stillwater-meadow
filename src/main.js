@@ -12,7 +12,7 @@ import { clock } from './core/clock.js';
 import { buildSky, sky, skyU, starMat } from './world/sky.js';
 import { buildMountains, tintMountains } from './world/mountains.js';
 import { buildLights, hemi, ambient, sun } from './world/lights.js';
-import { buildTerrain } from './world/terrain.js';
+import { buildTerrain, groundU } from './world/terrain.js';
 import { buildWater, waterU, renderReflection } from './world/water.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
@@ -151,6 +151,10 @@ function applySky() {
   skyU.sunColor.value.copy(cur.glow);
   starMat.opacity = cur.stars;
   tintMountains(cur, sunDir, seasonState.coverFloor || 0);
+  groundU.bloom.value = seasonState.flowerFrac ?? 1;
+  const wildOn = seasonState.name !== 'Winter'; // the wildflowers die back under the snow
+  if (world.wild && world.wildOn !== wildOn) { world.wildOn = wildOn; world.wild.forEach((h) => { h.visible = wildOn; }); }
+  groundU.autumn.value += ((seasonState.name === 'Autumn' ? 1 : 0) - groundU.autumn.value) * 0.02; // leaves gather and melt away slowly
   scene.fog.color.copy(cur.horizon);
   scene.fog.near = cur.fogNear; scene.fog.far = cur.fogFar;
   waterU.fogColor.value.copy(cur.horizon);

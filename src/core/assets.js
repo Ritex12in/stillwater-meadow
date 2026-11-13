@@ -23,6 +23,8 @@ const TEXTURES = ['leaves_round', 'leaves_pine', 'leaves_bush', 'bark', 'flowers
 // built things (bench, fence, vines), from two more Quaternius kits; see public/assets/props
 const PROPS = ['Bench', 'Prop_WoodenFence_Single', 'Prop_WoodenFence_Extension1', 'Prop_Vine1', 'Prop_Vine4'];
 const PROP_TEXTURES = ['furniture', 'woodtrim', 'vine'];
+// hand-painted ground (CC0, Cethiel on OpenGameArt; see public/assets/ground), tiled in world space
+const GROUND = ['grass_lush', 'grass_flowers', 'grass_fine', 'soil', 'bloom_violet', 'bloom_orange'];
 
 /** The loaded kit, or null when the meadow uses its hand-built shapes. */
 export let kit = null;
@@ -100,6 +102,9 @@ export async function loadKit() {
     ]);
     const out = { models: Object.assign(Object.fromEntries(models), Object.fromEntries(props)), tex: Object.fromEntries(textures) };
     Object.values(out.tex).forEach((t) => { t.flipY = false; t.anisotropy = 4; }); // glTF texture coordinates
+    const ground = await Promise.all(GROUND.map((t) => tex.loadAsync(ROOT + 'ground/' + t + '.jpg').then((x) => [t, x])));
+    ground.push(['leaves_litter', await tex.loadAsync(ROOT + 'ground/leaves.png')]); // painted by tools/paint_leaves.py
+    ground.forEach(([name, t]) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; out.tex[name] = t; });
     kit = out;
   } catch (e) {
     console.warn('Nature models could not be loaded; using the hand-built shapes.', e);

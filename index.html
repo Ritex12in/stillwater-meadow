@@ -10,6 +10,24 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500;1,600&family=Manrope:wght@500;600;700&display=swap">
 </head>
 <body>
+  <!-- Shown from the first paint until the meadow has drawn its first frame (src/ui/loading.js) -->
+  <div id="loading" role="status" aria-live="polite">
+    <div class="ld-card">
+      <svg class="ld-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="24" r="10" fill="#ffcf7a"/><path d="M4 46c12-8 20-8 28 0s16 8 28 0v14H4z" fill="#3f86d4"/><path d="M4 52c12-6 20-6 28 0s16 6 28 0" fill="none" stroke="#bfe0ff" stroke-width="2" stroke-linecap="round" opacity=".6"/></svg>
+      <h1>Stillwater Meadow</h1>
+      <p id="loadingText">Waking the meadow…</p>
+      <div class="ld-bar" aria-hidden="true"><b id="loadingBar"></b></div>
+    </div>
+  </div>
+  <!-- On a phone held upright: the meadow is made for a wide screen -->
+  <div id="rotate" hidden>
+    <div class="ld-card">
+      <svg class="rot-icon" viewBox="0 0 64 64" aria-hidden="true"><rect x="22" y="8" width="20" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M12 50a22 22 0 0 0 30 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M44 62l-2-6 6-2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h2>Turn your phone sideways</h2>
+      <p>The meadow is best seen wide.</p>
+      <button type="button" class="btn" id="rotateSkip">Play upright anyway</button>
+    </div>
+  </div>
   <canvas id="world" aria-label="A calm lakeside meadow you can walk around in"></canvas>
 
   <header class="brand">
@@ -30,6 +48,9 @@
     <button class="tool glass" type="button" data-panel="worldPanel" aria-expanded="false" title="Time, weather and season">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       <span>World</span>
+    </button>
+    <button class="tool glass icon-only" type="button" id="fullscreenBtn" aria-pressed="false" title="Full screen" aria-label="Full screen" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
     <button class="tool glass icon-only" type="button" data-panel="settingsPanel" aria-expanded="false" title="Settings" aria-label="Settings">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
@@ -144,6 +165,12 @@
     </form>
   </div>
 
+  <!-- On a touch screen the actions are round icon buttons down the right edge, all of them showing -->
+  <div class="pad" id="pad" hidden></div>
+  <div class="zoom glass" id="zoom" hidden>
+    <button type="button" id="zoomIn" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <button type="button" id="zoomOut" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+  </div>
   <div class="prompts">
     <div class="line" id="promptExtra"></div>
     <div class="line"><span id="promptPrimary" class="line"></span><button type="button" class="more" id="promptMore" hidden aria-expanded="false"></button></div>

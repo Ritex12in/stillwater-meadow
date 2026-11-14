@@ -42,6 +42,39 @@ function chip(a) {
   b.addEventListener('click', () => runAction(a));
   return b;
 }
+// One picture per kind of action, for the touch pad (24 x 24, drawn in the button's colour).
+const ICON = {
+  sit: '<path d="M7 4v9h9M7 13v7M16 13v7M5 13h13"/>',
+  boat: '<path d="M3 15h18l-3 5H6zM12 4v9M12 5l6 6h-6"/>',
+  fire: '<path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-7 1 1 2 2 3-3z"/>',
+  paw: '<circle cx="7" cy="9" r="1.9"/><circle cx="12" cy="7" r="1.9"/><circle cx="17" cy="9" r="1.9"/><path d="M12 12c3 0 5 2.6 5 4.8 0 1.7-1.6 2.4-2.8 2-0.9-0.3-1.4-0.6-2.2-0.6s-1.3 0.3-2.2 0.6c-1.2 0.4-2.8-0.3-2.8-2C7 14.6 9 12 12 12z"/>',
+  fish: '<path d="M3 12c3-5 9-6 13-2l5-3v10l-5-3c-4 4-10 3-13-2z"/><circle cx="8" cy="11" r="0.8"/>',
+  rod: '<path d="M4 20L18 4M18 4c2 3 2 7 0 10M18 14v3a2 2 0 0 1-4 0"/>',
+  bread: '<path d="M4 11a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4c0 1.3-0.8 2-2 2.4V19H6v-5.6C4.800 13 4 12.300 4 11z"/><path d="M9 11v2M12 10v3M15 11v2"/>',
+  flower: '<circle cx="12" cy="9" r="2"/><path d="M12 3v4M12 11v10M7.800 6.500l2.700 1.700M16.200 6.500l-2.700 1.700M8 12.500l2.500-2M16 12.500l-2.500-2M12 17c-2-2-4-2-5-1M12 15c2-2 4-2 5-1"/>',
+  cone: '<path d="M12 3l5 8H7zM12 9l6 9H6zM12 18v3"/>',
+  star: '<path d="M12 3l2.600 5.600 6.100 0.700-4.500 4.200 1.200 6-5.400-3-5.400 3 1.200-6L3.300 9.300l6.100-0.700z"/>',
+  hand: '<path d="M8 12V6a1.500 1.500 0 0 1 3 0v5V4.500a1.500 1.500 0 0 1 3 0V11V6a1.500 1.500 0 0 1 3 0v8c0 4-2.500 7-6 7s-5-2-6.500-5L3 13a1.500 1.500 0 0 1 2.600-1.500L8 14"/>',
+};
+const iconFor = (id) => ICON[
+  /^(sit|stand)$/.test(id) ? 'sit' : /board|step-off/.test(id) ? 'boat' : /campfire/.test(id) ? 'fire' : /^pet/.test(id) ? 'paw' : /^feed/.test(id) ? 'fish'
+    : /^fish/.test(id) ? 'rod' : /bread/.test(id) ? 'bread' : /cone/.test(id) ? 'cone' : /pick|give|bench/.test(id) ? 'flower' : /lie|get-up/.test(id) ? 'star' : 'hand'];
+/** Touch screens: every action as a round icon button down the right edge, the best one biggest and lowest. */
+function renderPad(list) {
+  const pad = $('pad');
+  pad.hidden = list.length === 0;
+  pad.replaceChildren(...list.map((a, i) => {
+    const b = document.createElement('button'), off = !!(a.disabled && a.disabled());
+    b.type = 'button';
+    b.className = 'pad-btn glass' + (i === 0 ? ' first' : '') + (a.urgent && a.urgent() ? ' urgent' : '');
+    if (off) { b.classList.add('off'); b.setAttribute('aria-disabled', 'true'); }
+    b.title = a.label(); b.setAttribute('aria-label', a.label());
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.700" stroke-linecap="round" stroke-linejoin="round">${iconFor(a.id)}</svg>`;
+    // an icon alone can't say why something isn't possible yet: tapping a greyed one tells you
+    b.addEventListener('click', () => { if (off) toast(a.label(), 3); else runAction(a); b.blur(); });
+    return b;
+  }));
+}
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /** Show the best action prominently; the rest sit behind a "more" chip. */
@@ -50,6 +83,7 @@ export function renderPrompts(list) {
   if (key === lastKey) return;
   lastKey = key;
   shown = list;
+  if (coarsePointer) { renderPad(list); return; }
   primaryEl = primaryEl || $('promptPrimary');
   moreEl = moreEl || $('promptMore');
   extraEl = extraEl || $('promptExtra');

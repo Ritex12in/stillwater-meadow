@@ -30,6 +30,7 @@ export function initPointer() {
   const joyEl = document.getElementById('joy'), knobEl = document.getElementById('knob');
   const lockTip = document.getElementById('lockTip');
   const look = { id: null, lx: 0, ly: 0 };
+  const pinch = { id: null, x: 0, y: 0, span: 0, dist: 0 }; // a second finger on the view: zoom
   let canLock = !coarsePointer && typeof canvas.requestPointerLock === 'function';
   let locked = false;
   const syncLockUi = () => {
@@ -66,6 +67,9 @@ export function initPointer() {
     } else if (look.id === null) {
       look.id = e.pointerId; look.lx = e.clientX; look.ly = e.clientY;
       canvas.classList.add('dragging');
+    } else if (e.pointerType === 'touch' && pinch.id === null) {
+      pinch.id = e.pointerId; pinch.x = e.clientX; pinch.y = e.clientY;
+      pinch.span = Math.max(20, Math.hypot(e.clientX - look.lx, e.clientY - look.ly)); pinch.dist = camState.dist;
     }
     canvas.setPointerCapture(e.pointerId);
   });
@@ -76,6 +80,10 @@ export function initPointer() {
       if (len > max) { dx = (dx / len) * max; dy = (dy / len) * max; }
       knobEl.style.transform = `translate(${dx}px, ${dy}px)`;
       joy.x = dx / max; joy.y = -dy / max;
+    } else if (pinch.id !== null && (e.pointerId === pinch.id || e.pointerId === look.id)) {
+      // two fingers: spread them to come closer, pinch to pull back (and the view doesn't turn meanwhile)
+      if (e.pointerId === pinch.id) { pinch.x = e.clientX; pinch.y = e.clientY; } else { look.lx = e.clientX; look.ly = e.clientY; }
+      camState.dist = clamp(pinch.dist * pinch.span / Math.max(20, Math.hypot(pinch.x - look.lx, pinch.y - look.ly)), camState.minDist, camState.maxDist);
     } else if (e.pointerId === look.id) {
       const sens = (e.pointerType === 'touch' ? 0.007 : 0.005) * camState.sensitivity;
       camState.yaw -= (e.clientX - look.lx) * sens;
@@ -85,10 +93,19 @@ export function initPointer() {
   });
   const endPointer = (e) => {
     if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; joyEl.hidden = true; }
-    if (e.pointerId === look.id) { look.id = null; canvas.classList.remove('dragging'); }
+    if (e.pointerId === look.id) { look.id = null; pinch.id = null; canvas.classList.remove('dragging'); }
+    if (e.pointerId === pinch.id) pinch.id = null;
   };
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
+  // touch screens also get a small + / − control
+  const zoomEl = document.getElementById('zoom');
+  if (zoomEl && coarsePointer) {
+    zoomEl.hidden = false;
+    const by = (k) => () => { camState.dist = clamp(camState.dist * k, camState.minDist, camState.maxDist); };
+    document.getElementById('zoomIn').addEventListener('click', by(0.8));
+    document.getElementById('zoomOut').addEventListener('click', by(1.25));
+  }
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     camState.dist = clamp(camState.dist * (1 + e.deltaY * 0.001), camState.minDist, camState.maxDist);

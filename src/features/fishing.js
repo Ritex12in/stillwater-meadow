@@ -469,7 +469,7 @@ export function initFishing() {
     hero.arms[1].rotation.z = 0;
     hero.elbows[0].rotation.x = hero.elbows[1].rotation.x = 0; // both arms straight on the rod
     hero.chest.rotation.y = 0;
-    if (player.umbAmt < 0.05) { hero.arms[0].rotation.x = armX * 0.75; hero.arms[0].rotation.z = 0.28; }
+    hero.arms[0].rotation.x = armX * 0.75; hero.arms[0].rotation.z = 0.28;
     rod.rotation.x = rodWorld - hero.body.rotation.x - hero.chest.rotation.x - armX;
   });
 }

@@ -1,27 +1,24 @@
-// You: walking, sitting, the umbrella, the pose blend, and getting safely off thawing ice.
-import * as THREE from 'three';
+// You: walking, sitting, the pose blend, and getting safely off thawing ice.
 import { scene } from '../core/render.js';
-import { lerp, damp, turnTo } from '../core/math.js';
+import { damp, turnTo } from '../core/math.js';
 import { SPAWN, LAKE, height, groundAt, walkable, onIce, nearestShore, ICE_Y } from '../core/shape.js';
-import { std, enableShadows, timeU, windU } from '../core/materials.js';
+import { timeU, windU } from '../core/materials.js';
 import { seats, pushOut, hooks } from '../core/state.js';
 import { makeKid, KIDS } from './kid.js';
-import { poseKid, straighten, STRIDE_RATE } from './kidpose.js';
+import { poseKid, STRIDE_RATE } from './kidpose.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
 import { camState, moveInput } from '../systems/input.js';
-import { wx } from '../systems/weather.js';
 import { toast } from '../ui/hud.js';
 
 export const player = {
   x: SPAWN.x, z: SPAWN.z, y: height(SPAWN.x, SPAWN.z),
   rot: Math.atan2(LAKE.x - SPAWN.x, LAKE.z - SPAWN.z),
   phase: 0, move: 0, seat: null, sitAmt: 0, seatTop: 0.44, slide: null,
-  petting: null, petTimer: 0, petAmt: 0, heartT: 0, umbAmt: 0,
+  petting: null, petTimer: 0, petAmt: 0, heartT: 0,
   idleT: 0, turn: 0, lastRot: 0, t: 0,
 };
 export let hero = null;
-let umbrella = null;
 const stepListeners = new Set();
 /** Called with (foot 0|1, x, z) each time a foot lands. */
 export const onStep = (fn) => stepListeners.add(fn);
@@ -29,20 +26,6 @@ export const onStep = (fn) => stepListeners.add(fn);
 export function buildPlayer() {
   hero = makeKid(KIDS.boy);
   scene.add(hero.root);
-  umbrella = new THREE.Group();
-  const cloth = std('#2f6f73', { side: THREE.DoubleSide }), trim = std('#e9e2d0'), dark = std('#2b2622');
-  umbrella.add(
-    new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1.2, 5).translate(0, 0.6, 0), dark),
-    new THREE.Mesh(new THREE.ConeGeometry(0.8, 0.34, 8, 1, true).translate(0, 1.36, 0), cloth),
-    new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 5).translate(0, 1.58, 0), trim),
-    new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.016, 4, 8, Math.PI).rotateZ(Math.PI).translate(0.05, 0, 0), dark)
-  );
-  umbrella.position.set(0, -hero.dims.arm + 0.02, 0);
-  umbrella.scale.setScalar(0.92);
-  umbrella.rotation.order = 'ZYX'; // set to the inverse of the arm's rotation so the shaft stays upright
-  umbrella.visible = false;
-  enableShadows(umbrella);
-  hero.arms[0].add(umbrella);
   registerSeatActions();
 }
 
@@ -168,17 +151,6 @@ export function poseHero(dt) {
   poseKid(hero, player, dt);
   // the face: content by default, beaming while petting
   hero.face.set(player.petAmt > 0.5 ? 'happy' : player.lieAmt > 0.5 ? 'sleepy' : 'calm');
-  const covered = player.seat && player.seat.covered;
-  player.umbAmt = damp(player.umbAmt, (wx.rain > 0.25 || wx.snow > 0.35 || wx.storm > 0.3) && !covered ? 1 : 0, 3, dt);
-  const ua = player.umbAmt;
-  umbrella.visible = ua > 0.02;
-  if (umbrella.visible) {
-    hero.arms[0].rotation.x = lerp(hero.arms[0].rotation.x, -1.15, ua);   // held up, so the canopy clears his hair
-    hero.arms[0].rotation.z = lerp(hero.arms[0].rotation.z, 0.32, ua);
-    straighten(hero, 0, ua);
-    umbrella.rotation.set(-(hero.arms[0].rotation.x + hero.body.rotation.x + hero.chest.rotation.x), 0, -hero.arms[0].rotation.z);
-    umbrella.scale.set(Math.max(ua, 0.05) * 0.92, 1, Math.max(ua, 0.05) * 0.92);
-  }
   for (const h of hooks.pose) h(dt);
   hero.root.position.set(player.x, player.y, player.z);
   hero.root.rotation.y = player.rot;

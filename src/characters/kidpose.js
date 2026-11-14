@@ -83,7 +83,7 @@ export function poseKid(k, st, dt) {
   }
 }
 
-/** Ease one arm's elbow straight (for a feature that drives the whole arm: a rod, an umbrella, a throw). */
+/** Ease one arm's elbow straight (for a feature that drives the whole arm: a rod, a throw). */
 export function straighten(k, i, amt = 1, bend = 0) {
   k.elbows[i].rotation.x = lerp(k.elbows[i].rotation.x, bend, amt);
 }

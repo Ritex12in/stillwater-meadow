@@ -202,3 +202,40 @@ body.photo-mode > *:not(#world):not(.photo-bar):not(.photo-vignette):not(.photo-
 .catches.pets li { grid-template-columns: 18px minmax(0, 1fr); row-gap: 2px; }
 .catches.pets .sw { width: auto; height: auto; border: 0; border-radius: 0; font-size: 14px; line-height: 1; }
 .catches.pets .st { grid-column: 2; text-align: left; }
+
+/* Loading screen: plain HTML and CSS, so it shows before any script runs */
+#loading, #rotate { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; color: var(--ink); text-align: center;
+  background: radial-gradient(120% 90% at 50% 20%, #2f5f86 0%, #1b3550 45%, #0f1f30 100%); }
+#loading { transition: opacity 0.7s ease; }
+#loading.done { opacity: 0; pointer-events: none; }
+#loading[hidden], #rotate[hidden] { display: none; }
+.ld-card { display: grid; justify-items: center; gap: 10px; max-width: 320px; }
+.ld-mark { width: 72px; height: 72px; animation: ld-bob 3.2s ease-in-out infinite; }
+#loading h1 { margin: 6px 0 0; font: italic 600 34px/1.1 var(--font-display); }
+#loading p, #rotate p { margin: 0; color: var(--ink-soft); font-size: 14px; min-height: 1.4em; }
+.ld-bar { width: min(240px, 70vw); height: 6px; margin-top: 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+.ld-bar b { display: block; height: 100%; width: 4%; border-radius: inherit; background: var(--sun); transition: width 0.35s ease; }
+@keyframes ld-bob { 50% { transform: translateY(-5px); } }
+#rotate { z-index: 101; }
+#rotate h2 { margin: 6px 0 0; font: italic 600 26px/1.1 var(--font-display); }
+.rot-icon { width: 72px; height: 72px; color: var(--sun); animation: rot-tip 2.6s ease-in-out infinite; transform-origin: 50% 50%; }
+@keyframes rot-tip { 0%, 25% { transform: rotate(0); } 55%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+#rotate .btn { margin-top: 10px; }
+@media (prefers-reduced-motion: reduce) { .ld-mark, .rot-icon { animation: none; } #loading { transition: none; } }
+
+/* Touch screens: actions as round icon buttons down the right edge; a small zoom control above them */
+/* (a column from the bottom up; when it would reach the zoom control it starts another column to its left) */
+.pad { position: fixed; right: var(--right); bottom: var(--bottom); z-index: 5; display: flex; flex-flow: column-reverse wrap-reverse; align-items: center; align-content: flex-start; gap: 10px; max-height: calc(100vh - var(--top) - var(--bottom) - 112px); }
+.pad[hidden], .zoom[hidden] { display: none; }
+.pad-btn { display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border-radius: 50%; color: var(--ink); cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.pad-btn svg { width: 24px; height: 24px; }
+.pad-btn.first { width: 62px; height: 62px; background: var(--chip); color: var(--chip-ink); border-color: transparent; }
+.pad-btn.first svg { width: 30px; height: 30px; }
+.pad-btn.urgent { box-shadow: 0 0 0 3px var(--sun); }
+.pad-btn.off { opacity: 0.45; }
+.pad-btn:active { transform: scale(0.94); }
+.zoom { position: fixed; right: var(--right); top: calc(var(--top) + 54px); z-index: 5; display: flex; flex-direction: row-reverse; border-radius: 999px; overflow: hidden; }
+.zoom button { appearance: none; border: 0; background: transparent; color: var(--ink); width: 40px; height: 38px; display: grid; place-items: center; cursor: pointer; touch-action: manipulation; }
+.zoom button + button { border-right: 1px solid var(--line); }
+.zoom svg { width: 18px; height: 18px; }
+@media (pointer: coarse) { .prompts { display: none; } }

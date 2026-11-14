@@ -96,23 +96,27 @@ export function fit(parts, height, sink = 0) {
   return parts;
 }
 
-export async function loadKit() {
+/** Load everything. `onProgress(fraction)` is called as each file arrives. */
+export async function loadKit(onProgress) {
   if (query.get('assets') === '0') return null;
   const loader = new GLTFLoader();
   const tex = new THREE.TextureLoader();
+  const total = MODELS.length + PROPS.length + MEADOW.length + TEXTURES.length + PROP_TEXTURES.length + MEADOW_TEXTURES.length + GROUND.length + 1;
+  let got = 0;
+  const track = (p) => p.then((v) => { got++; if (onProgress) onProgress(got / total); return v; });
   try {
-    const models = await Promise.all(MODELS.map((m) => loader.loadAsync(BASE + m + '.gltf').then((g) => [m, piecesOf(g.scene)])));
-    const props = await Promise.all(PROPS.map((m) => loader.loadAsync(PROPS_BASE + m + '.gltf').then((g) => [m, piecesOf(g.scene)])));
-    const meadow = await Promise.all(MEADOW.map((m) => loader.loadAsync(ROOT + 'meadow/' + m + '.gltf').then((g) => [m, piecesOf(g.scene)])));
+    const models = await Promise.all(MODELS.map((m) => track(loader.loadAsync(BASE + m + '.gltf')).then((g) => [m, piecesOf(g.scene)])));
+    const props = await Promise.all(PROPS.map((m) => track(loader.loadAsync(PROPS_BASE + m + '.gltf')).then((g) => [m, piecesOf(g.scene)])));
+    const meadow = await Promise.all(MEADOW.map((m) => track(loader.loadAsync(ROOT + 'meadow/' + m + '.gltf')).then((g) => [m, piecesOf(g.scene)])));
     const textures = await Promise.all([
-      ...TEXTURES.map((t) => tex.loadAsync(BASE + t + '.png').then((x) => [t, x])),
-      ...PROP_TEXTURES.map((t) => tex.loadAsync(PROPS_BASE + t + '.png').then((x) => [t, x])),
-      ...MEADOW_TEXTURES.map((t) => tex.loadAsync(ROOT + 'meadow/' + t + '.png').then((x) => [t, x])),
+      ...TEXTURES.map((t) => track(tex.loadAsync(BASE + t + '.png')).then((x) => [t, x])),
+      ...PROP_TEXTURES.map((t) => track(tex.loadAsync(PROPS_BASE + t + '.png')).then((x) => [t, x])),
+      ...MEADOW_TEXTURES.map((t) => track(tex.loadAsync(ROOT + 'meadow/' + t + '.png')).then((x) => [t, x])),
     ]);
     const out = { models: Object.assign(Object.fromEntries(models), Object.fromEntries(props), Object.fromEntries(meadow)), tex: Object.fromEntries(textures) };
     Object.values(out.tex).forEach((t) => { t.flipY = false; t.anisotropy = 4; }); // glTF texture coordinates
-    const ground = await Promise.all(GROUND.map((t) => tex.loadAsync(ROOT + 'ground/' + t + '.jpg').then((x) => [t, x])));
-    ground.push(['leaves_litter', await tex.loadAsync(ROOT + 'ground/leaves.png')]); // painted by tools/paint_leaves.py
+    const ground = await Promise.all(GROUND.map((t) => track(tex.loadAsync(ROOT + 'ground/' + t + '.jpg')).then((x) => [t, x])));
+    ground.push(['leaves_litter', await track(tex.loadAsync(ROOT + 'ground/leaves.png'))]); // painted by tools/paint_leaves.py
     ground.forEach(([name, t]) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; out.tex[name] = t; });
     // trees grown from code (world/proctrees.js), under the same names the loaded ones had
     const gen = procTrees();

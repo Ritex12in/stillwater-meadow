@@ -16,6 +16,7 @@ import { buildTerrain, groundU } from './world/terrain.js';
 import { buildWater, waterU } from './world/water.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
+import { loadingStep, paint, loadingDone, initScreen } from './ui/loading.js';
 import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows, lampSpots } from './world/props.js';
 import { buildFences } from './world/kitprops.js';
 import { buildWildflowers } from './world/wildflowers.js';
@@ -69,12 +70,15 @@ try {
 }
 
 // ── Build the world. The order matters: it fixes where every tree and flower grows. ──
-await loadKit(); // nature models; the meadow falls back to hand-built shapes without them
+// (the loading screen's bar follows along; `paint` lets the browser draw it between the heavy steps)
+await loadKit((f) => loadingStep(0.05 + f * 0.5, 'Gathering trees and flowers…')); // nature models; the meadow falls back to hand-built shapes without them
+loadingStep(0.58, 'Raising the hills…'); await paint();
 buildSky();
 buildMountains();
 buildLights();
 buildTerrain();
 buildWater();
+loadingStep(0.68, 'Planting the forest…'); await paint();
 buildTrees();
 chooseShrineSite(treeSpots);
 buildRocks();
@@ -84,6 +88,7 @@ buildReedsAndPads();
 if (kit) buildUndergrowth(treeSpots);
 if (kit) buildWildflowers();
 if (kit) buildFarForest(renderer);
+loadingStep(0.8, 'Setting out the jetty…'); await paint();
 buildDockAndBench();
 buildChairs();
 buildLamps();
@@ -95,6 +100,7 @@ buildFireflies();
 buildButterflies();
 buildPollen();
 buildBirds();
+loadingStep(0.9, 'Waking the animals…'); await paint();
 buildPlayer();
 buildAnimals();
 buildBoat();
@@ -107,6 +113,7 @@ initHud();
 initPointer();
 initSettings();
 initWorldPanel();
+initScreen();
 const resizers = [];
 const resize = () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -266,6 +273,7 @@ updateCamera(0, player);
 updateDetail(camera, camTarget);
 renderer.shadowMap.needsUpdate = true;
 renderNow();
+loadingDone();
 requestAnimationFrame(frame);
 
 // A small handle for automated tests and the debug panel.

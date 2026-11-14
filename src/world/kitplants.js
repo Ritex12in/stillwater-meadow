@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { TAU, lerp, mulberry32, fbm } from '../core/math.js';
 import { height, lakeT, pathAmt, SPAWN, nearReserved } from '../core/shape.js';
-import { std, col, weatherize, addWind, bothSides, instancedVariants, lodSet, cutoutDepth } from '../core/materials.js';
+import { std, col, weatherize, addWind, bothSides, instancedVariants, lodSet, cutoutDepth, treeWarp } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { variantAt } from './detail.js';
 import { world } from '../core/state.js';
@@ -118,7 +118,11 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
   const pineModels = [1, 2, 3, 4, 5].map((i) => fit(pieces('Pine_' + i), 6.4, 0.15));
   const roundModels = [1, 2, 3, 4, 5].map((i) => fit(pieces('CommonTree_' + i), 6.2, 0.15));
   const bark = weatherize(std('#ffffff', { map: tex('bark'), flatShading: false, vertexColors: true }), 'std');
-  const pineLeaf = crownStd(tex('leaves_pine')), roundLeaf = crownStd(tex('leaves_round'));
+  const pineLeaf = crownStd(tex('leaves_pine')), roundLeaf = treeWarp(crownStd(tex('leaves_round')));
+  // broadleaf trees each take their own shape (treeWarp): bark, leaves and both shadows bent alike
+  const warpedBark = (map) => treeWarp(weatherize(std('#ffffff', { map, flatShading: false, vertexColors: true }), 'std'));
+  const barkDepth = () => treeWarp(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
+  const leafDepth = (map) => treeWarp(cutoutDepth(map));
   const meadow = !!kit.models.MapleTree_1, slim = !!kit.models.PineTree_1;
   // two in five pines are the meadow pack's tall, slender ones (fixed hash: nothing moves)
   [pines, pineItems].forEach((list) => list.forEach((t) => { t.family = slim && variantAt(t.x, t.z, 100, 16) < 40 ? 'slimpine' : 'pine'; }));
@@ -138,13 +142,12 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
   };
   [rounds, roundItems].forEach((list) => list.forEach((t) => { t.family = family(t); }));
   const commonKind = (t) => (t.family === 'common' ? roundKind(t) : -1), blossomKind = (t) => (t.type === 'blossom' ? variantAt(t.x, t.z, 5, 9) : -1);
-  lodSet(rb, rb.map((b) => farBark(b, 3)), bark, rounds, commonKind, L);
-  const common = lodSet(rl, rl.map((l) => farLeaves(l, FAR_KEEP)), roundLeaf, roundItems, commonKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_round')) }));
+  lodSet(rb, rb.map((b) => farBark(b, 3)), warpedBark(tex('bark')), rounds, commonKind, Object.assign({}, L, { depthMat: barkDepth() }));
+  const common = lodSet(rl, rl.map((l) => farLeaves(l, FAR_KEEP)), roundLeaf, roundItems, commonKind, Object.assign({}, L, { depthMat: leafDepth(tex('leaves_round')) }));
   const twisted = [1, 2, 3, 4, 5].map((i) => fit(pieces('TwistedTree_' + i), 6.6, 0.15));
   const tl = twisted.map((m) => first(m, /Leaves/)), tb = twisted.map((m) => first(m, /Bark/));
-  const twistedBark = weatherize(std('#ffffff', { map: tex('bark_twisted'), flatShading: false, vertexColors: true }), 'std');
-  lodSet(tb, tb.map((b) => farBark(b, 3)), twistedBark, rounds, blossomKind, L);
-  const blossom = lodSet(tl, tl.map((l) => farLeaves(l, FAR_KEEP)), crownStd(tex('leaves_bush')), roundItems, blossomKind, Object.assign({}, L, { depthMat: cutoutDepth(tex('leaves_bush')) }));
+  lodSet(tb, tb.map((b) => farBark(b, 3)), warpedBark(tex('bark_twisted')), rounds, blossomKind, Object.assign({}, L, { depthMat: barkDepth() }));
+  const blossom = lodSet(tl, tl.map((l) => farLeaves(l, FAR_KEEP)), treeWarp(crownStd(tex('leaves_bush'))), roundItems, blossomKind, Object.assign({}, L, { depthMat: leafDepth(tex('leaves_bush')) }));
   const crowns = [common, blossom];
   if (meadow) {
     // maples (broad, spreading), birches (tall, white-barked) and light, airy common trees
@@ -154,9 +157,8 @@ export function kitTrees(pines, pineItems, rounds, roundItems, lod) {
       const models = [1, 2, 3, 4, 5].map((i) => fit(pieces(prefix + i), h, 0.15));
       const ml = models.map((m) => first(m, /Leaves/)), mb = models.map((m) => first(m, /Bark/));
       const kind = (t) => (t.family === fam ? variantAt(t.x, t.z, 5, salt) : -1);
-      const barkMat = weatherize(std('#ffffff', { map: tex(fam + '_bark'), flatShading: false, vertexColors: true }), 'std');
-      lodSet(mb, mb.map((b) => farBark(b, 3)), barkMat, rounds, kind, L);
-      crowns.push(lodSet(ml, ml.map((l) => farLeaves(l, FAR_KEEP)), crownStd(tex(fam + '_leaves')), roundItems, kind, Object.assign({}, L, { depthMat: cutoutDepth(tex(fam + '_leaves')) })));
+      lodSet(mb, mb.map((b) => farBark(b, 3)), warpedBark(tex(fam + '_bark')), rounds, kind, Object.assign({}, L, { depthMat: barkDepth() }));
+      crowns.push(lodSet(ml, ml.map((l) => farLeaves(l, FAR_KEEP)), treeWarp(crownStd(tex(fam + '_leaves'))), roundItems, kind, Object.assign({}, L, { depthMat: leafDepth(tex(fam + '_leaves')) })));
     });
   }
   if (slim) {

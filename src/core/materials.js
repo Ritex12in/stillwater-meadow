@@ -369,6 +369,47 @@ export function updateDetail(camera, focus) {
 }
 
 /** Shadow material for leaf and grass cards: three r128 ignores alphaTest when drawing shadows. */
+/**
+ * Every tree its own shape, though they share a handful of models: each one leans, twists and
+ * stretches by noise read at its own spot. A smooth noise field gives neighbouring trees a shared,
+ * wind-sculpted lean; a hash of the spot adds each tree's own lean, a twist that turns its crown
+ * further round the higher it goes (so limbs reach new ways), and a taller or squatter crown.
+ * Apply it to a tree's bark, its leaves and both their shadow materials, so all four agree.
+ */
+const TREE_WARP_HEAD = `
+  float twHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float twNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(twHash(i), twHash(i + vec2(1.0, 0.0)), f.x), mix(twHash(i + vec2(0.0, 1.0)), twHash(i + vec2(1.0, 1.0)), f.x), f.y); }
+  float twTwist(vec2 ip, float y) { return (twHash(ip + 7.7) - 0.5) * 1.5 * smoothstep(1.0, 5.0, y); }`;
+export function treeWarp(mat) {
+  const prev = mat.onBeforeCompile, baseKey = mat.customProgramCacheKey();
+  mat.onBeforeCompile = (sh, r) => {
+    prev.call(mat, sh, r);
+    sh.vertexShader = TREE_WARP_HEAD + '\n' + sh.vertexShader
+      .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+      #ifdef USE_INSTANCING
+      { float twA = twTwist((modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xz, position.y), twC = cos(twA), twS = sin(twA);
+        objectNormal.xz = mat2(twC, -twS, twS, twC) * objectNormal.xz; }
+      #endif`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+      {
+        vec2 twIp = (modelMatrix * vec4(instanceMatrix[3].xyz, 1.0)).xz;
+        float twH = clamp(transformed.y / 6.5, 0.0, 1.4);
+        float twA = twTwist(twIp, transformed.y), twC = cos(twA), twS = sin(twA);
+        transformed.xz = mat2(twC, -twS, twS, twC) * transformed.xz;
+        transformed.y *= 1.0 + (twHash(twIp + 11.3) - 0.5) * 0.2 * smoothstep(0.3, 0.75, twH);
+        // lean, in metres at the top: the meadow's slow field plus this tree's own, turned into the model's frame
+        vec2 twLean = (vec2(twNoise(twIp * 0.018), twNoise(twIp * 0.018 + 17.3)) - 0.5) * 1.6 + (vec2(twHash(twIp), twHash(twIp + 3.1)) - 0.5) * 1.1;
+        vec3 twL = transpose(mat3(instanceMatrix)) * vec3(twLean.x, 0.0, twLean.y) / max(dot(instanceMatrix[0].xyz, instanceMatrix[0].xyz), 1e-4);
+        transformed.xz += twL.xz * twH * twH;
+      }
+      #endif`);
+  };
+  mat.customProgramCacheKey = () => baseKey + '|treewarp';
+  return mat;
+}
+
 export function cutoutDepth(map, alphaTest = 0.5) {
   return new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest });
 }

@@ -9,11 +9,11 @@ and the bench, fences and vines come from his free (CC0)
 [Fantasy Props](https://quaternius.com/packs/fantasypropsmegakit.html) and
 [Medieval Village](https://quaternius.com/packs/medievalvillagemegakit.html) MegaKits; the ground
 uses hand-painted CC0 grass and soil textures by [Cethiel](https://opengameart.org/users/cethiel).
-Grass clumps, flower clumps, maples and birches come from his free (CC0)
+Grass clumps and flower clumps come from his free (CC0)
 [Ultimate Stylized Nature Pack](https://quaternius.com/packs/ultimatestylizednature.html)
 (`tools/prepare_meadow.py` -> `public/assets/meadow`); its common trees, slender pines and
-rocks only ship as OBJ, so `tools/obj_to_gltf.mjs` converts them first. Everything else (daisies, lupins, lamp
-posts, mountains, sky, clouds, water, the autumn leaf litter and the snow) is built from code.
+rocks only ship as OBJ, so `tools/obj_to_gltf.mjs` converts them first. Everything else (maples, birches and the
+round-crowned trees, daisies, lupins, lamp posts, mountains, sky, clouds, water, the autumn leaf litter and the snow) is built from code.
 
 ## Run it
 
@@ -88,6 +88,12 @@ Key ideas:
   favourite. Dogs need 5 and take food from your hand; cats need 8, run from you until they trust
   you, and only eat a thrown fish while you keep still at a distance. Nothing is random, and trust
   is never lost. Only tamed animals can be named, petted, follow you or join you at the fire.
+- **Trees grown from code** (`world/proctrees.js`): maples, birches and round-crowned trees are
+  branching skeletons of tapered tubes with rounded clusters of leaf cards, on leaf and bark textures
+  painted at load; about a third of the triangles of the models they replaced. Every broadleaf tree
+  then takes its own shape in the vertex shader (`treeWarp`): a smooth noise field and a per-tree hash
+  lean it, twist its crown and stretch it, the same for bark, leaves and their shadows.
+  `tools/studio/trees.html?fam=MapleTree` shows a family's five variants.
 - **Audio mixer** (`systems/audio.js`): four buses — nature, animals, music, interface — each with
   its own volume; suspended while the tab is hidden.
 - **Two random streams** (`core/math.js`): the seeded world-building stream is only used at boot

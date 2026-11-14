@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Tree studio</title>
+<style>html,body{margin:0;background:#9fb7c8}canvas{display:block}</style>
+<script type="module">
+// Dev tool: the generated trees of one family, five variants in a row, under plain light.
+// Open /tools/studio/trees.html?fam=MapleTree&leaf=%236f9a3c (the loaded kit no longer has these families)
+import * as THREE from 'three';
+import { loadKit, fit } from '/src/core/assets.js';
+import { procTrees } from '/src/world/proctrees.js';
+const q = new URLSearchParams(location.search), fam = q.get('fam') || 'MapleTree', tint = q.get('leaf') || '#6f9a3c', texName = { MapleTree: 'maple', BirchTree: 'birch', NormalTree: 'normal' }[fam];
+const kit = await loadKit(), gen = procTrees();
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#9fb7c8');
+scene.add(new THREE.HemisphereLight('#cfe0f0', '#5d6b3a', 0.75));
+const sun = new THREE.DirectionalLight('#fff1d6', 0.9); sun.position.set(-20, 30, 25); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 30, bottom: -30 }); sun.shadow.mapSize.set(2048, 2048); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshLambertMaterial({ color: '#6d8a45' })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const tris = { kit: [0, 0], gen: [0, 0] };
+[[kit, 'kit', 0], [gen, 'gen', 0]].filter(([, l]) => l === (q.get('only') || 'gen')).forEach(([src, label, z]) => {
+  for (let i = 1; i <= 5; i++) {
+    const parts = fit(Object.fromEntries(Object.entries(src.models[fam + '_' + i]).map(([k, g]) => [k, g.clone()])), 6.6, 0.15);
+    for (const [name, g] of Object.entries(parts)) {
+      const leaf = /Leaves/.test(name);
+      tris[label][leaf ? 1 : 0] += g.index.count / 3;
+      const mat = new THREE.MeshLambertMaterial({ map: src.tex[texName + (leaf ? '_leaves' : '_bark')], vertexColors: true, color: leaf ? tint : '#ffffff', alphaTest: leaf ? 0.5 : 0, side: leaf ? THREE.DoubleSide : THREE.FrontSide });
+      const m = new THREE.Mesh(g, mat); m.position.set((i - 3) * 8.5, 0, z); m.castShadow = m.receiveShadow = true; scene.add(m);
+    }
+  }
+});
+document.title = `kit ${tris.kit.join('/')} gen ${tris.gen.join('/')}`;
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 400);
+cam.position.set(0, +(q.get('y') || 9), +(q.get('d') || 46)); cam.lookAt(0, 3.6, 0);
+renderer.render(scene, cam);
+window.__ready = true;
+</script>

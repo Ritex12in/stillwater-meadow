@@ -105,6 +105,10 @@ Key ideas:
   the wind; faces change expression with what happens (a bite, a snapped line, a tamed pet).
   `kidpose.js` poses walk, run, idle, sitting and kneeling for both.
   `tools/studio/kid.html?who=boy&view=turn|head|faces|poses|motion` previews them.
+- **Company** (`features/friend.js`, `emotes.js`, `pets.js`): the girl can be greeted and talked to (C), walks
+  with you hand in hand (X), sits beside you, by the lit campfire, or lies down to watch the stars, takes a
+  bouquet (G) and wears a flower from it, and answers your waves, cheers and dances (keys 1-4). Tamed pets
+  settle round you when you sit, cats come to your feet, and a tamed dog fetches a thrown stick (Y).
 - **Audio mixer** (`systems/audio.js`): four buses — nature, animals, music, interface — each with
   its own volume; suspended while the tab is hidden.
 - **Two random streams** (`core/math.js`): the seeded world-building stream is only used at boot

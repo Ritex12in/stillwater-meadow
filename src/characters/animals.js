@@ -122,7 +122,7 @@ export function updateAnimal(a, dt, t) {
     const g = a.goal, d = Math.hypot(g.x - a.x, g.z - a.z);
     a.state = 'goal';
     setTarget(a, g.x, g.z);
-    if (d > 0.4) want = d > 6 ? (a.kind === 'dog' ? 3.2 : 2.0) : (a.kind === 'dog' ? 1.6 : 1.0);
+    if (d > 0.4) want = g.fast ? 4.8 : d > 6 ? (a.kind === 'dog' ? 3.2 : 2.0) : (a.kind === 'dog' ? 1.6 : 1.0); // (`fast`: running for a thrown stick)
     else {
       wantSit = g.sit === false ? 0 : 1;
       if (g.faceX !== undefined) a.heading = turnTo(a.heading, Math.atan2(g.faceX - a.x, g.faceZ - a.z), dt * 3);

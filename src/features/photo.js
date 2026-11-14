@@ -1,6 +1,7 @@
 // Photo mode (P): hides the interface, frees the camera, offers soft filters and a focus blur,
 // and saves a PNG. Mouse or right-side drag to look, W A S D or the joystick to move,
 // Space / C up and down, scroll to zoom, Shift to move faster.
+import { playEmote } from './emotes.js';
 import { camera, canvas } from '../core/render.js';
 import { clamp } from '../core/math.js';
 import { heightAt } from '../core/shape.js';
@@ -101,7 +102,7 @@ export function initPhoto(renderNow) {
   };
 
   bindKey('KeyP', () => (on ? exit() : enter()), { modal: true });
-  for (let i = 0; i < FILTERS.length; i++) bindKey('Digit' + (i + 1), () => { if (!on) return false; filter = i; applyFilter(); }, { modal: true });
+  for (let i = 0; i < FILTERS.length; i++) bindKey('Digit' + (i + 1), () => { if (!on) return i < 4 && playEmote(i) ? undefined : false; filter = i; applyFilter(); }, { modal: true }); // (out of photo mode, 1-4 are the emotes)
   bindKey('Enter', () => { if (!on) return false; save(); }, { modal: true });
   bindKey('KeyV', () => { if (!on) return false; toggleFocus(); }, { modal: true });
   document.getElementById('photoSave').addEventListener('click', save);

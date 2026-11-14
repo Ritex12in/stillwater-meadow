@@ -11,6 +11,7 @@ import { hooks, seats, seasonState, world } from '../core/state.js';
 import { player, hero } from '../characters/player.js';
 import { boat, sk } from '../characters/boat.js';
 import { hasRod, judgeBouquet, nearSkipper, giveRod } from './rod.js';
+import { friendNear, giftFriend } from './friend.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
 import { store, saveSoon, onSave } from '../systems/save.js';
@@ -110,6 +111,12 @@ export function initFlowers() {
     nearDist = best;
   };
 
+  registerAction({
+    id: 'give-friend', key: 'KeyG', keyLabel: 'G', score: () => 9,
+    available: () => activity.free && bouquet.length && friendNear(2.6),
+    label: () => 'Give her the bouquet',
+    run: () => { giftFriend(bouquet.slice()); bouquet = []; rebuildHand(); player.pickT = 0.6; },
+  });
   registerAction({
     id: 'give-skipper', key: 'KeyG', keyLabel: 'G', score: () => 10,
     available: () => activity.free && bouquet.length && nearSkipper(),

@@ -83,6 +83,66 @@ export function poseKid(k, st, dt) {
   }
 }
 
+/**
+ * Poses laid over the base one, each eased in by its amount (0..1):
+ *   ground: sitting on the ground, legs out, leaning back on the hands
+ *   lie:    flat on the back, hands behind the head (stargazing)
+ *   hold:   one arm (index `side`) held out a little to the side, for walking hand in hand
+ */
+export function poseExtras(k, o) {
+  const D = k.dims, g = o.ground || 0, la = o.lie || 0;
+  if (g > 0.001) {
+    k.legs.forEach((l, i) => { l.rotation.x = lerp(l.rotation.x, -1.48 + (i ? 0.06 : 0), g); l.rotation.z = lerp(l.rotation.z, i ? 0.14 : -0.14, g); });
+    k.knees.forEach((kn, i) => { kn.rotation.x = lerp(kn.rotation.x, i ? 0.22 : 0.1, g); });
+    k.body.position.y = lerp(k.body.position.y, 0.115 - D.hip, g);
+    k.body.rotation.x = lerp(k.body.rotation.x, -0.16, g);
+    k.chest.rotation.x = lerp(k.chest.rotation.x, 0.06, g);
+    k.arms.forEach((a, i) => { const sd = i ? 1 : -1; a.rotation.x = lerp(a.rotation.x, 0.55, g); a.rotation.z = lerp(a.rotation.z, sd * 0.3, g); k.elbows[i].rotation.x = lerp(k.elbows[i].rotation.x, -0.08, g); });
+  }
+  if (la > 0.001) {
+    k.body.rotation.x = lerp(k.body.rotation.x, -1.52, la);
+    k.body.position.y = lerp(k.body.position.y, 0.2, la);
+    k.legs.forEach((l, i) => { l.rotation.x = lerp(l.rotation.x, i ? 0.05 : -0.08, la); });
+    k.knees.forEach((kn, i) => { kn.rotation.x = lerp(kn.rotation.x, i ? 0.4 : 0, la); });
+    k.arms.forEach((a, i) => { a.rotation.x = lerp(a.rotation.x, -2.7, la); a.rotation.z = lerp(a.rotation.z, i ? -0.5 : 0.5, la); k.elbows[i].rotation.x = lerp(k.elbows[i].rotation.x, -1.6, la); });
+    k.chest.rotation.x = lerp(k.chest.rotation.x, 0, la); k.chest.rotation.y = lerp(k.chest.rotation.y, 0, la);
+    k.head.rotation.x = lerp(k.head.rotation.x, -0.2, la); k.head.rotation.y = lerp(k.head.rotation.y, 0, la);
+  }
+  if (o.hold > 0.001) {
+    const i = o.side, sd = i ? 1 : -1, h = o.hold;
+    k.arms[i].rotation.x = lerp(k.arms[i].rotation.x, k.arms[i].rotation.x * 0.25, h);   // the joined hands swing only a little
+    k.arms[i].rotation.z = lerp(k.arms[i].rotation.z, sd * 0.3, h);
+    k.elbows[i].rotation.x = lerp(k.elbows[i].rotation.x, -0.1, h);
+  }
+}
+
+/** A gesture laid over the pose: 'wave', 'cheer' or 'dance', eased in by `amt`, at clock `t`. */
+export function gesture(k, name, amt, t) {
+  if (amt < 0.001) { k.elbows[0].rotation.z = k.elbows[1].rotation.z = 0; return; }
+  const w = amt;
+  if (name === 'wave') {
+    k.arms[1].rotation.x = lerp(k.arms[1].rotation.x, -0.2, w); k.arms[1].rotation.z = lerp(k.arms[1].rotation.z, 2.35, w);
+    k.elbows[1].rotation.set(lerp(k.elbows[1].rotation.x, 0, w), 0, w * (0.55 + Math.sin(t * 9) * 0.45));
+    k.head.rotation.z = lerp(k.head.rotation.z, 0.12, w);
+  } else if (name === 'cheer') {
+    const hop = Math.abs(Math.sin(t * 7.5));
+    k.body.position.y += hop * 0.09 * w;
+    k.arms.forEach((a, i) => { const sd = i ? 1 : -1; a.rotation.x = lerp(a.rotation.x, -0.15, w); a.rotation.z = lerp(a.rotation.z, sd * (2.55 + 0.2 * Math.sin(t * 7.5)), w); k.elbows[i].rotation.set(lerp(k.elbows[i].rotation.x, -0.15, w), 0, 0); });
+    k.legs.forEach((l) => { l.rotation.x = lerp(l.rotation.x, 0.1 - hop * 0.25, w); });
+    k.knees.forEach((kn) => { kn.rotation.x = lerp(kn.rotation.x, hop * 0.5, w); });
+    k.head.rotation.x = lerp(k.head.rotation.x, -0.18, w);
+  } else if (name === 'dance') {
+    const b = Math.sin(t * 6), b2 = Math.sin(t * 3);
+    k.body.position.y += Math.abs(b) * 0.05 * w;
+    k.body.rotation.z = lerp(k.body.rotation.z, b2 * 0.13, w);
+    k.chest.rotation.y = lerp(k.chest.rotation.y, b2 * 0.4, w);
+    k.arms.forEach((a, i) => { const sd = i ? 1 : -1; a.rotation.x = lerp(a.rotation.x, -1.5 + sd * b2 * 0.9, w); a.rotation.z = lerp(a.rotation.z, sd * 0.35, w); k.elbows[i].rotation.set(lerp(k.elbows[i].rotation.x, -1.0, w), 0, 0); });
+    k.legs.forEach((l, i) => { l.rotation.x = lerp(l.rotation.x, (i ? 1 : -1) * b * 0.22, w); l.rotation.z = lerp(l.rotation.z, (i ? 1 : -1) * 0.08, w); });
+    k.knees.forEach((kn, i) => { kn.rotation.x = lerp(kn.rotation.x, Math.max(0, (i ? 1 : -1) * b) * 0.55, w); });
+    k.head.rotation.z = lerp(k.head.rotation.z, -b2 * 0.14, w);
+  }
+}
+
 /** Ease one arm's elbow straight (for a feature that drives the whole arm: a rod, a throw). */
 export function straighten(k, i, amt = 1, bend = 0) {
   k.elbows[i].rotation.x = lerp(k.elbows[i].rotation.x, bend, amt);

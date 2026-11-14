@@ -25,6 +25,7 @@ import { creel, takeFish, fishValue, speciesName, SPECIES } from './fishing.js';
 import { askName } from './names.js';
 import { meow, bark } from './voices.js';
 import { photoOn } from './photo.js';
+import { emoteState } from './emotes.js';
 
 export const NEED = { cat: 8, dog: 5 };
 const FAVOURITES = ['perch', 'bluegill', 'carp', 'minnow', 'trout', 'bluegill', 'perch']; // by animal, in build order
@@ -190,6 +191,97 @@ export function initPets() {
   };
   onPanel('journal', (open) => { if (open) renderPets(); });
 
+  // ── your pets keep you company ──
+  // Sit down (on a seat, on the grass, or lying back) and the tamed animals nearby come and settle round you.
+  // Stand idle for a while and your cats come to wind round your legs. Now and then one gives you a heart.
+  hooks.frame.push((dt) => {
+    const settled = player.sitAmt > 0.6 || emoteState.ground > 0.6 || player.lieAmt > 0.6, idle = player.idleT > 4 && activity.free;
+    let slot = 0;
+    for (const a of animals) {
+      if (!a.tamed) continue;
+      const mine = a.goal && a.goal.src === 'you';
+      const d = Math.hypot(a.x - player.x, a.z - player.z);
+      const wanted = (settled || (idle && a.kind === 'cat')) && d < 14 && a.state !== 'shelter' && !a.petted && a !== fetch.dog && (!a.goal || mine);
+      if (wanted) {
+        const close = a.kind === 'cat' && !settled;                     // a cat at your feet
+        const ang = player.rot + (slot % 2 ? 1 : -1) * (0.75 + 0.55 * Math.floor(slot / 2)), rad = close ? 0.5 : 1.3; slot++;
+        if (!mine) { const x = player.x + Math.sin(ang) * rad, z = player.z + Math.cos(ang) * rad; if (animalWalkable(x, z)) a.goal = { x, z, faceX: player.x, faceZ: player.z, src: 'you', hearts: 1.5 }; }
+        else {
+          a.goal.faceX = player.x; a.goal.faceZ = player.z;
+          if (Math.hypot(a.goal.x - a.x, a.goal.z - a.z) < 0.55) { a.goal.hearts -= dt; if (a.goal.hearts <= 0) { spawnHeart(a); a.goal.hearts = 4 + (a.x * 7.3 % 1 + 1) * 2; if (a.kind === 'cat') meow(a.x, a.z, 1.3); } }
+        }
+      } else if (mine) a.goal = null;
+    }
+  });
+
+  // ── fetch (Y): throw a stick for a tamed dog; it runs it down and brings it back ──
+  const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 0.5, 6).rotateZ(Math.PI / 2), std('#7a5230'));
+  stick.castShadow = true; stick.visible = false; scene.add(stick);
+  const fetch = { dog: null, phase: 'none', t: 0, from: new THREE.Vector3(), x: 0, z: 0, age: 0, lastX: 0, lastZ: 0, stuck: 0 };
+  fetchPhase = () => fetch.phase;
+  const headAt = new THREE.Vector3();
+  const fetchDog = () => {
+    let best = null, bd = 9;
+    for (const a of animals) { const d = Math.hypot(a.x - player.x, a.z - player.z); if (a.kind === 'dog' && a.tamed && !a.petted && a.state !== 'shelter' && (!a.goal || a.goal.src === 'you') && d < bd) { bd = d; best = a; } }
+    return best;
+  };
+  const endFetch = () => { if (fetch.dog && fetch.dog.goal && fetch.dog.goal.src === 'fetch') fetch.dog.goal = null; fetch.dog = null; fetch.phase = 'none'; };
+  registerAction({
+    id: 'fetch', key: 'KeyY', keyLabel: 'Y', score: () => 2,
+    available: () => activity.free && fetch.phase === 'none' && !!fetchDog(),
+    label: () => `Throw a stick for ${label(fetchDog())}`,
+    run: () => {
+      const dog = fetchDog(); if (!dog) return;
+      let land = null;
+      // ahead of you if there's ground there; otherwise off to one side, or behind (never into the lake)
+      for (const off of [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, Math.PI]) {
+        for (let dist = 9; dist >= 4 && !land; dist -= 1) {
+          // the dog must be able to run straight there: clear ground all the way out
+          let clear = true;
+          for (let k = 1; k <= dist && clear; k++) clear = animalWalkable(player.x + Math.sin(player.rot + off) * k, player.z + Math.cos(player.rot + off) * k);
+          if (clear) land = { x: player.x + Math.sin(player.rot + off) * dist, z: player.z + Math.cos(player.rot + off) * dist };
+        }
+        if (land) break;
+      }
+      if (!land) { toast('No room to throw a stick here.'); return; }
+      Object.assign(fetch, { dog, phase: 'air', t: 0, x: land.x, z: land.z, age: 0 });
+      fetch.from.set(player.x, player.y + 1.0, player.z);
+      stick.visible = true; player.throwT = 0.5;
+      bark(dog.x, dog.z, dog.scale || 1, 1);
+    },
+  });
+  hooks.frame.push((dt) => {
+    const f = fetch, dog = f.dog;
+    if (f.phase === 'none') { if (stick.visible) { f.age += dt; if (f.age > 6) stick.visible = false; } return; }
+    f.age += dt;
+    // call it off if it drags on, or the dog can't get anywhere (stuck against water or a fence)
+    f.stuck = Math.hypot(dog.x - f.lastX, dog.z - f.lastZ) < 0.02 && f.phase !== 'air' ? f.stuck + dt : 0; f.lastX = dog.x; f.lastZ = dog.z;
+    if (f.age > 30 || f.stuck > 2.5 || !dog.tamed) { endFetch(); f.age = 0; f.stuck = 0; return; }
+    if (f.phase === 'air') {
+      f.t = Math.min(1, f.t + dt / 0.85);
+      stick.position.set(lerp(f.from.x, f.x, f.t), lerp(f.from.y, groundAt(f.x, f.z) + 0.04, f.t) + Math.sin(f.t * Math.PI) * 2.2, lerp(f.from.z, f.z, f.t));
+      stick.rotation.set(f.t * 14, f.t * 5, 0);
+      dog.goal = { x: f.x, z: f.z, src: 'fetch', fast: true, sit: false };   // off after it at once
+      if (f.t >= 1) f.phase = 'out';
+    } else if (f.phase === 'out') {
+      dog.goal = { x: f.x, z: f.z, src: 'fetch', fast: true, sit: false };
+      if (Math.hypot(dog.x - f.x, dog.z - f.z) < 0.7) f.phase = 'back';
+    } else if (f.phase === 'back') {
+      // carried in its mouth, back to you
+      dog.head.getWorldPosition(headAt);
+      stick.position.set(headAt.x + Math.sin(dog.heading) * 0.22, headAt.y - 0.06, headAt.z + Math.cos(dog.heading) * 0.22);
+      stick.rotation.set(0, dog.heading, 0);
+      const d = Math.hypot(dog.x - player.x, dog.z - player.z);
+      dog.goal = { x: player.x, z: player.z, src: 'fetch', fast: d > 3, sit: false };
+      if (d < 1.35) {
+        stick.position.set(dog.x + Math.sin(dog.heading) * 0.4, groundAt(dog.x, dog.z) + 0.03, dog.z + Math.cos(dog.heading) * 0.4);
+        spawnHeart(dog); bark(dog.x, dog.z, dog.scale || 1, 2);
+        hero.face.flash('happy', 2.5);
+        endFetch(); f.age = 0;
+      }
+    }
+  });
+
   // ── every frame: thrown fish fly, wait, and get eaten (or not) ──
   hooks.frame.push((dt) => {
     for (const a of animals) {
@@ -238,4 +330,7 @@ export function initPets() {
 }
 
 /** For tests: each animal's taming state. */
-export const petsView = () => animals.map((a) => ({ kind: a.kind, desc: a.desc, tamed: a.tamed, trust: a.trust, fav: a.fav, favKnown: a.favKnown, x: a.x, z: a.z, state: a.state, name: a.name }));
+let fetchPhase = () => 'none';
+/** For tests: where a game of fetch has got to ('none', 'air', 'out', 'back'). */
+export const fetchView = () => fetchPhase();
+export const petsView = () => animals.map((a) => ({ kind: a.kind, desc: a.desc, tamed: a.tamed, goal: a.goal ? a.goal.src : null, trust: a.trust, fav: a.fav, favKnown: a.favKnown, x: a.x, z: a.z, state: a.state, name: a.name }));

@@ -12,7 +12,7 @@ import { TAU, clamp, lerp, damp, rnd } from '../core/math.js';
 import { lakeT, onIce, waterAhead, animalWalkable, onDock } from '../core/shape.js';
 import { std } from '../core/materials.js';
 import { clock } from '../core/clock.js';
-import { hooks, seasonState } from '../core/state.js';
+import { hooks, seasonState, world } from '../core/state.js';
 import { player, hero } from '../characters/player.js';
 import { animals } from '../characters/animals.js';
 import { boatSeat, ferry } from '../characters/boat.js';
@@ -406,6 +406,7 @@ export function initFishing() {
         const where = F.kept ? ` · into the creel (${store.creel.length}/${CREEL_MAX})` : ' · your creel is full, so you let it go';
         toast(`${!j ? 'New species! ' : record ? 'New record! ' : ''}You caught a ${F.sp.name} · ${F.cm} cm${where}`, 4.5);
         hero.face.flash(!j || record ? 'love' : 'happy', 3.5);
+        world.caughtAt = clock.elapsed; // (a friend watching cheers)
         if (F.buddy) {
           for (let i = 0; i < 3; i++) setTimeout(() => { if (F.buddy) spawnHeart(F.buddy); }, i * 300);
           meow(F.buddy.x, F.buddy.z, 1.1);

@@ -239,3 +239,8 @@ body.photo-mode > *:not(#world):not(.photo-bar):not(.photo-vignette):not(.photo-
 .zoom button + button { border-right: 1px solid var(--line); }
 .zoom svg { width: 18px; height: 18px; }
 @media (pointer: coarse) { .prompts { display: none; } }
+
+/* What your friend says: a little card over her head */
+.bubble { position: fixed; z-index: 4; transform: translate(-50%, -100%); max-width: min(260px, 60vw); padding: 8px 12px; border-radius: 14px; background: var(--chip); color: var(--chip-ink); font-size: 13px; font-weight: 600; line-height: 1.3; text-align: center; pointer-events: none; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); }
+.bubble::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 12px; height: 12px; margin-left: -6px; background: inherit; transform: rotate(45deg); border-radius: 2px; }
+.bubble[hidden] { display: none; }

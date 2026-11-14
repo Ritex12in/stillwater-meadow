@@ -32,11 +32,12 @@ export function initStargaze() {
     const la = player.lieAmt;
     if (la < 0.001) return;
     hero.body.rotation.x = lerp(hero.body.rotation.x, -1.52, la);
-    hero.body.position.y = lerp(hero.body.position.y, 0.27, la);
+    hero.body.position.y = lerp(hero.body.position.y, 0.2, la);
     hero.legs.forEach((l, i) => { l.rotation.x = lerp(l.rotation.x, i ? 0.05 : -0.08, la); });
     hero.knees.forEach((k, i) => { k.rotation.x = lerp(k.rotation.x, i ? 0.4 : 0, la); });
-    hero.arms.forEach((a, i) => { a.rotation.x = lerp(a.rotation.x, -2.9, la); a.rotation.z = lerp(a.rotation.z, i ? -0.45 : 0.45, la); });
-    hero.head.rotation.x = lerp(hero.head.rotation.x, -0.25, la);
+    hero.arms.forEach((a, i) => { a.rotation.x = lerp(a.rotation.x, -2.7, la); a.rotation.z = lerp(a.rotation.z, i ? -0.5 : 0.5, la); hero.elbows[i].rotation.x = lerp(hero.elbows[i].rotation.x, -1.6, la); }); // hands behind the head
+    hero.chest.rotation.x = lerp(hero.chest.rotation.x, 0, la); hero.chest.rotation.y = lerp(hero.chest.rotation.y, 0, la);
+    hero.head.rotation.x = lerp(hero.head.rotation.x, -0.2, la); hero.head.rotation.y = lerp(hero.head.rotation.y, 0, la);
   });
 
   // the view looks up from just above your face (and above the grass tips)
@@ -46,7 +47,7 @@ export function initStargaze() {
     if (la < 0.05) return false;
     if (activity.is('lie') && moving()) getUp();
     hero.head.getWorldPosition(head);
-    camTarget.set(player.x, player.y + 1.55, player.z);
+    camTarget.set(player.x, player.y + 1.3, player.z);
     want.set(head.x, head.y + 0.75, head.z);
     const yaw = camState.yaw, el = clamp(1.0 - (camState.pitch - 0.32) * 1.5, 0.3, 1.5);
     look.set(want.x - Math.sin(yaw) * Math.cos(el) * 10, want.y + Math.sin(el) * 10, want.z - Math.cos(yaw) * Math.cos(el) * 10);

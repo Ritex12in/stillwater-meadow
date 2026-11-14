@@ -62,12 +62,12 @@ src/
   main.js            boot, fixed build order, the frame loop, per-system error isolation
   core/              math and random streams, world shape and height field, renderer, materials, shared state
   world/             sky (moon phases), lights, terrain, water, vegetation, props, particles, effects
-  characters/        rigs, the player, animals, petting, the boat and skipper
+  characters/        the children (kid, kidpose), rigs for the skipper and animals, the player, petting, the boat
   systems/           activity state machine, actions and keys, audio mixer, save, time, weather,
                      input, camera, quality, post-processing
   ui/                HUD and prompts, World popover, settings
   features/          ducks, wildlife, voices, seasons, flowers, fishing, campfire, stargazing,
-                     photo mode, music, the rod quest, taming and pet names, footsteps
+                     photo mode, music, the rod quest, taming and pet names, the friend, footsteps
 tests/               Playwright regression and feature tests
 tools/               asset preparation script
 public/assets/       nature models and textures (CC0)
@@ -98,6 +98,13 @@ Key ideas:
   tall, cone-shaped tree behind the hall, built to plan (a leader and three sub-trunks, branches
   spiralling up and shortening toward the top, blossom clusters at their tips) with painted five-petal
   blossom, and a thick fall of notched petals drifting from its crown. `?fam=Cherry` in the studio.
+- **Sculpted children** (`core/sculpt.js`, `characters/kid.js`, `kidpose.js`): the boy you play and the
+  girl who wanders the meadow are built from code. Bodies are sculpted from distance fields (shapes
+  blended into one soft surface, meshed with surface nets, coloured per vertex); hair is layered
+  leaf-shaped locks that bend from the root, lagging behind the head on a spring and fluttering in
+  the wind; faces change expression with what happens (a bite, a snapped line, a tamed pet).
+  `kidpose.js` poses walk, run, idle, sitting and kneeling for both.
+  `tools/studio/kid.html?who=boy&view=turn|head|faces|poses|motion` previews them.
 - **Audio mixer** (`systems/audio.js`): four buses — nature, animals, music, interface — each with
   its own volume; suspended while the tab is hidden.
 - **Two random streams** (`core/math.js`): the seeded world-building stream is only used at boot

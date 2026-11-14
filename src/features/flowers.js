@@ -70,7 +70,7 @@ export function initFlowers() {
   const rebuildHand = () => {
     if (inHand) hero.arms[1].remove(inHand);
     inHand = bouquet.length ? buildBouquet(bouquet) : null;
-    if (inHand) { inHand.position.set(0, -0.64, 0.02); inHand.rotation.order = 'ZYX'; hero.arms[1].add(inHand); }
+    if (inHand) { inHand.position.set(0, -hero.dims.arm + 0.03, 0.03); inHand.scale.setScalar(0.8); inHand.rotation.order = 'ZYX'; hero.arms[1].add(inHand); }
     store.bouquet = bouquet.slice();
     saveSoon();
   };
@@ -176,7 +176,8 @@ export function initFlowers() {
       player.pickT = Math.max(0, player.pickT - dt);
       const e = Math.sin((1 - player.pickT / 0.6) * Math.PI);
       hero.body.rotation.x += 0.7 * e;
-      hero.body.position.y -= 0.25 * e;
+      hero.body.position.y -= 0.14 * e;
+      hero.elbows[1].rotation.x = lerp(hero.elbows[1].rotation.x, -0.15, e);
       hero.arms[1].rotation.x = lerp(hero.arms[1].rotation.x, -1.3, e);
     }
     if (inHand) {
@@ -184,8 +185,9 @@ export function initFlowers() {
       if (inHand.visible && !player.seat && player.petAmt < 0.05) {
         hero.arms[1].rotation.x = lerp(hero.arms[1].rotation.x, -0.55, 0.85);
         hero.arms[1].rotation.z = -0.15;
+        hero.elbows[1].rotation.x = lerp(hero.elbows[1].rotation.x, 0, 0.85); // the bouquet arm stays straight so the flowers stand upright
       }
-      inHand.rotation.set(-(hero.arms[1].rotation.x + hero.body.rotation.x) - 0.25, 0, -hero.arms[1].rotation.z);
+      inHand.rotation.set(-(hero.arms[1].rotation.x + hero.body.rotation.x + hero.chest.rotation.x) - 0.25, 0, -hero.arms[1].rotation.z);
     }
   });
 }

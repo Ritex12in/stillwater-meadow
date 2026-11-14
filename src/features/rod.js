@@ -8,7 +8,7 @@ import { TAU, mulberry32 } from '../core/math.js';
 import { heightAt } from '../core/shape.js';
 import { std } from '../core/materials.js';
 import { hooks, seasonState } from '../core/state.js';
-import { player } from '../characters/player.js';
+import { player, hero } from '../characters/player.js';
 import { ferry, sk, skipper } from '../characters/boat.js';
 import { treeSpots } from '../world/vegetation.js';
 import { activity } from '../systems/activity.js';
@@ -38,6 +38,7 @@ export function giveRod(how) {
   store.rod = true;
   saveSoon();
   sk.nod = 1; sk.waveT = 2;
+  hero.face.flash('love', 4);
   toast(`The skipper takes the ${how} with a grin and hands you his old fishing rod. Press R by the water to cast.`, 6);
 }
 

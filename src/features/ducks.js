@@ -58,7 +58,7 @@ function tossBread() {
   if (!player.seat) player.rot = Math.atan2(f.x, f.z);
   player.throwT = 0.5;
   const m = new THREE.Mesh(crumbGeo, crumbMat);
-  m.position.set(player.x, player.y + 1.3, player.z);
+  m.position.set(player.x, player.y + 1.0, player.z);
   scene.add(m);
   crumbs.push({ m, from: m.position.clone(), to: new THREE.Vector3(p.x + rnd(-0.4, 0.4), 0.05, p.z + rnd(-0.4, 0.4)), t: 0, life: 45, landed: false, skip: null });
 }
@@ -82,6 +82,7 @@ export function initDucks() {
     player.throwT = Math.max(0, player.throwT - dt);
     const e = Math.sin((1 - player.throwT / 0.5) * Math.PI);
     hero.arms[1].rotation.x = lerp(hero.arms[1].rotation.x, -2.2 + (1 - player.throwT / 0.5) * 1.4, e);
+    hero.elbows[1].rotation.x = lerp(hero.elbows[1].rotation.x, -0.9 * (player.throwT / 0.5), e); // wound up, then flung straight
   });
 
   hooks.frame.push((dt, t) => {

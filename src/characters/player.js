@@ -3,9 +3,10 @@ import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { lerp, damp, turnTo } from '../core/math.js';
 import { SPAWN, LAKE, height, groundAt, walkable, onIce, nearestShore, ICE_Y } from '../core/shape.js';
-import { std, enableShadows, timeU } from '../core/materials.js';
+import { std, enableShadows, timeU, windU } from '../core/materials.js';
 import { seats, pushOut, hooks } from '../core/state.js';
-import { makePerson } from './rigs.js';
+import { makeKid, KIDS } from './kid.js';
+import { poseKid, straighten, STRIDE_RATE } from './kidpose.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
 import { camState, moveInput } from '../systems/input.js';
@@ -17,6 +18,7 @@ export const player = {
   rot: Math.atan2(LAKE.x - SPAWN.x, LAKE.z - SPAWN.z),
   phase: 0, move: 0, seat: null, sitAmt: 0, seatTop: 0.44, slide: null,
   petting: null, petTimer: 0, petAmt: 0, heartT: 0, umbAmt: 0,
+  idleT: 0, turn: 0, lastRot: 0, t: 0,
 };
 export let hero = null;
 let umbrella = null;
@@ -25,7 +27,7 @@ const stepListeners = new Set();
 export const onStep = (fn) => stepListeners.add(fn);
 
 export function buildPlayer() {
-  hero = makePerson();
+  hero = makeKid(KIDS.boy);
   scene.add(hero.root);
   umbrella = new THREE.Group();
   const cloth = std('#2f6f73', { side: THREE.DoubleSide }), trim = std('#e9e2d0'), dark = std('#2b2622');
@@ -35,7 +37,8 @@ export function buildPlayer() {
     new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 5).translate(0, 1.58, 0), trim),
     new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.016, 4, 8, Math.PI).rotateZ(Math.PI).translate(0.05, 0, 0), dark)
   );
-  umbrella.position.set(0, -0.64, 0);
+  umbrella.position.set(0, -hero.dims.arm + 0.02, 0);
+  umbrella.scale.setScalar(0.92);
   umbrella.rotation.order = 'ZYX'; // set to the inverse of the arm's rotation so the shaft stays upright
   umbrella.visible = false;
   enableShadows(umbrella);
@@ -151,54 +154,35 @@ export function poseHero(dt) {
   const sa = player.sitAmt;
   const stride = Math.min(1, player.move / 2.7) * (1 - sa);
   const prevPhase = player.phase;
-  player.phase += dt * (player.move * 2.6);
+  player.phase += dt * player.move * STRIDE_RATE;
   // a foot lands each half cycle
   if (stride > 0.3 && Math.floor(player.phase / Math.PI) !== Math.floor(prevPhase / Math.PI)) {
     const foot = Math.floor(player.phase / Math.PI) % 2;
     stepListeners.forEach((fn) => fn(foot, player.x, player.z));
   }
-  const s = Math.sin(player.phase);
-  const legAmp = 0.55 * stride + (player.move > 3 ? 0.15 : 0) * (1 - sa);
-  hero.legs[0].rotation.x = lerp(s * legAmp, -1.52, sa);
-  hero.legs[1].rotation.x = lerp(-s * legAmp, -1.44, sa);
-  hero.knees[0].rotation.x = lerp(Math.max(0, s) * 0.6 * stride, 1.5, sa);
-  hero.knees[1].rotation.x = lerp(Math.max(0, -s) * 0.6 * stride, 1.38, sa);
-  hero.arms[0].rotation.x = lerp(-s * legAmp * 0.8, -0.6, sa);
-  hero.arms[1].rotation.x = lerp(s * legAmp * 0.8, -0.55, sa);
-  hero.arms[0].rotation.z = lerp(-0.06, 0.12, sa); hero.arms[1].rotation.z = lerp(0.06, -0.12, sa);
-  const breathe = Math.sin(timeU.value * 1.6) * 0.012 * (1 - stride);
-  const walkY = Math.abs(Math.cos(player.phase)) * 0.05 * stride + breathe;
-  hero.body.position.y = lerp(walkY, player.seatTop + 0.07 - 0.86 + breathe, sa);
-  hero.body.rotation.x = lerp((player.move > 3 ? 0.12 : 0.03) * stride, -0.07, sa);
-  hero.body.rotation.z = Math.sin(player.phase) * 0.025 * stride; // a little sway in the walk
-  const pa = player.petAmt; // kneel on the left knee and stroke with one hand
-  if (pa > 0.001) {
-    const st = Math.sin(timeU.value * 4.2);
-    hero.legs[1].rotation.x = lerp(hero.legs[1].rotation.x, -1.45, pa);
-    hero.knees[1].rotation.x = lerp(hero.knees[1].rotation.x, 1.5, pa);
-    hero.legs[0].rotation.x = lerp(hero.legs[0].rotation.x, 0.12, pa);
-    hero.knees[0].rotation.x = lerp(hero.knees[0].rotation.x, 1.48, pa);
-    hero.body.position.y = lerp(hero.body.position.y, 0.47 - 0.86, pa);
-    hero.body.rotation.x = lerp(hero.body.rotation.x, 0.26, pa);
-    hero.arms[1].rotation.x = lerp(hero.arms[1].rotation.x, -1.0 + st * 0.22, pa);
-    hero.arms[1].rotation.z = lerp(hero.arms[1].rotation.z, -0.12, pa);
-    hero.arms[0].rotation.x = lerp(hero.arms[0].rotation.x, -0.5, pa);
-  }
-  hero.head.rotation.x = 0.35 * pa;
-  const blink = timeU.value % 3.7 < 0.12 ? 0.12 : 1;
-  hero.eyes[0].scale.y = hero.eyes[1].scale.y = blink;
+  // how fast you are turning (for leaning into it), and how long you have stood still
+  let dr = player.rot - player.lastRot; dr = Math.atan2(Math.sin(dr), Math.cos(dr));
+  player.turn = damp(player.turn, dt > 0 ? dr / dt : 0, 8, dt); player.lastRot = player.rot;
+  player.idleT = player.move < 0.15 && activity.free ? player.idleT + dt : 0;
+  player.t = timeU.value;
+  poseKid(hero, player, dt);
+  // the face: content by default, beaming while petting
+  hero.face.set(player.petAmt > 0.5 ? 'happy' : player.lieAmt > 0.5 ? 'sleepy' : 'calm');
   const covered = player.seat && player.seat.covered;
   player.umbAmt = damp(player.umbAmt, (wx.rain > 0.25 || wx.snow > 0.35 || wx.storm > 0.3) && !covered ? 1 : 0, 3, dt);
   const ua = player.umbAmt;
   umbrella.visible = ua > 0.02;
   if (umbrella.visible) {
-    hero.arms[0].rotation.x = lerp(hero.arms[0].rotation.x, -0.8, ua);
+    hero.arms[0].rotation.x = lerp(hero.arms[0].rotation.x, -1.15, ua);   // held up, so the canopy clears his hair
     hero.arms[0].rotation.z = lerp(hero.arms[0].rotation.z, 0.32, ua);
-    umbrella.rotation.set(-(hero.arms[0].rotation.x + hero.body.rotation.x), 0, -hero.arms[0].rotation.z);
-    umbrella.scale.set(Math.max(ua, 0.05), 1, Math.max(ua, 0.05));
+    straighten(hero, 0, ua);
+    umbrella.rotation.set(-(hero.arms[0].rotation.x + hero.body.rotation.x + hero.chest.rotation.x), 0, -hero.arms[0].rotation.z);
+    umbrella.scale.set(Math.max(ua, 0.05) * 0.92, 1, Math.max(ua, 0.05) * 0.92);
   }
   for (const h of hooks.pose) h(dt);
   hero.root.position.set(player.x, player.y, player.z);
   hero.root.rotation.y = player.rot;
+  hero.root.updateMatrixWorld(true);
+  hero.face.update(dt, timeU.value);
+  hero.sway(dt, timeU.value, Math.min(1.5, windU.value));
 }
-

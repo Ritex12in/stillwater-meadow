@@ -14,7 +14,7 @@ import { clamp, lerp } from '../core/math.js';
 import { groundAt, animalWalkable } from '../core/shape.js';
 import { std } from '../core/materials.js';
 import { hooks } from '../core/state.js';
-import { player } from '../characters/player.js';
+import { player, hero } from '../characters/player.js';
 import { animals } from '../characters/animals.js';
 import { activity } from '../systems/activity.js';
 import { registerAction, moving } from '../systems/actions.js';
@@ -74,11 +74,14 @@ export function initPets() {
       a.tamedAt = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
       a.bond = Math.max(a.bond, 0.35);
       toast(`${Label(a)} eats the ${what} and trusts you now. It's yours!${fav}`, 5);
+      hero.face.flash('love', 5);
       askName(a);
     } else if (a.tamed) {
       toast(`${Label(a)} happily eats the ${what}.`, 3);
+      hero.face.flash('happy', 2.5);
     } else {
       toast(`${Label(a)} eats the ${what}. Trust ${a.trust}/${NEED[a.kind]}.${before === 0 ? ' Keep feeding it.' : ''}${fav}`, 4.5);
+      hero.face.flash('happy', 2.5);
     }
     saveSoon(); refreshMarker(a);
   };
@@ -117,7 +120,7 @@ export function initPets() {
     let x = a.x + Math.sin(ang) * 1.2, z = a.z + Math.cos(ang) * 1.2;
     if (!animalWalkable(x, z)) { x = a.x; z = a.z; }
     const mesh = fishMesh(f.id);
-    food.push({ a, fish: f, mesh, x, z, from: new THREE.Vector3(player.x, player.y + 1.2, player.z), t: 0, wait: 0, eating: -1, age: 0 });
+    food.push({ a, fish: f, mesh, x, z, from: new THREE.Vector3(player.x, player.y + 0.95, player.z), t: 0, wait: 0, eating: -1, age: 0 });
     player.pickT = 0.5;
     toast(`You toss the ${speciesName(f.id)} near ${label(a)}. Back off and keep still so it dares to eat.`, 4.5);
   };

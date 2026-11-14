@@ -10,7 +10,7 @@ export const keys = new Set();
 export const joy = { id: null, cx: 0, cy: 0, x: 0, y: 0 };
 keys.joyMag = () => Math.hypot(joy.x, joy.y);
 
-export const camState = { yaw: 0, pitch: 0.32, dist: 7.5, minDist: 3.5, maxDist: 16, sensitivity: 1 };
+export const camState = { yaw: 0, pitch: 0.32, dist: 6.2, minDist: 2.8, maxDist: 16, sensitivity: 1 }; // (framed for a child-sized figure)
 
 const typing = (e) => e.target && ((e.target.tagName === 'INPUT' && e.target.type !== 'range') || e.target.tagName === 'TEXTAREA');
 window.addEventListener('keydown', (e) => {

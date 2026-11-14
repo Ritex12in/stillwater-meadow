@@ -110,7 +110,7 @@ export function updatePetting(dt, mag) {
   a.bond = Math.min(1, a.bond + dt * 0.06);
   const ang = Math.atan2(a.x - player.x, a.z - player.z);
   player.rot = turnTo(player.rot, ang, dt * 6);
-  const reach = a.kind === 'dog' ? 0.95 : 0.8;
+  const reach = a.kind === 'dog' ? 0.74 : 0.62; // a child's arm
   if (d > reach + 0.04) {
     const stepLen = Math.min(d - reach, dt * 1.6);
     const nx = player.x + Math.sin(ang) * stepLen, nz = player.z + Math.cos(ang) * stepLen;

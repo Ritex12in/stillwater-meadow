@@ -159,7 +159,7 @@ export function initFishing() {
     const reel = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.04, 8).rotateZ(Math.PI / 2), std('#3a3a3a'));
     reel.position.set(0, 0.25, 0.05);
     rod.add(pole, grip, reel);
-    rod.position.set(0, -0.62, 0.03);
+    rod.position.set(0, -hero.dims.arm + 0.03, 0.03); rod.scale.setScalar(0.85);
     rod.visible = false;
     hero.arms[1].add(rod);
   }
@@ -353,12 +353,13 @@ export function initFishing() {
         // the real bite: the float plunges; the strike window depends on what's down there
         F.sp = pickSpecies(F.depth);
         F.state = 'bite'; F.t = BITE_WINDOW[F.sp.tier] * (relaxed() ? 1.8 : 1);
+        hero.face.flash('wow', 1.2);
         spawnRipple(F.to.x, F.to.z, 0.8); plop(F.to.x, F.to.z, 1);
       }
     } else if (F.state === 'bite') {
       F.t -= dt;
       bob.set(F.to.x + Math.sin(t * 30) * 0.03, 0.05 - 0.09 - Math.abs(Math.sin(t * 14)) * 0.05, F.to.z);
-      if (F.t <= 0) { toast('Too slow, it got away. Wait for the next bite.'); scheduleBite(); }
+      if (F.t <= 0) { toast('Too slow, it got away. Wait for the next bite.'); hero.face.flash('think', 2); scheduleBite(); }
     } else if (F.state === 'fight') {
       // the fish's fixed rhythm: pull, rest, pull…
       const sp = F.sp, tier = sp.tier, pat = sp.fight[F.pattern % sp.fight.length];
@@ -384,8 +385,8 @@ export function initFishing() {
       gLabel.textContent = F.pull ? 'It\'s pulling! Ease off' : held ? 'Reeling…' : 'Hold R to reel';
       gFill.style.width = `${F.tens * 100}%`;
       gProgFill.style.width = `${F.prog * 100}%`;
-      if (F.redT > (relaxed() ? 2.5 : 1.5)) stop('Snap! The line was pulled too tight and the fish is gone.');
-      else if (F.slackT > (relaxed() ? 3.5 : 2)) stop('The line went slack and the fish slipped the hook.');
+      if (F.redT > (relaxed() ? 2.5 : 1.5)) { stop('Snap! The line was pulled too tight and the fish is gone.'); hero.face.flash('sad', 3); }
+      else if (F.slackT > (relaxed() ? 3.5 : 2)) { stop('The line went slack and the fish slipped the hook.'); hero.face.flash('sad', 3); }
       else if (F.prog >= 1) landed();
     } else if (F.state === 'reel') {
       F.t += dt / 0.9;
@@ -404,6 +405,7 @@ export function initFishing() {
         const record = j && F.cm > j.best;
         const where = F.kept ? ` · into the creel (${store.creel.length}/${CREEL_MAX})` : ' · your creel is full, so you let it go';
         toast(`${!j ? 'New species! ' : record ? 'New record! ' : ''}You caught a ${F.sp.name} · ${F.cm} cm${where}`, 4.5);
+        hero.face.flash(!j || record ? 'love' : 'happy', 3.5);
         if (F.buddy) {
           for (let i = 0; i < 3; i++) setTimeout(() => { if (F.buddy) spawnHeart(F.buddy); }, i * 300);
           meow(F.buddy.x, F.buddy.z, 1.1);
@@ -413,7 +415,7 @@ export function initFishing() {
     } else if (F.state === 'show') {
       F.t -= dt;
       hero.arms[1].updateMatrixWorld(true);
-      tmp.set(0, -0.72, 0.12); hero.arms[1].localToWorld(tmp);
+      tmp.set(0, -hero.dims.arm - 0.06, 0.1); hero.arms[1].localToWorld(tmp);
       F.fish.position.copy(tmp);
       F.fish.rotation.set(Math.sin(t * 9) * 0.25, player.rot + Math.PI / 2, 0);
       if (F.t <= 0) {
@@ -462,9 +464,12 @@ export function initFishing() {
     else wantArm += Math.sin(clock.elapsed * 1.3) * 0.03;
     armX = F.state === 'cast' ? wantArm : damp(armX, wantArm, 10, dt);
     rodWorld = F.state === 'cast' ? wantRod : damp(rodWorld, wantRod, 8, dt);
+    if (F.state === 'fight') hero.face.flash(F.pull ? 'wow' : 'grit', 0.25); // straining at the rod
     hero.arms[1].rotation.x = armX;
     hero.arms[1].rotation.z = 0;
+    hero.elbows[0].rotation.x = hero.elbows[1].rotation.x = 0; // both arms straight on the rod
+    hero.chest.rotation.y = 0;
     if (player.umbAmt < 0.05) { hero.arms[0].rotation.x = armX * 0.75; hero.arms[0].rotation.z = 0.28; }
-    rod.rotation.x = rodWorld - hero.body.rotation.x - armX;
+    rod.rotation.x = rodWorld - hero.body.rotation.x - hero.chest.rotation.x - armX;
   });
 }

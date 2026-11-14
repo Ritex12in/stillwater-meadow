@@ -31,7 +31,7 @@ export function updateCamera(dt, focus) {
   let handled = false;
   for (const h of hooks.camera) if (h(dt, camTarget)) { handled = true; break; }
   if (handled) return;
-  camTarget.set(focus.x, focus.y + 1.55, focus.z);
+  camTarget.set(focus.x, focus.y + 1.3, focus.z);
   const cp = Math.cos(camState.pitch), sx = Math.sin(camState.yaw) * cp, sy = Math.sin(camState.pitch), sz = Math.cos(camState.yaw) * cp;
   // walk out from the target toward the wanted distance and stop just before anything solid
   const near = treeSpots.filter((t) => Math.abs(t.x - focus.x) < camState.dist + 3 && Math.abs(t.z - focus.z) < camState.dist + 3);

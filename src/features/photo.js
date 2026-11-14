@@ -45,7 +45,7 @@ export function initPhoto(renderNow) {
     on = true;
     saved = { dist: camState.dist, min: camState.minDist, max: camState.maxDist };
     camState.minDist = 0.8; camState.maxDist = 40;
-    target.set(player.x, player.y + 1.55, player.z);
+    target.set(player.x, player.y + 1.3, player.z);
     document.body.classList.add('photo-mode');
     bar.hidden = false;
     applyFilter();

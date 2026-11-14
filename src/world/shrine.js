@@ -13,6 +13,7 @@ import { TAU, mulberry32 } from '../core/math.js';
 import { height, heightAt, lakeT, pathAmt, LAKE, SPAWN, FIRE_SPOT, BENCH_SPOT, WORLD_LIMIT } from '../core/shape.js';
 import { std, weatherize, addWind, cutoutDepth, glowTex } from '../core/materials.js';
 import { kit } from '../core/assets.js';
+import { cherryHero } from './proctrees.js';
 import { world, obstacles, hooks } from '../core/state.js';
 import { cur } from '../systems/time.js';
 
@@ -147,50 +148,6 @@ function fuse(root) {
 }
 
 /** The cherry trees: the kit's twisted trees in blossom, or simple pink crowns without the kit. */
-function cherries(group, spots, mats) {
-  // hot pinks, as vivid as blossom against a blue sky
-  const pinks = ['#ff5c93', '#ff77a8', '#ff4d88', '#ff8fb6', '#ff6ea0', '#ffa6c6'].map((c) => new THREE.Color(c));
-  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
-  const white = new THREE.Color(1, 1, 1);
-  const place = (geo, mat, list, depth) => {
-    if (!list.length) return;
-    const m = new THREE.InstancedMesh(geo, mat, list.length);
-    list.forEach((t, i) => {
-      M.compose(P.set(t.x, t.y, t.z), Q.setFromAxisAngle(Y, t.ry), S.setScalar(t.s));
-      m.setMatrixAt(i, M); m.setColorAt(i, t.color);
-    });
-    m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false;
-    if (depth) m.customDepthMaterial = depth;
-    group.add(m);
-  };
-  spots.forEach((t, i) => { t.color = pinks[i % pinks.length]; });
-  mats.blossoms = [];
-  if (kit && kit.models.CommonTree_1) {
-    // tall, full crowns: the kit's dense common trees and (with the meadow pack) spreading maples
-    const families = [{ prefix: 'CommonTree_', leaves: 'leaves_round', bark: 'bark', share: kit.models.MapleTree_1 ? 0.6 : 1 }];
-    if (kit.models.MapleTree_1) families.push({ prefix: 'MapleTree_', leaves: 'maple_leaves', bark: 'maple_bark', share: 1 });
-    spots.forEach((t) => { t.fam = t.pick < families[0].share ? 0 : 1; });
-    families.forEach((f, fi) => {
-      const leaf = weatherize(addWind(std('#ffffff', { map: kit.tex[f.leaves], alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true, emissive: '#ff5c93', emissiveIntensity: 0 }), 0.0022, null, null, 0.07), 'std');
-      leaf.color.setRGB(1.5, 1.24, 1.34); // lift the grey leaf texture so the pinks stay bright
-      const bark = weatherize(std('#8a7a78', { map: kit.tex[f.bark], flatShading: false, vertexColors: true }), 'std');
-      mats.blossoms.push(leaf);
-      const depth = cutoutDepth(kit.tex[f.leaves]);
-      for (let v = 1; v <= 5; v++) {
-        const parts = kit.models[f.prefix + v], list = spots.filter((t) => t.fam === fi && t.v === v);
-        const find = (re) => Object.entries(parts).find(([k]) => re.test(k))[1];
-        place(find(/Leaves/), leaf, list, depth);
-        place(find(/Bark/), bark, list.map((t) => Object.assign({}, t, { color: white })), null);
-      }
-    });
-  } else {
-    const leaf = weatherize(std('#ffffff', { emissive: '#ff5c93', emissiveIntensity: 0 }), 'std');
-    mats.blossoms.push(leaf);
-    place(new THREE.IcosahedronGeometry(2.3, 1).scale(1.2, 0.8, 1.2).translate(0, 4.6, 0), leaf, spots, null);
-    place(new THREE.CylinderGeometry(0.16, 0.3, 3.4, 6).translate(0, 1.7, 0), std('#5a4038'), spots.map((t) => Object.assign({}, t, { color: white })), null);
-  }
-}
-
 /**
  * The flower carpet: clumps of pink and pale blossom crowding the ground under the trees, from
  * the meadow pack. Small plants (layer 1, no shadows), shown only while you are in or near the grove.
@@ -247,42 +204,71 @@ function petalCarpet(group, s) {
   group.add(m);
 }
 
-/** Petals in the air: points that fall, sway and loop inside a box over the grove, all on the GPU. */
-function petalFall(s) {
-  const N = 900, r = mulberry32(4107), pos = new Float32Array(N * 3), seed = new Float32Array(N * 2);
-  for (let i = 0; i < N; i++) { pos.set([(r() - 0.5) * 44, r() * 11, (r() - 0.5) * 44], i * 3); seed.set([r(), r()], i * 2); }
+/**
+ * Petals in the air: points that fall, sway and loop inside a box over `c`, all on the GPU. Each is
+ * a cherry petal (rounded, notched at the tip, deeper pink at its base) tumbling as it drifts.
+ */
+function petalFall(c, o) {
+  const N = o.n, W = o.spread, r = mulberry32(o.seed), pos = new Float32Array(N * 3), seed = new Float32Array(N * 2);
+  for (let i = 0; i < N; i++) { pos.set([(r() - 0.5) * W, o.low + r() * (o.top - o.low), (r() - 0.5) * W], i * 3); seed.set([r(), r()], i * 2); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 2));
-  const u = { uTime: { value: 0 }, uLight: { value: 1 }, uGround: { value: heightAt(s.x, s.z) }, uSize: { value: 1 } };
+  const u = { uTime: { value: 0 }, uLight: { value: 1 }, uGround: { value: heightAt(c.x, c.z) }, uSize: { value: 1 } };
+  const H = (o.top - o.low).toFixed(1), LOW = o.low.toFixed(1), HW = (W / 2).toFixed(1), WW = W.toFixed(1), SLOW = o.slow.toFixed(2);
   const m = new THREE.Points(g, new THREE.ShaderMaterial({
     uniforms: u, transparent: true, depthWrite: false,
-    vertexShader: `uniform float uTime; uniform float uGround; uniform float uSize; attribute vec2 aSeed; varying float vSpin; varying float vTone;
+    vertexShader: `uniform float uTime; uniform float uGround; uniform float uSize; attribute vec2 aSeed; varying float vSpin; varying float vTone; varying float vFlat;
       void main() {
         vec3 p = position;
-        float fall = 0.55 + aSeed.x * 0.5;
-        p.y = uGround + mod(position.y - uTime * fall, 11.0) + 0.1;
-        p.x += sin(uTime * (0.6 + aSeed.y) + aSeed.x * 40.0) * 0.9 + uTime * 0.25;
-        p.z += cos(uTime * (0.5 + aSeed.x) + aSeed.y * 40.0) * 0.9;
-        p.x = mod(p.x + 22.0, 44.0) - 22.0;
-        vSpin = uTime * (1.0 + aSeed.y * 2.0) + aSeed.x * 6.28; vTone = aSeed.y;
+        float t = uTime * ${SLOW}, fall = 0.45 + aSeed.x * 0.45;
+        p.y = uGround + ${LOW} + mod(position.y - ${LOW} - t * fall, ${H}) + 0.1;
+        // a lazy spiral as it falls, and the breeze carrying it along
+        float sw = t * (0.5 + aSeed.y * 0.6) + aSeed.x * 40.0;
+        p.x += sin(sw) * (0.6 + aSeed.y * 0.8) + t * 0.3;
+        p.z += cos(sw * 0.9) * (0.6 + aSeed.x * 0.8) + sin(t * 0.2 + aSeed.y * 9.0) * 0.6;
+        p.x = mod(p.x + ${HW}, ${WW}) - ${HW};
+        vSpin = t * (0.8 + aSeed.y * 1.6) + aSeed.x * 6.28; vTone = aSeed.y; vFlat = abs(sin(t * (0.7 + aSeed.x) + aSeed.y * 5.0));
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
-        gl_PointSize = min(uSize * (0.09 + aSeed.x * 0.05) / -mv.z, 16.0);
+        gl_PointSize = min(uSize * (0.1 + aSeed.x * 0.06) / -mv.z, 22.0);
         gl_Position = projectionMatrix * mv;
       }`,
-    fragmentShader: `uniform float uLight; varying float vSpin; varying float vTone;
+    fragmentShader: `uniform float uLight; varying float vSpin; varying float vTone; varying float vFlat;
       void main() {
         vec2 q = gl_PointCoord - 0.5; float c = cos(vSpin), s = sin(vSpin);
         q = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
-        // a petal: an ellipse that narrows as it tumbles edge-on
-        float e = length(q * vec2(1.0, 1.7 + 1.2 * abs(sin(vSpin * 0.7))));
+        // narrower as it tumbles edge-on
+        q.x /= 0.35 + 0.65 * vFlat;
+        float e = length(q * vec2(1.25, 0.95) - vec2(0.0, 0.02));
         if (e > 0.42) discard;
-        gl_FragColor = vec4(mix(vec3(1.0, 0.72, 0.84), vec3(1.0, 0.9, 0.94), vTone) * uLight, 0.92);
+        if (q.y < -0.3 && abs(q.x) < (q.y + 0.42) * 0.55) discard;                     // the notch at its tip
+        vec3 base = mix(vec3(1.0, 0.55, 0.72), vec3(1.0, 0.68, 0.8), vTone), tip = vec3(1.0, 0.9, 0.94);
+        gl_FragColor = vec4(mix(base, tip, smoothstep(0.25, -0.35, q.y)) * uLight * (0.85 + 0.15 * vFlat), 0.95);
       }`,
   }));
-  m.position.set(s.x, 0, s.z); m.frustumCulled = false;
+  m.position.set(c.x, 0, c.z); m.frustumCulled = false;
   scene.add(m);
   return { mesh: m, u };
+}
+
+/**
+ * The great cherry behind the hall: one old tree grown from code (world/proctrees.js), far bigger
+ * than the rest, its blossom painted flower by flower. It glows faintly after dark like the others.
+ */
+function greatCherry(group, p, mats) {
+  const t = cherryHero(), S = 1.55, y = heightAt(p.x, p.z) - 0.3;
+  const blossom = weatherize(addWind(std('#ffffff', { map: t.blossomTex, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true, emissive: '#ff5c93', emissiveIntensity: 0 }), 0.0007, null, null, 0.12), 'std');
+  blossom.color.set('#ff6ea0').multiply(new THREE.Color(1.5, 1.24, 1.34)); // the same lifted hot pink as the grove's other cherries
+  mats.blossoms.push(blossom);
+  const bark = weatherize(std('#ffffff', { map: t.barkTex, flatShading: false, vertexColors: true }), 'std');
+  [[t.blossom, blossom], [t.bark, bark]].forEach(([geo, mat]) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(p.x, y, p.z); m.scale.setScalar(S); m.rotation.y = 0.6;
+    m.castShadow = m.receiveShadow = true;
+    if (mat === blossom) m.customDepthMaterial = cutoutDepth(t.blossomTex);
+    group.add(m);
+  });
+  obstacles.push({ x: p.x, z: p.z, r: 1.3 });
 }
 
 /** Build the grove at the chosen site. `lampSpots` gains the shrine's lantern light if there is room. */
@@ -331,36 +317,28 @@ export function buildShrine(lampSpots) {
   if (lampSpots && lampSpots.length < 12) { const p = at(6, 0); lampSpots.push(new THREE.Vector3(p.x, heightAt(p.x, p.z) + 1.6, p.z)); }
 
   fuse(group); // hall, gates and lanterns become one mesh per material
-  // cherry trees: two loose rings round the hall, leaving the path open
-  const spots = [];
-  { const p = at(-7.5, 0); spots.push({ x: p.x, z: p.z, y: heightAt(p.x, p.z) - 0.15, s: 2.1, ry: 1.1, v: 1, pick: 0 }); } // the great tree behind the hall
-  for (let i = 0; i < 400 && spots.length < 13; i++) {
-    const a = rr(0, TAU), d = rr(6.5, GROVE_R), x = s.x + Math.cos(a) * d, z = s.z + Math.sin(a) * d;
-    const dx = x - s.x, dz = z - s.z, along = dx * s.fx + dz * s.fz, across = Math.abs(-dx * s.fz + dz * s.fx);
-    if ((along > -2 && across < 3.4) || (Math.abs(along) < 5 && across < 6)) continue;
-    if (spots.some((t) => Math.hypot(t.x - x, t.z - z) < 6.5)) continue;
-    spots.push({ x, z, y: heightAt(x, z) - 0.15, s: rr(1.15, 1.65), ry: rr(0, TAU), v: 1 + Math.floor(R() * 5), pick: R() });
-  }
-  spots.forEach((t) => obstacles.push({ x: t.x, z: t.z, r: 0.4 * t.s }));
-  cherries(group, spots, mats);
+  // one great cherry stands alone behind the hall (the grove's ring of small ones is gone)
+  const hero = at(-13, 1.2);
+  mats.blossoms = [];
+  greatCherry(group, hero, mats);
   petalCarpet(group, s);
   scene.add(group);
   const flowers = flowerCarpet(s, R);
   scene.add(flowers);
-  const petals = petalFall(s);
+  // a few petals carried over the whole grove, and a thick fall drifting out of the great cherry's crown
+  const petalSets = [petalFall(s, { n: 260, spread: 44, low: 0, top: 11, seed: 4107, slow: 1 }), petalFall(hero, { n: 1900, spread: 30, low: 0, top: 19, seed: 4111, slow: 0.75 })];
 
   const casters = []; group.traverse((o) => { if (o.isMesh && o.castShadow) casters.push(o); });
   let wasDetail = true;
   // far away, none of it is drawn or animated
   hooks.frame.push((dt, t, camera) => {
     const d = Math.hypot(camera.position.x - s.x, camera.position.z - s.z), near = d < HIDE, detail = d < DETAIL;
-    group.visible = near; petals.mesh.visible = flowers.visible = detail;
+    group.visible = near; flowers.visible = detail;
+    petalSets.forEach((p) => { p.mesh.visible = detail; });
     if (!near) return;
     if (detail !== wasDetail) { wasDetail = detail; casters.forEach((m) => { m.castShadow = detail; }); }
     if (!detail) return;
-    petals.u.uTime.value = t;
-    petals.u.uLight.value = 0.4 + 0.6 * cur.day;
-    petals.u.uSize.value = window.innerHeight * 1.2;
+    petalSets.forEach((p) => { p.u.uTime.value = t; p.u.uLight.value = 0.4 + 0.6 * cur.day; p.u.uSize.value = window.innerHeight * 1.2; });
     mats.light.emissiveIntensity = cur.eve * 2.2;
     glowMat.opacity = cur.eve * 0.8;
     mats.blossoms.forEach((b) => { b.emissiveIntensity = cur.eve * 0.14; }); // the blossom holds a faint glow after dark

@@ -94,6 +94,10 @@ Key ideas:
   then takes its own shape in the vertex shader (`treeWarp`): a smooth noise field and a per-tree hash
   lean it, twist its crown and stretch it, the same for bark, leaves and their shadows.
   `tools/studio/trees.html?fam=MapleTree` shows a family's five variants.
+- **The shrine's great cherry** (`cherryHero` in `world/proctrees.js`, placed by `world/shrine.js`): one
+  tall, cone-shaped tree behind the hall, built to plan (a leader and three sub-trunks, branches
+  spiralling up and shortening toward the top, blossom clusters at their tips) with painted five-petal
+  blossom, and a thick fall of notched petals drifting from its crown. `?fam=Cherry` in the studio.
 - **Audio mixer** (`systems/audio.js`): four buses — nature, animals, music, interface — each with
   its own volume; suspended while the tab is hidden.
 - **Two random streams** (`core/math.js`): the seeded world-building stream is only used at boot

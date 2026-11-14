@@ -58,7 +58,7 @@ function tube(m, pts, radii, sides, shade, wrap, vPerM) {
   }
   for (let i = 0; i < n - 1; i++) for (let j = 0; j < sides; j++) {
     const a = base + i * (sides + 1) + j, b = a + sides + 1;
-    m.i.push(a, b, a + 1, b, b + 1, a + 1);
+    m.i.push(a, a + 1, b, b, a + 1, b + 1); // wound so the outside is the front face
   }
 }
 
@@ -113,12 +113,14 @@ function crown(r, P, sites) {
   // and facing out of it: the crown reads as a few soft, rounded masses rather than loose cards
   const ends = sites.filter((s) => s.end), rest = sites.filter((s) => !s.end);
   for (const l of [ends, rest]) for (let i = l.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)), t = l[i]; l[i] = l[j]; l[j] = t; }
-  const seeds = ends.concat(rest).slice(0, P.blobs);
+  const seeds = sites.filter((s) => s.keep).concat(ends.concat(rest).filter((s) => !s.keep)).slice(0, P.blobs);
   const centre = V(); seeds.forEach((s) => centre.add(s.p)); centre.divideScalar(Math.max(1, seeds.length));
   let R = 0.1; seeds.forEach((s) => { R = Math.max(R, s.p.distanceTo(centre)); });
   const quads = [], dir = V();
+  let y0 = Infinity, y1 = -Infinity; seeds.forEach((s) => { y0 = Math.min(y0, s.p.y); y1 = Math.max(y1, s.p.y); });
   for (const s of seeds) {
-    const rb = P.blob * (0.75 + 0.5 * r());
+    const up = P.coneBlobs ? clamp((s.p.y - y0) / Math.max(0.1, y1 - y0), 0, 1) : 0;
+    const rb = P.blob * (0.75 + 0.5 * r()) * (P.coneBlobs ? lerp(1.2, 0.55, up) : 1);
     const bc = V().copy(s.p).addScaledVector(V().subVectors(s.p, centre).normalize(), rb * 0.35);
     const n = Math.round(P.perBlob * (rb / P.blob) ** 2);
     for (let k = 0; k < n; k++) {
@@ -161,12 +163,13 @@ function crown(r, P, sites) {
 
 // ───────────── painted textures ─────────────
 /** A canvas painted by `draw`, turned into a texture whose empty texels carry leaf grey (no dark mip fringes). */
-function leafAtlas(size, draw) {
+function leafAtlas(size, draw, bleed = [196, 196, 196], toGrey = false) {
   const cv = document.createElement('canvas'); cv.width = cv.height = size;
   const x = cv.getContext('2d', { willReadFrequently: true });
   draw(x, size);
   const img = x.getImageData(0, 0, size, size), d = img.data;
-  for (let i = 0; i < d.length; i += 4) if (d[i + 3] < 10) { d[i] = d[i + 1] = d[i + 2] = 196; d[i + 3] = 0; }
+  if (toGrey) for (let i = 0; i < d.length; i += 4) { const l = Math.min(255, 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2] + 40); d[i] = d[i + 1] = d[i + 2] = l; }
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] < 10) { d[i] = bleed[0]; d[i + 1] = bleed[1]; d[i + 2] = bleed[2]; d[i + 3] = 0; }
   const t = new THREE.DataTexture(new Uint8Array(d.buffer.slice(0)), size, size, THREE.RGBAFormat);
   t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
   t.anisotropy = 4; t.flipY = false; t.needsUpdate = true;
@@ -319,6 +322,120 @@ function buildTree(name, P, variant) {
     tube(wood, b.pts, radii, sides, (p) => (b.depth === 0 ? lerp(0.62, 1, clamp(p.y / 1.2, 0, 1)) : 0.9), b.depth === 0 ? 2 : 1, 0.35);
   }
   return { [name + '_Bark']: wood.geometry(), [name + '_Leaves']: crown(r, P, sites) };
+}
+
+// ───────────── the great cherry ─────────────
+/** One petal pointing up from (0, 0): rounded, widest past the middle, with the cherry's notched tip. */
+function petal(x, len, w) {
+  x.beginPath(); x.moveTo(0, 0);
+  x.bezierCurveTo(w * 0.9, -len * 0.2, w * 1.1, -len * 0.8, w * 0.38, -len);
+  x.lineTo(0, -len * 0.84);
+  x.lineTo(-w * 0.38, -len);
+  x.bezierCurveTo(-w * 1.1, -len * 0.8, -w * 0.9, -len * 0.2, 0, 0);
+  x.fill();
+}
+const PINKS = ['#ff5f97', '#ff7aa8', '#ff8fb6', '#ffa6c6', '#ff4f8a', '#ffbfd4', '#ff6ea0'];
+/** A spray of five-petal blossom in one atlas cell: dense in the middle, ragged at the rim, buds at the edge. */
+function blossomCluster(x, ox, oy, S, r) {
+  const flowers = [];
+  for (let i = 0; i < 150; i++) {
+    const a = r() * TAU, d = Math.pow(r(), 0.75) * S * 0.44;
+    flowers.push([ox + S * 0.5 + Math.cos(a) * d, oy + S * 0.52 + Math.sin(a) * d * 0.95, d / (S * 0.44)]);
+  }
+  flowers.sort((a, b) => a[1] - b[1]);                                   // lower ones first, so the upper overlap them
+  for (const [fx, fy, rim] of flowers) {
+    const R = S * (0.042 + 0.028 * r()) * (1 - 0.3 * rim), base = PINKS[Math.floor(r() * PINKS.length)], a0 = r() * TAU;
+    x.save(); x.translate(fx, fy);
+    if (rim > 0.85 && r() < 0.5) {                                      // a bud
+      x.fillStyle = '#e8487e'; x.beginPath(); x.ellipse(0, 0, R * 0.32, R * 0.45, a0, 0, TAU); x.fill(); x.restore(); continue;
+    }
+    for (let k = 0; k < 5; k++) {
+      x.save(); x.rotate(a0 + (k * TAU) / 5);
+      const g = x.createLinearGradient(0, 0, 0, -R);
+      g.addColorStop(0, '#d93d76'); g.addColorStop(0.35, base); g.addColorStop(1, '#ffe3ec');
+      x.fillStyle = g; petal(x, R, R * 0.55);
+      x.restore();
+    }
+    x.fillStyle = '#b8285f'; x.beginPath(); x.arc(0, 0, R * 0.2, 0, TAU); x.fill();
+    x.strokeStyle = '#ffd6e3'; x.lineWidth = Math.max(0.6, R * 0.04);
+    for (let k = 0; k < 7; k++) { const a = r() * TAU, l = R * (0.3 + 0.15 * r()); x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(a) * l, Math.sin(a) * l); x.stroke(); x.fillStyle = '#ffc95a'; x.fillRect(Math.cos(a) * l - 0.8, Math.sin(a) * l - 0.8, 1.6, 1.6); }
+    x.restore();
+  }
+}
+/** Cherry bark: dark, smooth, with pale horizontal bands (its lenticels) and a few furrows. */
+function cherryBark(seed) {
+  return (x, w, h) => {
+    const r = mulberry32(seed);
+    x.fillStyle = '#5a4540'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 70; i++) { x.fillStyle = `rgba(30,20,18,${0.2 + 0.3 * r()})`; const cx = r() * w; x.fillRect(cx, 0, 1 + r() * 3, h); }
+    for (let i = 0; i < 160; i++) { x.fillStyle = `rgba(170,140,128,${0.25 + 0.35 * r()})`; const y = r() * h, cx = r() * w, l = 8 + r() * 40; x.fillRect(cx, y, l, 1 + r() * 2); x.fillRect(cx - w, y, l, 1 + r() * 2); }
+  };
+}
+// The great cherry is a cone, as in the reference photo: a clear trunk, then a crown widest a third of
+// the way up that tapers to a rounded point. Its skeleton is built to that plan (a leader with
+// branches spiralling up it, each shorter than the last) and its blossom clusters fill the cone.
+const HERO = { H: 12, base: 3.6, reach: 5.6, radius: 0.62, blob: 1.05, perBlob: 18, tips: 64, coneBlobs: true, leaf: 1.25, scatter: 0.8, roll: 0.5, bark: cherryBark(88), seed: 8800 };
+const coneRadius = (u) => HERO.reach * Math.pow(1 - clamp(u, 0, 1), 0.8) * (0.72 + 0.28 * clamp(u / 0.25, 0, 1));
+const coneU = (y) => (y - HERO.base) / (HERO.H - HERO.base);
+
+function coneSkeleton(r) {
+  const { H, base } = HERO, branches = [], sites = [], trunkR = (y) => HERO.radius * (1 - 0.82 * clamp(y / H, 0, 1));
+  // a stem from p0 along dir (curving by `bend` per step), with radius r0 tapering away
+  const stem = (p0, dir, len, r0, depth, bend = 0) => {
+    const n = Math.max(3, Math.round(len / 0.55)), pts = [p0.clone()], radii = [r0], d = dir.clone();
+    for (let k = 1; k <= n; k++) {
+      d.x += (r() - 0.5) * 0.18; d.z += (r() - 0.5) * 0.18; d.y += bend; d.normalize();
+      pts.push(pts[k - 1].clone().addScaledVector(d, len / n)); radii.push(r0 * (1 - 0.72 * (k / n)));
+    }
+    branches.push({ pts, radii, depth });
+    return { pts, radii };
+  };
+  // side branches spiralling up a stem, each reaching out to the cone's outline, blossom at their ends
+  const sides = (st, from, gap, depth) => {
+    let a = r() * TAU;
+    for (let i = 1; i < st.pts.length; i++) {
+      const p = st.pts[i]; if (p.y < from) continue;
+      for (let h = 0; h < 1; h += gap / 0.55) {
+        a += 2.4 + (r() - 0.5) * 0.4;
+        const q = st.pts[i - 1].clone().lerp(p, h), u = coneU(q.y);
+        if (u > 0.95) continue;
+        const dir = V(Math.cos(a), 0.34 + 0.5 * u + 0.15 * r(), Math.sin(a)).normalize();
+        // long enough that its tip reaches the cone's outline, however steeply it climbs
+        const out = Math.max(0.7, coneRadius(u) - Math.hypot(q.x, q.z)) * (0.8 + 0.25 * r()) / Math.max(0.35, Math.hypot(dir.x, dir.z));
+        const b = stem(q, dir, out, st.radii[i] * 0.5, depth, 0.02);
+        const tip = b.pts[b.pts.length - 1];
+        sites.push({ p: tip, d: dir, end: true });
+        if (r() < 0.75) {                                                  // a shoot off it, with its own spray
+          const m = b.pts[Math.min(b.pts.length - 1, 2)], cd = dir.clone().add(perp(dir, r() * TAU).multiplyScalar(0.9)).normalize();
+          const sh = stem(m, cd, out * 0.45, b.radii[2] * 0.7 || 0.04, depth + 1, 0.03);
+          sites.push({ p: sh.pts[sh.pts.length - 1], d: cd, end: true });
+        }
+      }
+    }
+  };
+  const lean = V((r() - 0.5) * 0.3, 0, (r() - 0.5) * 0.3), lead = [], lr = [];
+  for (let i = 0; i <= 24; i++) { const t = i / 24, y = -0.3 + (H + 0.3) * t; lead.push(V(lean.x * t * t + Math.sin(t * 5) * 0.08, y, lean.z * t * t)); lr.push(trunkR(y) * (i < 3 ? 1 + 0.5 * Math.exp(-i * 1.2) : 1)); }
+  branches.push({ pts: lead, radii: lr, depth: 0 });
+  const leader = { pts: lead, radii: lr };
+  sides(leader, base + 1.7, 0.75, 1);
+  sites.unshift({ p: lead[lead.length - 1].clone(), d: V(0, 1, 0), end: true, keep: true });          // the very top gets its spray
+  // three big limbs fork from the trunk where the crown begins and climb at a slant beside the leader
+  const a0 = r() * TAU;
+  for (let k = 0; k < 3; k++) {
+    const az = a0 + (k * TAU) / 3 + (r() - 0.5) * 0.5, p0 = V(lean.x * 0.1, base - 0.3, lean.z * 0.1);
+    const limb = stem(p0, V(Math.cos(az) * 0.5, 1, Math.sin(az) * 0.5).normalize(), (H - base) * (0.55 + 0.12 * r()), trunkR(base) * 0.62, 1, 0.012);
+    sides(limb, base + 1.6, 0.9, 2);
+  }
+  return { branches, sites };
+}
+/** The great cherry of the shrine grove: { bark, blossom } geometries in metres, and their textures. */
+export function cherryHero() {
+  const r = mulberry32(HERO.seed), { branches, sites } = coneSkeleton(r);
+  const wood = new Mesh();
+  for (const b of branches) if (b.radii[0] > 0.015) tube(wood, b.pts, b.radii, b.depth === 0 ? 10 : b.depth === 1 ? 6 : 4, (p) => (b.depth === 0 ? lerp(0.6, 1, clamp(p.y / 1.5, 0, 1)) : 0.85), b.depth === 0 ? 2 : 1, 0.35);
+  const blossom = crown(r, Object.assign({ blobs: HERO.tips }, HERO), sites), rt = mulberry32(HERO.seed + 31);
+  const blossomTex = leafAtlas(1024, (x, S) => { for (let c = 0; c < 4; c++) blossomCluster(x, (c % 2) * S / 2, Math.floor(c / 2) * S / 2, S / 2, rt); }, [215, 215, 215], true); // grey: tinted pink like the grove's other cherries
+  return { bark: wood.geometry(), blossom, barkTex: barkTexture(256, 256, HERO.bark), blossomTex };
 }
 
 /** Generated trees and their textures, in the kit's shape: { models, tex }. */

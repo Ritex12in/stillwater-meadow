@@ -7,9 +7,14 @@
 // Open /tools/studio/trees.html?fam=MapleTree&leaf=%236f9a3c (the loaded kit no longer has these families)
 import * as THREE from 'three';
 import { loadKit, fit } from '/src/core/assets.js';
-import { procTrees } from '/src/world/proctrees.js';
-const q = new URLSearchParams(location.search), fam = q.get('fam') || 'MapleTree', tint = q.get('leaf') || '#6f9a3c', texName = { MapleTree: 'maple', BirchTree: 'birch', NormalTree: 'normal' }[fam];
+import { procTrees, cherryHero } from '/src/world/proctrees.js';
+const q = new URLSearchParams(location.search), fam = q.get('fam') || 'MapleTree', tint = q.get('leaf') || '#6f9a3c', texName = { MapleTree: 'maple', BirchTree: 'birch', NormalTree: 'normal', Cherry: 'cherry' }[fam], count = fam === 'Cherry' ? 1 : 5;
 const kit = await loadKit(), gen = procTrees();
+if (fam === 'Cherry') { // the shrine's great cherry, alone
+  const t = cherryHero();
+  gen.models.Cherry_1 = { Cherry_Bark: t.bark, Cherry_Leaves: t.blossom };
+  gen.tex.cherry_bark = t.barkTex; gen.tex.cherry_leaves = t.blossomTex;
+}
 const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene(); scene.background = new THREE.Color('#9fb7c8');
 scene.add(new THREE.HemisphereLight('#cfe0f0', '#5d6b3a', 0.75));
@@ -17,13 +22,13 @@ const sun = new THREE.DirectionalLight('#fff1d6', 0.9); sun.position.set(-20, 30
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshLambertMaterial({ color: '#6d8a45' })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
 const tris = { kit: [0, 0], gen: [0, 0] };
 [[kit, 'kit', 0], [gen, 'gen', 0]].filter(([, l]) => l === (q.get('only') || 'gen')).forEach(([src, label, z]) => {
-  for (let i = 1; i <= 5; i++) {
-    const parts = fit(Object.fromEntries(Object.entries(src.models[fam + '_' + i]).map(([k, g]) => [k, g.clone()])), 6.6, 0.15);
+  for (let i = 1; i <= count; i++) {
+    const parts = fam === 'Cherry' ? Object.fromEntries(Object.entries(src.models[fam + '_' + i]).map(([k, g]) => [k, g.clone().scale(1.15, 1.15, 1.15)])) : fit(Object.fromEntries(Object.entries(src.models[fam + '_' + i]).map(([k, g]) => [k, g.clone()])), 6.6, 0.15);
     for (const [name, g] of Object.entries(parts)) {
       const leaf = /Leaves/.test(name);
       tris[label][leaf ? 1 : 0] += g.index.count / 3;
       const mat = new THREE.MeshLambertMaterial({ map: src.tex[texName + (leaf ? '_leaves' : '_bark')], vertexColors: true, color: leaf ? tint : '#ffffff', alphaTest: leaf ? 0.5 : 0, side: leaf ? THREE.DoubleSide : THREE.FrontSide });
-      const m = new THREE.Mesh(g, mat); m.position.set((i - 3) * 8.5, 0, z); m.castShadow = m.receiveShadow = true; scene.add(m);
+      const m = new THREE.Mesh(g, mat); m.position.set(count === 1 ? 0 : (i - 3) * 8.5, 0, z); m.castShadow = m.receiveShadow = true; scene.add(m);
     }
   }
 });

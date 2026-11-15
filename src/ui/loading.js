@@ -17,13 +17,32 @@ export const paint = () => new Promise((resolve) => {
   requestAnimationFrame(() => setTimeout(go, 0));
   setTimeout(go, 60); // a hidden tab gets no animation frames: don't wait for one forever
 });
-/** The meadow is on screen: fade the loading screen away. */
-export function loadingDone() {
+/**
+ * The meadow is on screen. The loading card turns into a start screen over the running (blurred)
+ * scene, so the graphics settle on a smooth frame rate before you step in, and your tap lets the
+ * browser play sound. A key, a click or a tap goes in; `onStart` is called then. (Automated test
+ * browsers skip straight in.)
+ */
+export function loadingDone(onStart = () => {}) {
   const el = $('loading');
-  if (!el) return;
-  loadingStep(1, 'Welcome');
-  el.classList.add('done');
-  setTimeout(() => { el.hidden = true; }, 800);
+  if (!el) { onStart(); return; }
+  loadingStep(1, 'Ready');
+  const go = () => {
+    if (el.classList.contains('done')) return;
+    el.classList.add('done');
+    window.removeEventListener('keydown', key, true);
+    setTimeout(() => { el.hidden = true; }, 800);
+    onStart();
+  };
+  const key = (e) => { if (e.key === 'Tab') return; e.preventDefault(); e.stopPropagation(); go(); };
+  if (navigator.webdriver) { go(); return; }
+  el.classList.add('ready');
+  const btn = $('startBtn');
+  btn.hidden = false;
+  btn.addEventListener('click', go);
+  el.addEventListener('pointerup', (e) => { if (e.target === el) go(); });
+  window.addEventListener('keydown', key, true);
+  setTimeout(() => btn.focus({ preventScroll: true }), 50);
 }
 
 export function initScreen() {

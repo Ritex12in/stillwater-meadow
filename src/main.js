@@ -35,11 +35,11 @@ import { camState, initPointer } from './systems/input.js';
 import { updateCamera, camTarget } from './systems/camera.js';
 import { cur, sunDir, moonDir, lightDir, solar, timeCtl, advanceTime, periodName, formatHour, goLive, setManual, wrap24 } from './systems/time.js';
 import { wx, WX_LABEL, buildWeather, updateWeather, updatePrecip, weatherModify, cycleWeather, onRainStopped, restoreWeather, resizeWeather } from './systems/weather.js';
-import { quality, initQuality, tickQuality, onQualityChange } from './systems/quality.js';
+import { quality, initQuality, tickQuality, onQualityChange, loadingStarted, loadingFinished } from './systems/quality.js';
 import { grassU } from './world/grassfield.js';
 import { farForest } from './world/farforest.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
-import { store, onSave } from './systems/save.js';
+import { store, onSave, flush } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
 import { initWorldPanel } from './ui/world-panel.js';
 import { initSettings } from './ui/settings.js';
@@ -69,6 +69,13 @@ try {
   showFatal('Your browser could not start WebGL, which this world needs to draw the meadow.');
   throw e;
 }
+
+// If the graphics card gives up (out of memory, a driver reset) and doesn't come back, save and start again a level lower.
+renderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  setTimeout(() => { if (renderer.getContext().isContextLost()) { try { flush(); } catch (err) { /* nothing to save */ } loadingStarted(); location.reload(); } }, 3000);
+});
+loadingStarted(); // (cleared once the first frame is drawn: still set next time means this load crashed the tab)
 
 // ── Build the world. The order matters: it fixes where every tree and flower grows. ──
 // (the loading screen's bar follows along; `paint` lets the browser draw it between the heavy steps)
@@ -274,7 +281,9 @@ updateCamera(0, player);
 updateDetail(camera, camTarget);
 renderer.shadowMap.needsUpdate = true;
 renderNow();
-loadingDone();
+loadingFinished();
+quality.fast = true; // tune quickly while the start screen is up
+loadingDone(() => { quality.fast = false; });
 requestAnimationFrame(frame);
 
 // A small handle for automated tests and the debug panel.

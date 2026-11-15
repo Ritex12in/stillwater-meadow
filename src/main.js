@@ -269,8 +269,10 @@ function frame(now) {
   const dt = clamp(real, 0, 0.05);
   last = now;
   tick(dt);
-  renderNow();
+  // (before drawing: a resolution change resizes the canvas, which clears it, so it must be redrawn at once
+  // in the same frame; done after drawing, the cleared canvas would be shown for a frame as a black flicker)
   tickQuality(clamp(real, 0, 0.5));
+  renderNow();
   requestAnimationFrame(frame);
 }
 advanceTime(0);

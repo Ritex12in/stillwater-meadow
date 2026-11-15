@@ -249,6 +249,71 @@ test('stargazing: lie down at night and see a shooting star', async ({ page }) =
   noErrors(errors);
 });
 
+test('winter: winter clothes, a snowman, and the skating dance on the ice with her', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=winter', '#16');
+  await step(page, 0.5);
+  const m = (fn) => page.evaluate(fn);
+  expect(await m(() => window.__meadow.wardrobe())).toBe('winter');
+  expect(await m(() => window.__meadow.snowman().visible)).toBe(true);
+  // out on the ice, hand in hand (she follows you onto it)
+  await m(() => { const w = window.__meadow, f = w.friendSt; w.player.x = f.x + 1; w.player.z = f.z; });
+  await press(page, 'KeyX', 1);
+  await teleport(page, -3, -13.2);
+  await m(() => { const w = window.__meadow, f = w.friendSt; f.x = -3.6; f.z = -13.2; w.player.rot = 2.5; });
+  await step(page, 1.5);
+  expect(await m(() => window.__meadow.geo.walkable(window.__meadow.friendSt.x, window.__meadow.friendSt.z))).toBe(true);
+  await press(page, 'KeyK', 0.5);
+  expect(await activity(page)).toBe('dance');
+  // the whole dance: both stay on the ice throughout, in each part in turn
+  const parts = new Set();
+  for (let t = 0; t < 61; t += 2) {
+    await step(page, 2);
+    const v = await m(() => { const w = window.__meadow, f = w.friendSt; return { d: w.dance(), on: w.geo.walkable(w.player.x, w.player.z) && w.geo.walkable(f.x, f.z), gap: Math.hypot(f.x - w.player.x, f.z - w.player.z) }; });
+    if (!v.d) break;
+    parts.add(v.d.part);
+    expect(v.on).toBe(true);
+    for (const [k, gap] of Object.entries(v.d.contacts)) if (k !== 'heads') expect(gap).toBeLessThan(0.05); // held hands touch
+    expect(v.gap).toBeGreaterThan(0.6);  // never inside each other
+  }
+  expect([...parts].sort()).toEqual(['close', 'dip', 'embrace', 'meet', 'side by side', 'twirl']);
+  await step(page, 3);
+  expect(await activity(page)).toBe('free');
+  expect(await m(() => window.__meadow.friendSt.together)).toBe(true);
+  // again, cut short by walking away
+  await press(page, 'KeyK', 5);
+  expect(await activity(page)).toBe('dance');
+  await page.keyboard.down('KeyW'); await step(page, 1); await page.keyboard.up('KeyW');
+  expect(await activity(page)).toBe('free');
+  // and once more, ended by the thaw: you both get back to the shore
+  await press(page, 'KeyK', 5);
+  expect(await activity(page)).toBe('dance');
+  await m(() => { window.__meadow.seasonState.ice = 0.5; });
+  await step(page, 20);
+  expect(await activity(page)).toBe('free');
+  expect(await m(() => { const w = window.__meadow, f = w.friendSt; return w.geo.walkable(w.player.x, w.player.z) && w.geo.walkable(f.x, f.z); })).toBe(true);
+  noErrors(errors);
+});
+
+test('winter clothes go on and come off as the season changes, even sitting on the bench together', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#16');
+  await step(page, 0.5);
+  const bench = await page.evaluate(() => window.__meadow.geo.bench());
+  await page.evaluate((be) => { const m = window.__meadow, f = m.friendSt; m.player.x = be.x + Math.sin(be.rot); m.player.z = be.z + Math.cos(be.rot); f.x = m.player.x + 0.8; f.z = m.player.z; }, bench);
+  await press(page, 'KeyX', 1);
+  await press(page, 'KeyE', 3);
+  expect(await activity(page)).toBe('sit');
+  await page.evaluate(() => document.querySelector('#season button[data-season="winter"]').click());
+  await step(page, 0.5);
+  expect(await page.evaluate(() => window.__meadow.wardrobe())).toBe('winter');
+  expect(await activity(page)).toBe('sit');
+  expect(await page.evaluate(() => window.__meadow.friend().sit)).toBeGreaterThan(0.9);
+  await page.evaluate(() => document.querySelector('#season button[data-season="summer"]').click());
+  await step(page, 0.5);
+  expect(await page.evaluate(() => window.__meadow.wardrobe())).toBe('summer');
+  expect(await activity(page)).toBe('sit');
+  noErrors(errors);
+});
+
 test('frame cost stays small', async ({ page }) => {
   const errors = await open(page, 'weather=storm', '#20');
   await step(page, 1);

@@ -4,7 +4,7 @@ import { damp, turnTo } from '../core/math.js';
 import { SPAWN, LAKE, height, groundAt, walkable, onIce, nearestShore, ICE_Y } from '../core/shape.js';
 import { timeU, windU } from '../core/materials.js';
 import { seats, pushOut, hooks } from '../core/state.js';
-import { makeKid, KIDS } from './kid.js';
+import { makeKid, KIDS, moveAttachments } from './kid.js';
 import { poseKid, STRIDE_RATE } from './kidpose.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
@@ -27,6 +27,15 @@ export function buildPlayer() {
   hero = makeKid(KIDS.boy);
   scene.add(hero.root);
   registerSeatActions();
+}
+/** Change your clothes: another rig takes over, carrying anything held or worn. */
+export function setHeroRig(k) {
+  if (!hero || k === hero) return;
+  moveAttachments(hero, k);
+  k.root.position.copy(hero.root.position); k.root.rotation.copy(hero.root.rotation); k.root.visible = hero.root.visible;
+  scene.remove(hero.root); scene.add(k.root);
+  hero = k;
+  poseHero(0); // (posed at once, so it is never drawn standing stiff for a frame)
 }
 
 // ── Sitting ────────────────────────────────────────────────────
@@ -74,6 +83,7 @@ function registerSeatActions() {
 let wasOnIce = false;
 let rescued = false;
 export function updatePlayer(dt, petting) {
+  if (activity.within('dance')) return; // the dance moves and poses you
   const input = moveInput();
   const locked = activity.locksMovement();
   const mag = locked ? 0 : input.mag;

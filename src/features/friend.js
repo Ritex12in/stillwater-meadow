@@ -6,15 +6,17 @@
 //      you, and stands by while you fish, cheering a catch. X again and she goes her own way.
 //   G  with a bouquet in hand: give it to her. She wears one of the flowers in her hair from then on.
 //   A lit campfire draws her over to sit by it. She answers your waves, cheers and dances in kind.
-// She keeps out of the water and steps aside if you walk into her. Far away she isn't posed or drawn.
+// She keeps out of the water and steps aside if you walk into her; out on the frozen lake only with you
+// (alone, or if the ice thaws, she heads back to the shore). Far away she isn't posed or drawn.
+// While you dance (dance.js) the dance moves and poses her; `st.dancing` says so.
 // Her wandering draws from its own random stream.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, clamp, damp, lerp, turnTo, mulberry32 } from '../core/math.js';
-import { SPAWN, FIRE_SPOT, lakePoint, groundAt, animalWalkable } from '../core/shape.js';
+import { SPAWN, FIRE_SPOT, lakePoint, groundAt, animalWalkable, walkable, onIce, nearestShore, ICE_Y } from '../core/shape.js';
 import { hooks, pushOut, world, seasonState, seats } from '../core/state.js';
 import { windU, timeU } from '../core/materials.js';
-import { makeKid, KIDS } from '../characters/kid.js';
+import { makeKid, KIDS, moveAttachments } from '../characters/kid.js';
 import { poseKid, poseExtras, gesture, STRIDE_RATE } from '../characters/kidpose.js';
 import { player, hero } from '../characters/player.js';
 import { animals } from '../characters/animals.js';
@@ -35,28 +37,33 @@ export const friendView = () => friend && { x: friend.st.x, z: friend.st.z, stat
   hold: friend.st.hold, sit: friend.st.sitAmt, ground: friend.st.ground, lie: friend.st.lie, gest: friend.st.gest, flower: !!store.friend.flower, said: friend.bubbleText() };
 /** Is she within `range` of you (for other features' actions)? */
 export const friendNear = (range = 2.6) => !!friend && Math.hypot(friend.st.x - player.x, friend.st.z - player.z) < range;
-let giveFn = () => {};
+let giveFn = () => {}, setRigFn = () => {};
+/** Change her clothes: another rig takes over, carrying the flower in her hair. */
+export const setFriendRig = (k) => setRigFn(k);
 /** Hand her a bouquet (array of "#colour:kind"). */
 export const giftFriend = (bouquet) => giveFn(bouquet);
 
 export function initFriend() {
-  const r = mulberry32(90417), k = makeKid(KIDS.girl);
+  const r = mulberry32(90417);
+  let k = makeKid(KIDS.girl);
   scene.add(k.root);
   store.friend = store.friend || {};
   onSave((s) => { s.friend = Object.assign({}, store.friend); });
   // she starts a little way along the shore from where you do
   let home = lakePoint(Math.PI / 2 + 0.55, 1.28);
   if (!animalWalkable(home.x, home.z)) home = { x: SPAWN.x + 6, z: SPAWN.z + 3 };
-  const st = { x: home.x, z: home.z, y: groundAt(home.x, home.z), rot: r() * TAU, move: 0, phase: 0, sitAmt: 0, seatTop: 0.44, petAmt: 0, idleT: 0, turn: 0, t: 0,
+  const st = { x: home.x, z: home.z, y: groundAt(home.x, home.z), rot: r() * TAU, move: 0, phase: 0, sitAmt: 0, seatTop: 0.44, petAmt: 0, idleT: 0, turn: 0, t: 0, dancing: false, rescue: null,
     state: 'idle', mode: 'alone', timer: 2 + r() * 3, target: null, wave: 0, waveT: 0, greeted: 0, together: false, met: false,
-    ground: 0, lie: 0, hold: 0, gest: null, gestAmt: 0, cheerT: 0, fireA: null, line: 0 };
+    ground: 0, lie: 0, hold: 0, onRight: false, gest: null, gestAmt: 0, cheerT: 0, fireA: null, line: 0 };
 
   // ── the flower she wears once you've given her a bouquet ──
   const flower = new THREE.Group();
   const petalMat = new THREE.MeshStandardMaterial({ color: store.friend.flower || '#ff8fb6', roughness: 0.8 });
   for (let i = 0; i < 5; i++) { const p = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), petalMat); p.position.set(Math.cos((i / 5) * TAU) * 0.034, Math.sin((i / 5) * TAU) * 0.034, 0); p.scale.set(1, 1, 0.45); flower.add(p); }
   flower.add(new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), new THREE.MeshStandardMaterial({ color: '#ffd35a', roughness: 0.8 })));
-  flower.position.set(0.25, 0.4, 0.17); flower.rotation.set(-0.2, 0.9, 0); flower.visible = !!store.friend.flower;
+  // in her hair; in winter pinned to the band of her knitted hat (it would be hidden under it)
+  const placeFlower = () => { if (k.winter) { flower.position.set(0.335, 0.38, 0.235); flower.rotation.set(-0.1, 0.95, 0); } else { flower.position.set(0.25, 0.4, 0.17); flower.rotation.set(-0.2, 0.9, 0); } };
+  placeFlower(); flower.visible = !!store.friend.flower;
   k.hair.add(flower);
 
   // ── speech bubble: a little card that floats over her head ──
@@ -87,6 +94,9 @@ export function initFriend() {
     return L[st.line++ % L.length];
   };
 
+  /** Where she may step: the ice only while she is with you. */
+  const canWalk = (x, z) => animalWalkable(x, z) || (st.together && onIce(x, z));
+
   // ── what you can do with her ──
   const dist = () => Math.hypot(player.x - st.x, player.z - st.z);
   registerAction({
@@ -102,7 +112,7 @@ export function initFriend() {
     id: 'friend-walk', key: 'KeyX', keyLabel: 'X', score: () => 3,
     available: () => activity.free && (st.together || dist() < TALK),
     label: () => (st.together ? 'Walk on your own' : 'Walk together, hand in hand'),
-    run: () => { st.together = !st.together; st.met = true; say(st.together ? 'Yes, let\'s!' : 'See you around!', 3); if (!st.together) { st.state = 'idle'; st.timer = 3; st.waveT = 1.8; } },
+    run: () => { st.together = !st.together; st.onRight = false; st.met = true; say(st.together ? 'Yes, let\'s!' : 'See you around!', 3); if (!st.together) { st.state = 'idle'; st.timer = 3; st.waveT = 1.8; } },
   });
   giveFn = (bouquet) => {
     const first = String(bouquet[0] || '#ff8fb6').split(':')[0];
@@ -146,13 +156,25 @@ export function initFriend() {
     const sp = clamp(d * 2.2, WALK, RUN);
     st.rot = turnTo(st.rot, Math.atan2(dx, dz), dt * 7);
     const nx = st.x + Math.sin(st.rot) * sp * dt, nz = st.z + Math.cos(st.rot) * sp * dt;
-    if (animalWalkable(nx, nz) || d < 1.5) { st.x = nx; st.z = nz; }
+    if (canWalk(nx, nz) || d < 1.5) { st.x = nx; st.z = nz; }
     return d;
+  };
+
+  /** The bubble follows her head, and goes when its time is up or she is out of sight. */
+  const bubbleTick = (dt, camera, camD) => {
+  if (bubbleLeft > 0) {
+    bubbleLeft -= dt;
+    k.head.getWorldPosition(headAt); headAt.y += 0.75; headAt.project(camera);
+    const on = bubbleLeft > 0 && headAt.z < 1 && camD < 30;
+    bubble.hidden = !on;
+    if (on) { bubble.style.left = `${(headAt.x * 0.5 + 0.5) * window.innerWidth}px`; bubble.style.top = `${(-headAt.y * 0.5 + 0.5) * window.innerHeight}px`; }
+  }
   };
 
   hooks.frame.push((dt, t, camera) => {
     const camD = Math.hypot(camera.position.x - st.x, camera.position.z - st.z);
     k.root.visible = camD < SHOW;
+    if (st.dancing) { bubbleTick(dt, camera, camD); return; }
     const dxp = player.x - st.x, dzp = player.z - st.z, dp = Math.hypot(dxp, dzp);
     const fx = Math.sin(player.rot), fz = Math.cos(player.rot), rx = Math.cos(player.rot), rz = -Math.sin(player.rot); // your forward, and your left-hand side (where she walks)
     const prevRot = st.rot, px = st.x, pz = st.z;
@@ -166,10 +188,17 @@ export function initFriend() {
     if (st.mode !== 'fire') st.fireA = null;
     if (st.mode !== st.seatMode) { st.seatMode = st.mode; st.seat = undefined; } // (a seat is chosen afresh each time)
 
-    if (st.mode === 'follow') {
-      // beside you, hand in hand; if she has fallen behind she hurries to catch up
-      let sx = player.x + rx * SIDE, sz = player.z + rz * SIDE;
-      if (!animalWalkable(sx, sz)) { sx = player.x - fx * 0.75; sz = player.z - fz * 0.75; }
+    // on ice that is thawing, or out on it without you: back to the shore, the straight way
+    if (!st.rescue && (!walkable(st.x, st.z) || (!st.together && onIce(st.x, st.z)))) st.rescue = nearestShore(st.x, st.z);
+    if (st.rescue) {
+      const dx = st.rescue.x - st.x, dz = st.rescue.z - st.z, d = Math.hypot(dx, dz);
+      if (d < 0.15) st.rescue = null;
+      else { st.rot = turnTo(st.rot, Math.atan2(dx, dz), dt * 8); const s2 = Math.min(d, WALK * 1.6 * dt); st.x += (dx / d) * s2; st.z += (dz / d) * s2; }
+    } else if (st.mode === 'follow') {
+      // beside you, hand in hand (on your left, or your right after a dance); if she has fallen behind she hurries to catch up
+      const sd = st.onRight ? -1 : 1;
+      let sx = player.x + rx * SIDE * sd, sz = player.z + rz * SIDE * sd;
+      if (!canWalk(sx, sz)) { sx = player.x - fx * 0.75; sz = player.z - fz * 0.75; }
       const d = Math.hypot(sx - st.x, sz - st.z);
       if (d > 1.3) goTo(sx, sz, dt, 0);
       else {
@@ -241,24 +270,17 @@ export function initFriend() {
     if (!attached && st.sitAmt < 0.3 && st.mode !== 'sit') {
       if (dp < 0.55 && dp > 0.01) { st.x -= (dxp / dp) * (0.55 - dp); st.z -= (dzp / dp) * (0.55 - dp); }
       const p = { x: st.x, z: st.z }; pushOut(p, 0.3);
-      if (animalWalkable(p.x, p.z)) { st.x = p.x; st.z = p.z; }
+      if (canWalk(p.x, p.z)) { st.x = p.x; st.z = p.z; }
     }
     // how fast she actually went (drives her stride), and her height
     const sp = dt > 0 ? Math.hypot(st.x - px, st.z - pz) / dt : 0;
     st.move = attached ? player.move : damp(st.move, Math.min(sp, RUN), 8, dt);
-    st.y = damp(st.y, baseY !== null ? baseY : groundAt(st.x, st.z), 12, dt);
+    st.y = damp(st.y, baseY !== null ? baseY : Math.max(groundAt(st.x, st.z), st.rescue ? ICE_Y : -99), 12, dt); // (on thawing ice: across the top of it)
     st.sitAmt = damp(st.sitAmt, wantSit, 5, dt); st.ground = damp(st.ground, wantGround, 5, dt); st.lie = damp(st.lie, wantLie, 4, dt); st.hold = damp(st.hold, wantHold, 7, dt);
     k.root.position.set(st.x, st.y, st.z);
     k.root.rotation.y = st.rot;
 
-    // the bubble follows her head, and goes when its time is up or she is out of sight
-    if (bubbleLeft > 0) {
-      bubbleLeft -= dt;
-      k.head.getWorldPosition(headAt); headAt.y += 0.75; headAt.project(camera);
-      const on = bubbleLeft > 0 && headAt.z < 1 && camD < 30;
-      bubble.hidden = !on;
-      if (on) { bubble.style.left = `${(headAt.x * 0.5 + 0.5) * window.innerWidth}px`; bubble.style.top = `${(-headAt.y * 0.5 + 0.5) * window.innerHeight}px`; }
-    }
+    bubbleTick(dt, camera, camD);
     if (camD > POSE) return; // too far to see her move
 
     if (attached) st.phase = player.phase + Math.PI; // in step with you, opposite foot
@@ -268,7 +290,7 @@ export function initFriend() {
     st.idleT = st.move < 0.15 && st.mode === 'alone' && st.state !== 'greet' ? st.idleT + dt : 0;
     st.t = t + 11.3; // (out of step with your own idle sway)
     poseKid(k, st, dt);
-    poseExtras(k, { ground: st.ground, lie: st.lie, hold: st.hold, side: 0 });
+    poseExtras(k, { ground: st.ground, lie: st.lie, hold: st.hold, side: st.onRight ? 1 : 0 });
     // gestures: her own wave or cheer, or yours given back (wave for wave, a cheer, a dance)
     if (st.waveT > 0) { st.waveT -= dt; gest = 'wave'; face = 'happy'; }
     if (st.cheerT > 0) { st.cheerT -= dt; gest = 'cheer'; face = 'love'; }
@@ -285,7 +307,15 @@ export function initFriend() {
   });
 
   // hand in hand: your arm on her side reaches out to hers
-  hooks.pose.push(() => { if (st.hold > 0.01) poseExtras(hero, { hold: st.hold, side: 1 }); });
+  hooks.pose.push(() => { if (st.hold > 0.01) poseExtras(hero, { hold: st.hold, side: st.onRight ? 0 : 1 }); });
 
   friend = { k, st, bubbleText: () => (bubbleLeft > 0 ? bubbleText : '') };
+  setRigFn = (nk) => {
+    if (nk === k) return;
+    moveAttachments(k, nk);
+    nk.root.position.copy(k.root.position); nk.root.rotation.copy(k.root.rotation); nk.root.visible = k.root.visible;
+    scene.remove(k.root); scene.add(nk.root);
+    k = friend.k = nk;
+    placeFlower();
+  };
 }

@@ -58,10 +58,11 @@ const ICON = {
   talk: '<path d="M4 6h16v10H10l-5 4v-4H4z"/><path d="M8 10h8M8 13h5"/>',
   pair: '<circle cx="8" cy="6" r="2.300"/><circle cx="16" cy="6" r="2.300"/><path d="M5 20v-7a3 3 0 0 1 6 0M13 13a3 3 0 0 1 6 0v7M11 14h2"/>',
   smile: '<circle cx="12" cy="12" r="8.500"/><path d="M8.500 14c1 1.600 2.200 2.300 3.500 2.300s2.500-0.700 3.500-2.300M9 9.500v0.500M15 9.500v0.500"/>',
+  note: '<path d="M9 18V6l10-2v12"/><circle cx="6.500" cy="18" r="2.500"/><circle cx="16.500" cy="16" r="2.500"/>',
   hand: '<path d="M8 12V6a1.500 1.500 0 0 1 3 0v5V4.500a1.500 1.500 0 0 1 3 0V11V6a1.500 1.500 0 0 1 3 0v8c0 4-2.500 7-6 7s-5-2-6.500-5L3 13a1.500 1.500 0 0 1 2.600-1.500L8 14"/>',
 };
 const iconFor = (id) => ICON[
-  id === 'fetch' ? 'stick' : id === 'friend-talk' ? 'talk' : id === 'friend-walk' ? 'pair' : id === 'emote' ? 'smile' : /^(sit|stand|emote-up)$/.test(id) ? 'sit' : /board|step-off/.test(id) ? 'boat' : /campfire/.test(id) ? 'fire' : /^pet/.test(id) ? 'paw' : /^feed/.test(id) ? 'fish'
+  id === 'fetch' ? 'stick' : id === 'friend-talk' ? 'talk' : id === 'friend-walk' ? 'pair' : id === 'emote' ? 'smile' : /^dance/.test(id) ? 'note' : /^(sit|stand|emote-up)$/.test(id) ? 'sit' : /board|step-off/.test(id) ? 'boat' : /campfire/.test(id) ? 'fire' : /^pet/.test(id) ? 'paw' : /^feed/.test(id) ? 'fish'
     : /^fish/.test(id) ? 'rod' : /bread/.test(id) ? 'bread' : /cone/.test(id) ? 'cone' : /pick|give|bench/.test(id) ? 'flower' : /lie|get-up/.test(id) ? 'star' : 'hand'];
 /** Touch screens: every action as a round icon button down the right edge, the best one biggest and lowest. */
 function renderPad(list) {

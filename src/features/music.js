@@ -8,8 +8,17 @@ import { store, saveSoon } from '../systems/save.js';
 import { cur } from '../systems/time.js';
 import { wx } from '../systems/weather.js';
 
-let on = false, bus = null, tone = null, nextStep = 0, step = 0, degree = 4;
+let on = false, ducked = false, bus = null, tone = null, nextStep = 0, step = 0, degree = 4;
 export const musicOn = () => on;
+const level = () => (on && !ducked ? 0.9 : 0);
+/** Fade the meadow's music out (true) while something else plays (the dance), and back in (false). */
+export function duckMusic(v) {
+  if (v === ducked) return;
+  ducked = v;
+  if (!bus || !audio.ctx) return;
+  const t = audio.ctx.currentTime;
+  bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(level(), t + (v ? 1.5 : 4));
+}
 
 function impulse(ctx, secs) {
   const len = Math.floor(ctx.sampleRate * secs), buf = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -89,7 +98,7 @@ export function initMusic() {
       const t = audio.ctx.currentTime;
       bus.gain.cancelScheduledValues(t);
       bus.gain.setValueAtTime(bus.gain.value, t);
-      bus.gain.linearRampToValueAtTime(on ? 0.9 : 0, t + 2);
+      bus.gain.linearRampToValueAtTime(level(), t + 2);
       if (on) nextStep = Math.max(nextStep, t + 0.2);
     }
     store.music = on;
@@ -112,7 +121,7 @@ export function initMusic() {
   }
 
   hooks.frame.push(() => {
-    if (!on || !audio.ctx || !audio.enabled) return;
+    if (!on || ducked || !audio.ctx || !audio.enabled) return;
     const ctx = audio.ctx, m = mood();
     tone.frequency.value += (m.bright - tone.frequency.value) * 0.02;
     const stepLen = 60 / m.tempo / 2;

@@ -10,7 +10,8 @@ const RULES = {
   fish:   { from: ['free', 'sit'] },
   lie:    { from: ['free'], locks: true },
   dialog: { from: ['free', 'pet', 'sit', 'fish'], locks: true },
-  photo:  { from: ['free', 'sit', 'pet', 'fish', 'lie'], locks: true },
+  photo:  { from: ['free', 'sit', 'pet', 'fish', 'lie', 'dance'], locks: true },
+  dance:  { from: ['free'], locks: true },
 };
 
 const listeners = new Set();
@@ -18,6 +19,8 @@ export const activity = {
   current: 'free',
   stack: [],
   is(name) { return this.current === name; },
+  /** True if `name` is current or is waiting under another activity (e.g. a dance under photo mode). */
+  within(name) { return this.current === name || this.stack.includes(name); },
   get free() { return this.current === 'free'; },
   canEnter(name) { return !!RULES[name] && RULES[name].from.includes(this.current); },
   /** Start an activity on top of the current one. Returns false if it isn't allowed now. */

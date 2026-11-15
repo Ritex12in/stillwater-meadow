@@ -67,6 +67,10 @@ export const KIDS = {
     hairStyle: 'bun', scrunchie: '#f2a0ad', motif: 'cat', wideLegs: true, patch: '#d98a5a',
   },
 };
+// Winter costumes for the same two: faces, hair and proportions unchanged, dressed for the snow
+// (and for dancing on the ice). No backpacks.
+KIDS.boyWinter = Object.assign({}, KIDS.boy, { winter: true, coat: '#2c3e63', coatTrim: '#22304d', pants: '#3a3f4a', boot: '#6b4a32', bootTrim: '#e9dfcf', pocket: false, badge: null });
+KIDS.girlWinter = Object.assign({}, KIDS.girl, { winter: true, coat: '#c4323a', coatTrim: '#a3262e', pants: '#4a3a44', boot: '#f1ece4', bootTrim: '#ffffff', skirt: '#f6f2ec', scarf: '#fbf8f2', hat: '#fbf8f2', wideLegs: false, patch: null, motif: null });
 
 // sizes, in metres (the figure stands about 1.6 m to the top of its hair)
 const HIP = 0.52, THIGH = 0.25, SHIN = 0.27, SHOULDER = 0.93, UPPER = 0.2, FORE = 0.2, HAND = 0.045, NECK = 1.0;
@@ -349,7 +353,7 @@ export function makeKid(spec = KIDS.boy) {
   let seed = C.hairStyle === 'bun' ? 71 : 37;
   const r = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
-  const dims = Object.assign({}, KID_DIMS), outer = C.jacket || C.top, wide = C.wideLegs ? 1.3 : 1;
+  const dims = Object.assign({}, KID_DIMS), outer = C.coat || C.jacket || C.top, wide = C.wideLegs ? 1.3 : 1;
 
   // legs: baggy trousers with a rolled cuff, a sock, and a chunky sneaker
   const legs = [], knees = [];
@@ -359,15 +363,25 @@ export function makeKid(spec = KIDS.boy) {
     if (C.pocket) thigh.push({ f: rbox(sd * 0.1, -0.14, 0, 0.022, 0.06, 0.062, 0.02), color: shade(C.pants, 0.9) });
     part(hip, thigh, [-0.21, -0.38, -0.21, 0.21, 0.14, 0.21], 28, 0.012);
     const knee = pivot(hip, 0, -THIGH, 0), F = -SHIN;
-    part(knee, [
-      { f: capsule([0, 0, 0], [0, -0.13, 0.004], 0.104 * wide, 0.112 * wide), color: C.pants },
-      { f: ring(0, -0.155, 0.004, 0.085 * wide, 0.036), color: C.cuff },                                      // the rolled cuff
-      { f: capsule([0, -0.15, 0], [0, -0.21, 0.005], 0.06, 0.062), color: '#f6f1e6' },                         // sock
-      { f: blend(0.03, ellipsoid(sd * 0.01, F + 0.1, 0.055, 0.1, 0.09, 0.175), ellipsoid(sd * 0.01, F + 0.125, -0.04, 0.088, 0.072, 0.088)), color: C.shoe }, // the sneaker's upper
-      { f: both(union(ellipsoid(sd * 0.01, F + 0.024, 0.058, 0.108, 0.05, 0.2), ellipsoid(sd * 0.01, F + 0.074, 0.2, 0.088, 0.062, 0.068)), above(() => F + 0.002)), color: '#f6f1e6' }, // sole and toe cap
-      { f: union(capsule([-0.04, F + 0.168, 0.105], [0.06, F + 0.168, 0.105], 0.013), capsule([-0.04, F + 0.182, 0.06], [0.06, F + 0.182, 0.06], 0.013), capsule([sd * 0.108, F + 0.08, 0.0], [sd * 0.106, F + 0.1, 0.12], 0.014)), color: '#f6f1e6' }, // laces and side stripe
-    ].concat(C.patch && sd > 0 ? [{ f: rbox(0.03, -0.07, 0.1 * wide, 0.026, 0.026, 0.012, 0.008), color: C.patch }] : []),
-    [-0.2, F - 0.01, -0.19, 0.2, 0.13, 0.3], 44, 0.012);
+    if (C.winter) {
+      // tights or trousers, then a winter boot: a shaft to mid-shin with a soft cuff, a rounded foot, a dark sole
+      part(knee, [
+        { f: capsule([0, 0, 0], [0, -0.12, 0.004], 0.1 * wide, 0.096 * wide), color: C.pants },
+        { f: blend(0.03, capsule([0, -0.07, 0.004], [0, F + 0.1, 0.01], 0.086, 0.09), ellipsoid(sd * 0.008, F + 0.085, 0.06, 0.095, 0.08, 0.16)), color: C.boot },
+        { f: ring(0, -0.06, 0.004, 0.085, 0.03), color: C.bootTrim },                                              // the cuff
+        { f: both(ellipsoid(sd * 0.008, F + 0.03, 0.062, 0.103, 0.045, 0.178), above(() => F + 0.002)), color: shade(C.boot, 0.45) }, // sole
+      ], [-0.2, F - 0.01, -0.19, 0.2, 0.13, 0.3], 44, 0.012);
+    } else {
+      part(knee, [
+        { f: capsule([0, 0, 0], [0, -0.13, 0.004], 0.104 * wide, 0.112 * wide), color: C.pants },
+        { f: ring(0, -0.155, 0.004, 0.085 * wide, 0.036), color: C.cuff },                                      // the rolled cuff
+        { f: capsule([0, -0.15, 0], [0, -0.21, 0.005], 0.06, 0.062), color: '#f6f1e6' },                         // sock
+        { f: blend(0.03, ellipsoid(sd * 0.01, F + 0.1, 0.055, 0.1, 0.09, 0.175), ellipsoid(sd * 0.01, F + 0.125, -0.04, 0.088, 0.072, 0.088)), color: C.shoe }, // the sneaker's upper
+        { f: both(union(ellipsoid(sd * 0.01, F + 0.024, 0.058, 0.108, 0.05, 0.2), ellipsoid(sd * 0.01, F + 0.074, 0.2, 0.088, 0.062, 0.068)), above(() => F + 0.002)), color: '#f6f1e6' }, // sole and toe cap
+        { f: union(capsule([-0.04, F + 0.168, 0.105], [0.06, F + 0.168, 0.105], 0.013), capsule([-0.04, F + 0.182, 0.06], [0.06, F + 0.182, 0.06], 0.013), capsule([sd * 0.108, F + 0.08, 0.0], [sd * 0.106, F + 0.1, 0.12], 0.014)), color: '#f6f1e6' }, // laces and side stripe
+      ].concat(C.patch && sd > 0 ? [{ f: rbox(0.03, -0.07, 0.1 * wide, 0.026, 0.026, 0.012, 0.008), color: C.patch }] : []),
+      [-0.2, F - 0.01, -0.19, 0.2, 0.13, 0.3], 44, 0.012);
+    }
     legs.push(hip); knees.push(knee);
   });
 
@@ -376,7 +390,13 @@ export function makeKid(spec = KIDS.boy) {
   const chest = pivot(body, 0, HIP, 0); // bends a little at the waist
   const trunk = both(blend(0.05, rbox(0, 0.17, 0, 0.165, 0.245, 0.135, 0.11), ellipsoid(0, 0.36, -0.005, 0.165, 0.13, 0.125), capsule([-0.15, 0.4, 0], [0.15, 0.4, 0], 0.075)), (x, y) => 0.012 - y, 0.03);
   const T = [];
-  if (C.jacket) {
+  if (C.winter) {
+    // a coat buttoned to the neck: for her a long one, red, with toggles; for him a navy jacket with a zip and collar
+    const coat = grow(trunk, 0.022);
+    T.push({ f: coat, color: (x, y, z) => (y < 0.05 ? C.coatTrim : z > 0.12 && Math.abs(x) < 0.012 && !C.skirt ? shade(C.coat, 0.7) : C.coat) });
+    T.push({ f: blend(0.03, ring(0, 0.455, 0.0, 0.098, 0.048)), color: C.coatTrim });                                    // collar
+    if (C.skirt) T.push({ f: union(...[0.33, 0.24, 0.15].map((y) => ellipsoid(0, y, 0.16, 0.016, 0.022, 0.012))), color: '#f3e9d8' }); // toggles
+  } else if (C.jacket) {
     // the jacket: the trunk grown a little, open down the front in a V that widens toward the collar
     const open = (x, y, z) => Math.max(Math.abs(x) - (0.035 + 0.07 * Math.max(0, y) / 0.45), -z);
     const jacket = carve(grow(trunk, 0.02), open, 0.012);
@@ -389,14 +409,26 @@ export function makeKid(spec = KIDS.boy) {
     T.push({ f: rbox(0, 0.115, 0.15, 0.09, 0.048, 0.03, 0.03), color: shade(C.top, 0.95) });                          // pouch pocket
     if (C.motif === 'cat') T.push({ f: union(ellipsoid(0, 0.3, 0.158, 0.034, 0.026, 0.012), capsule([-0.022, 0.318, 0.158], [-0.028, 0.34, 0.156], 0.012, 0.004), capsule([0.022, 0.318, 0.158], [0.028, 0.34, 0.156], 0.012, 0.004)), color: '#9a8f8a' });
   }
-  T.push({ f: blend(0.03, ring(0, 0.455, 0.0, 0.105, 0.05), ellipsoid(0, 0.42, -0.125, 0.145, 0.095, 0.085)), color: C.top });  // hood: a roll round the neck, the hood hanging behind
-  T.push({ f: union(capsule([-0.035, 0.42, 0.15], [-0.04, 0.31, 0.162], 0.008), capsule([0.035, 0.42, 0.15], [0.04, 0.33, 0.162], 0.008)), color: C.scrunchie || '#f6f1e6' }); // drawstrings
-  T.push({ f: both(grow(trunk, 0.032), (x, y) => y - 0.05, 0.012), color: shade(outer, C.jacket ? 0.82 : 0.9) });                      // hem band
+  if (!C.winter) T.push({ f: blend(0.03, ring(0, 0.455, 0.0, 0.105, 0.05), ellipsoid(0, 0.42, -0.125, 0.145, 0.095, 0.085)), color: C.top });  // hood: a roll round the neck, the hood hanging behind
+  if (!C.winter) T.push({ f: union(capsule([-0.035, 0.42, 0.15], [-0.04, 0.31, 0.162], 0.008), capsule([0.035, 0.42, 0.15], [0.04, 0.33, 0.162], 0.008)), color: C.scrunchie || '#f6f1e6' }); // drawstrings
+  if (!C.winter) T.push({ f: both(grow(trunk, 0.032), (x, y) => y - 0.05, 0.012), color: shade(outer, C.jacket ? 0.82 : 0.9) });                      // hem band
   T.push({ f: capsule([0, 0.44, 0], [0, 0.5, 0], 0.058), color: C.skin });                                               // neck
   // straps: from the top of the pack, over the shoulder, down the chest and back under the arm
-  T.push({ f: mirror(union(strand([0.11, 0.4, -0.14], [0.115, 0.5, 0.0], [0.115, 0.36, 0.14], 0.026, 0.026), strand([0.115, 0.36, 0.14], [0.13, 0.2, 0.175], [0.175, 0.1, 0.02], 0.026, 0.026))), color: C.packTrim });
+  if (!C.winter) T.push({ f: mirror(union(strand([0.11, 0.4, -0.14], [0.115, 0.5, 0.0], [0.115, 0.36, 0.14], 0.026, 0.026), strand([0.115, 0.36, 0.14], [0.13, 0.2, 0.175], [0.175, 0.1, 0.02], 0.026, 0.026))), color: C.packTrim });
   part(chest, T, [-0.3, -0.07, -0.25, 0.3, 0.55, 0.23], 64, 0.012);
 
+  // the skirt: flared below the coat, swinging on its own pivot; the scarf, its ends hanging down the front
+  let skirt = null, scarfEnds = null;
+  if (C.skirt) {
+    skirt = pivot(body, 0, HIP + 0.02, 0);
+    const R = (y) => 0.17 + (-y) * 0.55, shell = (x, y, z) => Math.max(Math.abs(Math.hypot(x, z * 1.12) - R(y)) - 0.016, y, -0.24 - y);
+    part(skirt, [{ f: shell, color: (x, y) => (y < -0.21 ? shade(C.skirt, 0.92) : C.skirt) }], [-0.34, -0.27, -0.32, 0.34, 0.02, 0.32], 40, 0.006);
+  }
+  if (C.scarf) {
+    part(chest, [{ f: blend(0.025, ring(0, 0.46, 0.012, 0.1, 0.05), ellipsoid(0.04, 0.44, 0.13, 0.06, 0.05, 0.05)), color: C.scarf }], [-0.2, 0.36, -0.18, 0.2, 0.55, 0.22], 30, 0.008);
+    scarfEnds = pivot(chest, 0.05, 0.43, 0.16);
+    part(scarfEnds, [{ f: union(strand([0, 0, 0], [0.01, -0.1, 0.04], [0.02, -0.21, 0.035], 0.04, 0.034), strand([0.03, -0.01, -0.01], [0.06, -0.08, 0.03], [0.07, -0.16, 0.03], 0.036, 0.03)), color: (x, y) => (y < -0.17 ? shade(C.scarf, 0.9) : C.scarf) }], [-0.08, -0.27, -0.06, 0.15, 0.06, 0.1], 26, 0.006);
+  }
   // arms: shoulder and elbow, a baggy sleeve with a cuff, a mitten hand
   const arms = [], elbows = [], hands = [];
   [-1, 1].forEach((sd) => {
@@ -405,15 +437,16 @@ export function makeKid(spec = KIDS.boy) {
     const el = pivot(sh, 0, -UPPER, 0);
     part(el, [
       { f: capsule([0, 0, 0], [0, -FORE + 0.045, 0], 0.07, 0.078), color: outer },
-      { f: ring(0, -FORE + 0.035, 0, 0.056, 0.03), color: C.jacket ? C.top : shade(C.top, 0.9) },                    // cuff
+      { f: ring(0, -FORE + 0.035, 0, 0.056, 0.03), color: C.winter ? C.coatTrim : C.jacket ? C.top : shade(C.top, 0.9) }, // cuff
       { f: blend(0.025, ellipsoid(0, -FORE - HAND + 0.008, 0, 0.058, 0.066, 0.05), ellipsoid(0, -FORE - HAND - 0.035, 0.014, 0.046, 0.036, 0.04), capsule([-sd * 0.04, -FORE - HAND + 0.03, 0.03], [-sd * 0.05, -FORE - HAND - 0.01, 0.045], 0.024, 0.02)), color: C.skin }, // hand and thumb
     ], [-0.12, -0.36, -0.11, 0.12, 0.1, 0.11], 38, 0.01);
     const hand = pivot(el, 0, -(FORE + HAND), 0);
     arms.push(sh); elbows.push(el); hands.push(hand);
   });
 
-  // backpack: hangs from the shoulders, bobs a beat behind the body
+  // backpack: hangs from the shoulders, bobs a beat behind the body (left at home in winter)
   const pack = pivot(chest, 0, 0.27, -0.175);
+  pack.visible = !C.winter;
   part(pack, [
     { f: rbox(0, -0.01, -0.05, 0.15, 0.175, 0.075, 0.06), color: C.pack },
     { f: both(grow(rbox(0, -0.01, -0.05, 0.15, 0.175, 0.075, 0.06), 0.012), above(() => 0.045)), color: C.packTrim },   // the flap
@@ -433,10 +466,19 @@ export function makeKid(spec = KIDS.boy) {
   // the cap under the locks, darker so the gaps between locks read as depth
   const fluffy = C.hairStyle === 'fluffy';
   part(hair, [{ f: capField((x, z) => (fluffy ? 0.31 : 0.3) + (z > 0 ? 0.7 : 0.6) * z - 0.1 * Math.abs(x) * (z > 0 ? 1 : 0)), color: shade(C.hair, 0.72) }], [-0.37, 0.0, -0.36, 0.37, 0.62, 0.36], 36);
+  const HAT_LINE = (z) => 0.31 + 0.06 * z / 0.36;                                                // the hat's edge: over the brow at the front, lower at the back
+  // a knitted hat: a soft dome over the hair with a ribbed band and a pompom (her bun peeks out at the back)
+  if (C.hat) {
+    part(hair, [
+      { f: both(ellipsoid(0, 0.31, -0.035, 0.395, 0.385, 0.395), above((x, z) => HAT_LINE(z)), 0.025), color: (x, y, z) => (Math.sin(Math.atan2(x, z + 0.02) * 22) > 0.35 ? shade(C.hat, 0.93) : C.hat) }, // knitted ribs
+      { f: (x, y, z) => Math.max(Math.abs(Math.hypot(x, z + 0.035) - 0.39) - 0.032, Math.abs(y - HAT_LINE(z) - 0.03) - 0.04), color: shade(C.hat, 0.93) }, // the turned-up band
+      { f: sphere(0.0, 0.71, -0.06, 0.08), color: C.hat },                                                     // pompom
+    ], [-0.46, 0.2, -0.46, 0.46, 0.82, 0.46], 46, 0.01);
+  }
   let bun = null;
   if (fluffy) addLocks(hair, (L) => boyHair(L, r));
   else {
-    const bunAt = new THREE.Vector3(-0.03, 0.585, -0.14);
+    const bunAt = C.hat ? new THREE.Vector3(-0.02, 0.45, -0.3) : new THREE.Vector3(-0.03, 0.585, -0.14); // (under a hat it sits low at the back)
     addLocks(hair, (L) => girlHair(L, r, bunAt));
     bun = pivot(hair, bunAt.x, bunAt.y, bunAt.z); bun.rotation.set(-0.4, 0, 0.18);
     addLocks(bun, (L) => bunHair(L, r));
@@ -458,7 +500,17 @@ export function makeKid(spec = KIDS.boy) {
     hairU.uSway.value.copy(lag); hairU.uHairT.value = t; hairU.uHairWind.value = wind;
     if (bun) bun.rotation.set(bunRest.x + lag.z * 4, bunRest.y, bunRest.z - lag.x * 4);
     pack.rotation.x = lag.z * 1.6 - lag.y * 1.2;
+    if (skirt) skirt.rotation.set(lag.z * 2.6 - lag.y, 0, -lag.x * 2.6);   // the skirt flares and swings out after a turn
+    if (scarfEnds) scarfEnds.rotation.set(lag.z * 5 + lag.y * 2, 0, -lag.x * 5);
     pack.position.y = 0.27 + lag.y * 0.35;
   }
-  return { root, body, chest, legs, knees, arms, elbows, hands, head, hair, bun, pack, face, eyes: face.eyes.map((q2) => q2.ball), dims, sway, kid: true };
+  const own = new Set(); root.traverse((o) => own.add(o)); // the child's own parts (anything added later is carried, see moveAttachments)
+  return { root, body, chest, legs, knees, arms, elbows, hands, head, hair, bun, pack, skirt, face, eyes: face.eyes.map((q2) => q2.ball), dims, sway, own, winter: !!C.winter, kid: true };
+}
+
+/** Changing clothes: move whatever was added to one child's joints since it was built (a rod, a bouquet, a flower in the hair) onto another's. */
+export function moveAttachments(from, to) {
+  const joints = (k) => [k.root, k.body, k.chest, k.head, k.hair, ...k.legs, ...k.knees, ...k.arms, ...k.elbows, ...k.hands];
+  const a = joints(from), b = joints(to);
+  a.forEach((j, i) => { for (const c of [...j.children]) if (!from.own.has(c)) b[i].add(c); });
 }

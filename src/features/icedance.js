@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { clamp, lerp } from '../core/math.js';
-import { SPAWN, DOCK_A, lakePoint, onIce, onDock, groundAt, heightAt, walkable, nearReserved, ICE_Y } from '../core/shape.js';
+import { SPAWN, DOCK_A, lakePoint, lakeAt, lakeIce, onIce, onDock, groundAt, heightAt, walkable, nearReserved, ICE_Y } from '../core/shape.js';
 import { hooks, seasonState, obstacles, seats } from '../core/state.js';
 import { timeU, windU } from '../core/materials.js';
 import { player, hero } from '../characters/player.js';
@@ -19,7 +19,7 @@ import { moveInput } from '../systems/input.js';
 
 import { toast } from '../ui/hud.js';
 import { friend } from './friend.js';
-import { seasonNow } from './seasons.js';
+
 import { wardrobeNow } from './wardrobe.js';
 
 const START_IN = 1.4;   // seconds over which you both move from where you were onto the dance's first spots
@@ -78,7 +78,7 @@ function room() {
   }
   return roomFrame;
 }
-const canAsk = () => activity.free && friend && friend.st.together && wardrobeNow() === 'winter' && seasonState.ice > 0.85
+const canAsk = () => activity.free && friend && friend.st.together && wardrobeNow() === 'winter' && lakeIce(lakeAt(player.x, player.z)) > 0.85
   && onIce(player.x, player.z) && onIce(friend.st.x, friend.st.z) && Math.hypot(friend.st.x - player.x, friend.st.z - player.z) < 2.5;
 
 // ───────────── starting and ending ─────────────
@@ -162,7 +162,7 @@ export function initIceDance() {
   hooks.frame.push((dt) => {
     // the snowman comes with the snow
     if (snowman) {
-      const on = seasonNow() === 'winter';
+      const on = seasonState.homeWinter; // (the snowman stands by the home lake: it comes with the snow there)
       if (on !== snowman.visible) {
         snowman.visible = on;
         const i = obstacles.indexOf(block);
@@ -171,7 +171,7 @@ export function initIceDance() {
     }
     if (!D) return;
     if (!activity.within('dance')) { finish(); return; }
-    if (seasonState.ice < 0.86 || seasonNow() !== 'winter') { finish('The ice is getting thin. Time to get off the lake.'); return; }
+    if (lakeIce(lakeAt(player.x, player.z)) < 0.86) { finish('The ice is getting thin. Time to get off the lake.'); return; }
     if (activity.is('dance') && moveInput().mag > 0.3) { finish(); return; }
     if (activity.is('dance')) D.t += dt; // (held still while photo mode is open)
     const t = Math.min(D.t, SNOW_LENGTH), k = friend.k;

@@ -3,9 +3,9 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, lerp, damp, smooth, rnd } from '../core/math.js';
-import { lakeAt, lakeT, heightAt, walkable, HOME } from '../core/shape.js';
+import { lakeAt, lakeT, heightAt, walkable, HOME, lakeIce } from '../core/shape.js';
 import { std, enableShadows, glowTex } from '../core/materials.js';
-import { hooks, seasonState } from '../core/state.js';
+import { hooks, seasonState, world } from '../core/state.js';
 import { clock } from '../core/clock.js';
 import { player } from '../characters/player.js';
 import { boat } from '../characters/boat.js';
@@ -16,7 +16,7 @@ import { spawnRipple } from '../world/effects.js';
 import { lifeLake, lifeOf } from '../world/lakelife.js';
 import { hoot, croak, kraak, snort, plop } from './voices.js';
 
-const frozen = () => seasonState.ice > 0.5;
+const frozen = () => lakeIce(world.lifeLake || HOME) > 0.5; // (the lake the creatures are at)
 
 // ── Heron ──────────────────────────────────────────────────────
 function makeHeron() {
@@ -241,7 +241,7 @@ export function initWildlife() {
     eyes.forEach((e) => { e.visible = eyesT > 0; });
 
     // frogs
-    const showFrogs = seasonState.bugs > 0.5 && seasonState.ice < 0.3;
+    const showFrogs = seasonState.bugs > 0.5 && !frozen();
     frogs.forEach((f) => { f.g.visible = showFrogs && !f.away; });
     if (showFrogs) {
       croakIn -= dt;

@@ -11,6 +11,7 @@
 // lake you start beside, and the single-lake names (LAKE, lakeR, lakePoint, SPAWN, dockStart, ...)
 // stand for whichever lake the landmarks are at (HOME, until they move).
 import { TAU, smooth, clamp, fbm, fbmD, hash, mulberry32 } from './math.js';
+import { iceFrom } from './year.js';
 import { seasonState } from './state.js';
 import { worldSeed } from '../systems/save.js';
 import { query } from './env.js';
@@ -290,14 +291,24 @@ export function moistAt(x, z) {
 /** Cold, as far as snow goes (pass to snowOf): cold needs moisture to give snow. */
 export const snowCold = (cold, moist) => cold - SNOW_DRY * (1 - smooth(0.33, 0.45, moist));
 
-/** How cold the country is at a spot, before its height: 0 mild .. 1 frozen. */
+/** How warm the warm country is, in the units of the cold (it takes the chill below zero). */
+export const WARMTH = 0.6;
+/**
+ * How cold the country is at a spot, before its height: 0 mild .. 1 frozen, and below 0 in warm
+ * country (to -WARMTH): one broad field of temperature, cold at one end and warm at the other, the
+ * home lake in the middle of it.
+ */
 export function coldBase(x, z) {
   const n = fbm((x + SX * 17) * 0.0011 - 63.4, (z + SZ * 17) * 0.0011 + 28.9);
-  return smooth(0.575, 0.7, n) * mild(x, z);
+  return (smooth(0.575, 0.7, n) - WARMTH * smooth(0.425, 0.3, n)) * mild(x, z);
 }
-/** How cold a spot is, 0 mild .. 1 frozen: the country's cold and the height (`h`, the ground's height there). */
+/**
+ * How cold a spot is in summer ("chill"): about 0 mild, 1 frozen, below 0 in warm country; the
+ * country's cold and the height (`h`, the ground's height there). Through the year it rises
+ * (core/year.js chillNow).
+ */
 export function coldAt(x, z, h, base = coldBase(x, z)) {
-  return clamp(base + smooth(78, 132, h), 0, 1);
+  return clamp(base + smooth(78, 132, h), -1, 1);
 }
 
 // ── Treeline, rock and the way a slope faces ─────────────────
@@ -581,7 +592,18 @@ export const dockAt = (s, w) => ({ x: dockStart.x + dockDir.x * s + dockDir.z * 
 
 // ── Walking ────────────────────────────────────────────────────
 /** True when the lake is frozen solid enough to walk on, and (x, z) is over it. */
-export const onIce = (x, z) => { const lake = lakeAt(x, z); return (seasonState.ice > 0.85 || lake.frozen) && lake.t(x, z) < 1.0 && heightAt(x, z) < 0.3; }; // (in winter, or on a lake of the snow country at any time)
+/** A lake's chill (its place's cold in summer, at the water), kept on the lake. */
+export const lakeChill = (L) => (L.chill !== undefined ? L.chill : (L.chill = coldAt(L.x, L.z, 1)));
+/**
+ * How frozen a lake is just now (0 open water .. 1 ice you can walk on): each by its own place and
+ * the season a few weeks back; a lake of the snowfields is frozen all year. The home lake's ice is
+ * kept by features/seasons.js (it waits for the boat to be moored).
+ */
+export function lakeIce(L) {
+  if (L === HOME) return seasonState.ice;
+  return L.frozen ? 1 : iceFrom(lakeChill(L), seasonState.lagged || 0);
+}
+export const onIce = (x, z) => { const lake = lakeAt(x, z); return lakeIce(lake) > 0.85 && lake.t(x, z) < 1.0 && heightAt(x, z) < 0.3; }; // 
 export const ICE_Y = 0.09;
 export const groundAt = (x, z) => (onDock(x, z) ? Math.max(DOCK_Y + 0.05, heightAt(x, z)) : onIce(x, z) ? Math.max(heightAt(x, z), ICE_Y) : heightAt(x, z));
 export const MAX_SLOPE = 1.25;    // steeper than this (about 51 degrees) is a cliff, not a hillside

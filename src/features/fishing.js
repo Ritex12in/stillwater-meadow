@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, clamp, lerp, damp, rnd } from '../core/math.js';
-import { lakeT, onIce, waterAhead, animalWalkable, onDock } from '../core/shape.js';
+import { lakeT, lakeAt, lakeIce, onIce, waterAhead, animalWalkable, onDock } from '../core/shape.js';
 import { std } from '../core/materials.js';
 import { clock } from '../core/clock.js';
 import { hooks, seasonState, world } from '../core/state.js';
@@ -35,7 +35,7 @@ const isDusk = () => hour() > 17 && hour() < 20.5;
 const isNight = () => hour() >= 20.5 || hour() < 4.8;
 const isDay = () => hour() >= 8.5 && hour() < 17;
 const rainy = () => wx.rain > 0.3;
-const icy = () => seasonState.ice > 0.85;
+const icy = () => lakeIce(lakeAt(player.x, player.z)) > 0.85; // (the lake you are fishing)
 
 // tier: 1 small, 2 medium, 3 large (deeper water, harder fight, worth more to an animal).
 // fight: the fixed rhythm of pulls (seconds pulling, seconds resting), repeated in order.

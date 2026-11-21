@@ -22,6 +22,7 @@ import { itemKind, add, addItem, take, removeItem, held, hold, has, units, packS
 import { packActions } from '../ui/backpack.js';
 import { ICONS } from '../ui/icons.js';
 import { flowerName } from '../world/vegetation.js';
+import { flowersOut } from '../core/year.js';
 
 const MAX = 12, REGROW = 240;
 let debugView = () => [];
@@ -70,20 +71,20 @@ export function initFlowers() {
   // `items`: the flowers of the squares near you (they change as you walk); `shown`: those of them
   // standing just now. A picked flower is remembered by its name until it has grown back, so it
   // stays picked while you are away and its square is forgotten and grown again.
-  let items = world.picks || [], shown = [], lastFrac = -1, nearFlower = null, nearDist = 9;
+  let items = world.picks || [], shown = [], lastFrac = -1, lastCool = false, nearFlower = null, nearDist = 9;
   const picked = new Map();
   const redraw = () => {
-    const frac = seasonState.flowerFrac, now = clock.elapsed;
+    const now = clock.elapsed, s = seasonState.season, cool = seasonState.cooling;
     for (const [id, t] of picked) if (now - t > REGROW) picked.delete(id);
-    shown = items.filter((it) => it.keep < frac && !picked.has(it.id));
+    shown = items.filter((it) => it.keep < flowersOut(it.chill || 0, s, cool) && !picked.has(it.id)); // (each by its own place's season)
     world.picksDropped = world.drawPicks ? world.drawPicks(shown) : 0;
-    lastFrac = frac;
+    lastFrac = s; lastCool = cool;
   };
   world.setPicks = (list) => { items = list; nearFlower = null; redraw(); };
   debugView = () => { const up = new Set(shown); return items.map((it) => ({ id: it.id, x: it.x, z: it.z, shown: up.has(it), kind: it.kind })); };
   /** Once a second: redraw if the season has taken or given flowers, or a picked one has grown back. */
   const refresh = () => {
-    let due = seasonState.flowerFrac !== lastFrac;
+    let due = Math.abs(seasonState.season - lastFrac) > 0.002 || seasonState.cooling !== lastCool;
     if (!due) for (const t of picked.values()) if (clock.elapsed - t > REGROW) { due = true; break; }
     if (due) redraw();
   };

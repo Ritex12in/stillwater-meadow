@@ -13,6 +13,9 @@ export const seats = [];
 /** Season state written by the seasons feature, read by weather, water and creatures. */
 export const seasonState = {
   name: '', ice: 0, coverFloor: 0, bugs: 1, flowerFrac: 1, dayOfYear: null,
+  // the year (core/year.js): its phase, the season value today and ICE_LAG back, whether it is cooling;
+  // and how it is where you stand (features/seasons.js)
+  phase: 0.5, season: 0, lagged: 0, cooling: false, winterHere: false, homeWinter: false, leavesHere: 'summer',
   mapWeather: (k) => k,
 };
 

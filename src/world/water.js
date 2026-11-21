@@ -2,7 +2,7 @@
 // glinting in it at night, and winter ice.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
-import { LAKE, lakesNear } from '../core/shape.js';
+import { LAKE, lakesNear, lakeIce } from '../core/shape.js';
 import { skyU } from './sky.js';
 import { GRADE_GLSL, HAZE_GLSL } from '../core/atmosphere.js';
 
@@ -190,7 +190,7 @@ export function updateWater(x, z) {
     s.u.lakeStretch.value.set(L.E, L.TH);
     s.u.lakeTint.value.fromArray(L.tint);
   }
-  for (const s of sheets) { s.mesh.visible = !!s.lake; if (s.lake) s.u.uIce.value = Math.max(waterU.uIce.value, s.lake.frozen ? 1 : 0); }
+  for (const s of sheets) { s.mesh.visible = !!s.lake; if (s.lake) s.u.uIce.value = lakeIce(s.lake); }
 }
 /** For tests: which lakes have water drawn just now. */
 export const waterLakes = () => sheets.filter((s) => s.lake).map((s) => s.lake.id);

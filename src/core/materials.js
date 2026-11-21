@@ -4,7 +4,7 @@ import { scene } from './render.js';
 
 export const timeU = { value: 0 };                            // drives grass and reed sway
 export const windU = { value: 1 };                            // sway strength
-export const wxU = { snow: { value: 0 }, wet: { value: 0 } };  // snow cover and wetness on surfaces
+export const wxU = { snow: { value: 0 }, wet: { value: 0 }, fresh: { value: 0 } };  // snow cover and wetness on surfaces; `fresh`: snow fallen from the sky (the ground keeps the season's own)
 export const camU = { value: new THREE.Vector3() };            // camera position, for distance fades
 
 export const col = (hex) => new THREE.Color(hex);
@@ -68,17 +68,17 @@ export function weatherize(mat, mode) {
     sh.uniforms.uSnow = wxU.snow;
     sh.uniforms.uWet = wxU.wet;
     // a material can paint its own snow by defining SNOW_COLOR (the ground does); otherwise plain white
-    sh.fragmentShader = sh.fragmentShader.replace('void main() {', '#ifndef SNOW_COLOR\n#define SNOW_COLOR vec3(0.93, 0.95, 0.99)\n#endif\nvoid main() {');
+    sh.fragmentShader = sh.fragmentShader.replace('void main() {', '#ifndef SNOW_COLOR\n#define SNOW_COLOR vec3(0.93, 0.95, 0.99)\n#endif\n#ifndef SNOW_AMOUNT\n#define SNOW_AMOUNT uSnow\n#endif\nvoid main() {');
     sh.fragmentShader = 'uniform float uSnow;\nuniform float uWet;\n' + (mode === 'std'
       ? sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
           vec3 wN = inverseTransformDirection(normal, viewMatrix);
-          float sAmt = uSnow * smoothstep(0.3, 0.75, wN.y);
+          float sAmt = SNOW_AMOUNT * smoothstep(0.3, 0.75, wN.y);
           diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - uWet * 0.38), SNOW_COLOR, sAmt);
           roughnessFactor = mix(roughnessFactor, 0.42, uWet * (1.0 - sAmt));
         }`)
       : sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-        diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - uWet * 0.3), vec3(0.93, 0.95, 0.99), uSnow * 0.85);`));
+        diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - uWet * 0.3), vec3(0.93, 0.95, 0.99), SNOW_AMOUNT * 0.85);`));
   };
   mat.customProgramCacheKey = () => baseKey + '|wx-' + mode;
   return mat;

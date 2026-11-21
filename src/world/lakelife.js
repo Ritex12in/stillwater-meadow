@@ -9,9 +9,10 @@
 // "The lake you are at" (`lifeLake`) changes only when you have left the old one out of sight;
 // whoever keeps creatures there is told through `hooks.lake` (core/state.js) and moves them.
 import { TAU, mulberry32, hash } from '../core/math.js';
-import { HOME, height, lakesNear, kitOf } from '../core/shape.js';
+import { HOME, height, lakesNear, kitOf, lakeIce, lakeChill } from '../core/shape.js';
+import { flowersOut } from '../core/year.js';
 import { col } from '../core/materials.js';
-import { hooks, world } from '../core/state.js';
+import { hooks, world, seasonState } from '../core/state.js';
 
 const REED_GREENS = ['#6b7f3a', '#7f8f45', '#5a7034'].map(col), REED_STRAW = ['#a39a62', '#b3a871', '#8f8650'].map(col);
 const PAD_GREENS = ['#4f8a3c', '#5e9a46', '#447a36'].map(col), BLOOMS = ['#f7c6d6', '#ffffff', '#f3a8c3'].map(col);
@@ -60,11 +61,17 @@ const LIFE_REACH = 330;
 /** Once a frame: draw the reeds and lilies of the lakes nearest (x, z). Only does work when those lakes change. */
 export function updateLakeLife(x, z) {
   if (!sets) return;
-  const near = lakesNear(x, z, LIFE_REACH).slice(0, 3), key = near.map((L) => L.id).join('|');
+  // (each lake's lilies by its own season: no pads on ice, no flowers out of their season)
+  const near = lakesNear(x, z, LIFE_REACH).slice(0, 3);
+  const ice = near.map((L) => lakeIce(L) > 0.4), bloom = near.map((L) => flowersOut(lakeChill(L), seasonState.season, seasonState.cooling) > 0.3);
+  const key = near.map((L, i) => L.id + (ice[i] ? '*' : '') + (bloom[i] ? '+' : '')).join('|');
   if (key === shown) return;
   shown = key;
   const all = { reeds: [], heads: [], pads: [], blooms: [] };
-  for (const L of near) { const life = lifeOf(L); for (const k in all) for (const it of life[k]) all[k].push(it); }
+  near.forEach((L, i) => {
+    const life = lifeOf(L);
+    for (const k in all) { if ((k === 'pads' || k === 'blooms') && ice[i]) continue; if (k === 'blooms' && !bloom[i]) continue; for (const it of life[k]) all[k].push(it); }
+  });
   let dropped = 0;
   for (const k in all) { sets[k].setItems(all[k], () => 0); dropped += sets[k].dropped; }
   lifeStats.reeds = all.reeds.length; lifeStats.pads = all.pads.length; lifeStats.lakes = near.length; lifeStats.dropped = dropped;

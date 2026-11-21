@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, lerp, rnd, turnTo } from '../core/math.js';
-import { lakeAt, lakeT, lakePoint, heightAt, onDock, waterAhead } from '../core/shape.js';
+import { lakeAt, lakeT, lakePoint, heightAt, onDock, waterAhead, lakeIce, HOME } from '../core/shape.js';
 import { std } from '../core/materials.js';
-import { hooks, seasonState } from '../core/state.js';
+import { hooks, world } from '../core/state.js';
 import { player, hero } from '../characters/player.js';
 import { boat, boatSeat } from '../characters/boat.js';
 import { activity } from '../systems/activity.js';
@@ -16,7 +16,7 @@ import { quack, plop } from './voices.js';
 
 const ducks = [];
 const crumbs = [];
-const frozen = () => seasonState.ice > 0.5;
+const frozen = () => lakeIce(world.lifeLake || HOME) > 0.5; // (the lake the ducks are at)
 const duckWater = (x, z) => lakeT(x, z) < 0.97 && heightAt(x, z) < -0.05 && !onDock(x, z);
 const canToss = () => (activity.free || (activity.is('sit') && player.seat === boatSeat));
 

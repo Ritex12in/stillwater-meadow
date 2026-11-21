@@ -69,7 +69,7 @@ import { initDanceMusic } from './features/dancemusic.js';
 import { initFoley } from './features/foley.js';
 import { ferry, boatSeat, BOARD_POINT, boat } from './characters/boat.js';
 import { updateLakeLife, updateLifeLake, lifeLake, lifeStats, lifeOf } from './world/lakelife.js';
-import { seasonNow } from './features/seasons.js';
+import { seasonNow, holdPhase } from './features/seasons.js';
 
 let renderer;
 try {
@@ -232,9 +232,9 @@ function applySky() {
   neonU.value = (1 - smooth(-10, -2, solar.sunElev)) * (1 - wx.fog * 0.4) * (1 - wx.snow * 0.85); // the flowers glow neon once the sun is well down (dimmed under snow)
   groundU.haze.value = 0.62 + 0.38 * clamp(Math.max(wx.fog, wx.rain * 0.5, wx.snow * 0.5), 0, 1); // far hills show through the haze, unless the weather hides them
   groundU.bloom.value = seasonState.flowerFrac ?? 1;
-  const wildOn = seasonState.name !== 'Winter' && world.wildAllowed !== false; // the wildflowers die back under the snow (or are switched off)
+  const wildOn = seasonState.flowerFrac > 0.05 && world.wildAllowed !== false; // the wildflowers die back under the snow (or are switched off)
   if (world.wild && world.wildOn !== wildOn) { world.wildOn = wildOn; world.wild.forEach((h) => { h.visible = wildOn; }); }
-  groundU.autumn.value += ((seasonState.name === 'Autumn' ? 1 : 0) - groundU.autumn.value) * 0.02; // leaves gather and melt away slowly
+  groundU.autumn.value += ((seasonState.leavesHere === 'autumn' ? 1 : 0) - groundU.autumn.value) * 0.02; // leaves gather and melt away slowly
   scene.fog.color.copy(cur.horizon);
   scene.fog.near = cur.fogNear; scene.fog.far = cur.fogFar;
   waterU.fogColor.value.copy(cur.horizon);
@@ -362,6 +362,8 @@ window.__meadow = {
   /** The backpack's contents and the ways to change them (systems/pack.js). */
   pack: { view: pack.packView, add: pack.add, addItem: pack.addItem, take: pack.take, count: pack.count, hold: pack.hold, held: pack.held, fish: () => pack.units('fish').map((u) => ({ id: u.key, cm: u.unit })), tie: (kinds) => world.tieBouquet(kinds) },
   compass: compassView,
+  /** The year: hold it at a phase (0 midwinter .. 0.5 midsummer; null lets it run), and how it is now. */
+  year: { hold: holdPhase, get state() { return Object.assign({}, seasonState, { mapWeather: undefined }); } },
   /** The home lake's middle, and where you first arrive beside it. */
   home: { x: HOME.x, z: HOME.z, r: HOME.R0, rmax: HOME.rmax }, spawn: { x: SPAWN.x, z: SPAWN.z },
   /** Lakes: those about you, the ones with water drawn just now, and a way to go to one or to any spot. */

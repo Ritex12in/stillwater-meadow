@@ -259,7 +259,7 @@ test('nature: trees give out at a treeline, north faces hold more snow, cold dry
     const SH = await import(url('/src/core/shape.js')), m = window.__meadow;
     // the highest tree in mild country stands near the treeline, and none far above it
     let top = 0;
-    for (let iz = -40; iz <= 40; iz++) for (let ix = -40; ix <= 40; ix++) for (const t of m.wilds.square(ix, iz)) if (SH.coldBase(t.x, t.z) < 0.05) top = Math.max(top, t.y);
+    for (let iz = -40; iz <= 40; iz++) for (let ix = -40; ix <= 40; ix++) for (const t of m.wilds.square(ix, iz)) if (Math.abs(SH.coldBase(t.x, t.z)) < 0.05) top = Math.max(top, t.y);
     // snow at the same heights on slopes facing north and south
     const sn = [[0, 0], [0, 0]];
     let tundra = [0, 0], taiga = [0, 0], oasis = null;
@@ -279,5 +279,52 @@ test('nature: trees give out at a treeline, north faces hold more snow, cold dry
   expect(r.taiga - r.tundra, 'cold and wet is snowier than cold and dry').toBeGreaterThan(0.3);
   expect(r.oasis, 'a lake in dry country').not.toBeNull();
   expect(r.oasis.moist).toBeGreaterThan(r.oasis.rain);
+  noErrors(errors);
+});
+
+test('seasons by place: the year turns every 8 days; cold uplands whiten and their lakes freeze while home is in autumn, warm country stays green in winter, and at home there is always a way to the rod', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const r = await page.evaluate(async () => {
+    const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
+    const SH = await import(url('/src/core/shape.js')), Y = await import(url('/src/core/year.js')), m = window.__meadow;
+    const out = { quarter: Y.yearPhase(2 * 86400000) - Y.yearPhase(0) };
+    // late autumn: find a cold upland, a warm place, and a cold lake, by the land's own rules
+    const late = 0.78, s = Y.seasonValue(late), lag = Y.seasonValue(late - Y.ICE_LAG), cool = Y.isCooling(late);
+    let upland = null, warm = null;
+    for (let z = -2800; z < 2800 && !(upland && warm); z += 41) for (let x = -2800; x < 2800; x += 41) {
+      const h = SH.height(x, z), c = SH.coldAt(x, z, h);
+      if (!upland && c > 0.2 && c < 0.4 && h > 0) upland = { c };
+      if (!warm && c < -0.35) warm = { c };
+    }
+    const home = SH.lakeChill(SH.HOME);
+    out.homeSnow = Y.snowFrom(home, s); out.uplandSnow = upland ? Y.snowFrom(upland.c, s) : null;
+    out.homeLeaves = Y.leavesAt(home, s, cool); out.uplandLeaves = upland ? Y.leavesAt(upland.c, s, cool) : null;
+    const coldLake = m.lakes(4000).map((L) => SH.lakesNear(L.x, L.z, 1)[0]).find((L) => L && !L.frozen && SH.lakeChill(L) > 0.3 && SH.lakeChill(L) < 0.45);
+    out.homeIce = Y.iceFrom(home, lag); out.coldLakeIce = coldLake ? Y.iceFrom(SH.lakeChill(coldLake), lag) : null;
+    // midwinter in warm country: no snow, the trees in leaf
+    out.warmSnow = warm ? Y.snowFrom(warm.c, Y.seasonValue(0)) : null; out.warmLeaves = warm ? Y.leavesAt(warm.c, Y.seasonValue(0), false) : null;
+    // the year at home, in 50 steps: a bouquet of three kinds is in reach, or the skipper asks for pine cones
+    const fl = m.wilds.picksNear(m.spawn.x, m.spawn.z, 60), bad = [];
+    for (let k = 0; k < 50; k++) {
+      m.year.hold(k / 50);
+      const st = m.year.state, by = {};
+      for (const f of fl) if (f.keep < Y.flowersOut(f.chill || 0, st.season, st.cooling)) by[f.kind] = (by[f.kind] || 0) + 1;
+      const kinds = Object.values(by).filter((n) => n >= 4).length;
+      if (kinds < 3 && !(st.flowerFrac < 0.35)) bad.push(k / 50);
+    }
+    out.bad = bad;
+    m.year.hold(null);
+    return out;
+  });
+  expect(r.quarter, 'a quarter of the year every 2 real days').toBeCloseTo(0.25, 5);
+  expect(r.uplandSnow, 'late autumn: snow on the cold uplands').toBeGreaterThan(0.5);
+  expect(r.homeSnow, 'and none at home yet').toBeLessThan(0.1);
+  expect(r.uplandLeaves).toBe('winter');
+  expect(r.homeLeaves).toBe('autumn');
+  expect(r.coldLakeIce, 'a cold lake is frozen').toBeGreaterThan(0.85);
+  expect(r.homeIce, 'while home is open water').toBeLessThan(0.1);
+  expect(r.warmSnow, 'warm country: no snow in midwinter').toBe(0);
+  expect(r.warmLeaves, 'and its trees in leaf').toBe('summer');
+  expect(r.bad, 'no time of year at home without a way to the rod').toEqual([]);
   noErrors(errors);
 });

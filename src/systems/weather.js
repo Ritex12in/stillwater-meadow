@@ -211,8 +211,9 @@ export function updateWeather(dt, env) {
   WX_KEYS.forEach((k) => { wx[k] = damp(wx[k], target[k], wx.rate, dt); });
   wx.wet = clamp(wx.wet + (wx.rain > 0.2 ? dt * 0.05 * wx.rain : -dt * 0.006), 0, 1);
   wx.cover = clamp(wx.cover + (wx.snow > 0.4 ? dt * 0.012 * wx.snow : -dt * (0.005 + Math.max(0, env.sunElev) * 0.0003)), 0, 1);
-  wx.cover = Math.max(wx.cover, seasonState.coverFloor);
-  waterU.uIce.value = seasonState.ice;
+  wx.fresh = wx.cover; // (snow fallen from the sky: the ground takes this and works the season's own snow out spot by spot)
+  wxU.fresh.value = smooth(0, 1, wx.fresh);
+  wx.cover = Math.max(wx.cover, seasonState.coverFloor); // (trees, rocks and things: the season's snow where you stand)
   waterU.uSnowIce.value = smooth(0, 1, wx.cover);
   wxU.wet.value = wx.wet * (1 - wx.cover);
   wxU.snow.value = smooth(0, 1, wx.cover);

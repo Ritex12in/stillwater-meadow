@@ -17,6 +17,8 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { smooth, fbm } from '../core/math.js';
+import { SEASON_GLSL, seasonU } from '../core/year.js';
+import { wxU } from '../core/materials.js';
 import { height, lakeAt, setGroundSampler, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
@@ -307,6 +309,8 @@ export function farHaze(sh) {
 function groundDetail(mat, textured) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uCam = camU;
+    sh.uniforms.uSeason = seasonU;
+    sh.uniforms.uFreshSnow = wxU.fresh;
     if (textured) {
       Object.assign(sh.uniforms, {
         tLush: { value: kit.tex.grass_lush }, tFlowers: { value: kit.tex.grass_flowers }, tFine: { value: kit.tex.grass_fine },
@@ -319,7 +323,7 @@ function groundDetail(mat, textured) {
       vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;
       vClime = clime;
       ${textured ? 'vSplat = splat;' : ''}`);
-    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nuniform vec3 uCam;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
+    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nuniform vec3 uCam;\nuniform float uFreshSnow;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
       // (wrapped first: far from the middle of the world the numbers get too big for sin() to scatter)
       float gHash(vec2 p) { return fract(sin(dot(mod(p, 1024.0), vec2(127.1, 311.7))) * 43758.5453); }
       float gNoise(vec2 p) {
@@ -333,6 +337,9 @@ function groundDetail(mat, textured) {
         float d = length(vGround - uCam);
         float broad = gNoise(q * 0.045) * 0.6 + gNoise(q * 0.11) * 0.4;
         float mid = gNoise(q * 0.8);
+        // the season's snow, by this spot's own chill today (core/year.js), or fresh snow from the sky
+        float seasonIn = chillNow(vClime.x) + (broad - 0.5) * 0.3 + (mid - 0.5) * 0.14;
+        gSnowAmt = max(uFreshSnow, 0.79 * smoothstep(0.47, 0.6, seasonIn));
         ${textured ? `
         // grass: two scales and angles of the lush texture (so no tile repeats), patches of the
         // flowery one, and the fine one far off where the others would shimmer
@@ -356,7 +363,7 @@ function groundDetail(mat, textured) {
           grass = mix(grass, lf.rgb * 0.95, litter);
         }
         // winter: snow with soft drifts, wind ripples, blue in the hollows and glints of sparkle
-        if (uSnow > 0.01) {
+        if (gSnowAmt > 0.01) {
           float drift = gNoise(q * 0.08 + 7.0) * 0.6 + gNoise(q * 0.3) * 0.4;
           float ripple = sin(q.x * 1.7 + q.y * 0.6 + gNoise(q * 0.5) * 4.0) * 0.5 + 0.5;
           gSnow = mix(vec3(0.74, 0.82, 0.95), vec3(0.97, 0.98, 1.0), smoothstep(0.2, 0.75, drift)) * (0.95 + 0.05 * ripple);
@@ -384,9 +391,13 @@ function groundDetail(mat, textured) {
         // sunlit patches lean yellow-green, shaded ones blue-green
         diffuseColor.rgb += vec3(0.025, 0.02, -0.02) * (broad - 0.5) * 2.0 * diffuseColor.g;
         ${textured ? `// the climate: parched heath turns the grass gold (clumps of it paler, patches greener)
-        diffuseColor.rgb *= mix(vec3(1.0), vec3(1.3, 1.07, 0.64) * (0.92 + 0.16 * mid), vClime.y);` : ''}
+        // (in warm country the drought is in summer: gold then, green in the winter rains)
+        float dryNow = clamp(vClime.y + (1.0 - smoothstep(-0.5, 0.0, vClime.x)) * 0.5 * (0.5 - uSeason / 0.75), 0.0, 1.0);
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(1.3, 1.07, 0.64) * (0.92 + 0.16 * mid), dryNow);` : ''}
         // a lake a long way off: no sheet of water is spared for it, so its bed is painted the colour of water
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.42, 0.58), smoothstep(0.3, 0.7, vClime.z));
+        // (frozen over when the season is cold there, as a near lake's sheet of water would be)
+        vec3 farWater = mix(vec3(0.2, 0.42, 0.58), vec3(0.8, 0.86, 0.92), smoothstep(0.5, 0.6, chillNow(vClime.x)));
+        diffuseColor.rgb = mix(diffuseColor.rgb, farWater, smoothstep(0.3, 0.7, vClime.z));
         // in the cold, snow lies in ragged drifts that close up into snowfields (and on the high peaks all year)
         float snowIn = vClime.x + (broad - 0.5) * 0.3 + (mid - 0.5) * 0.14;
         vec3 snowCol = mix(vec3(0.78, 0.85, 0.96), vec3(0.95, 0.97, 1.0), smoothstep(0.3, 0.75, broad));

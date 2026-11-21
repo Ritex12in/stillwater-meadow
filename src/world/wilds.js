@@ -72,7 +72,7 @@ export function growSquare(ix, iz) {
     const pines = clamp(0.36 + cold * 0.7 + smooth(22, 60, h) * 0.3 - dry * 0.22 - grove + nearLine * 0.8, 0, 0.97);
     const type = roll < pines ? 'pine' : roll > 0.975 - grove * 0.8 ? 'blossom' : 'round';
     const s = (0.8 + size * 0.7) * (1 + lush * 0.14 - snow * 0.12) * (1 - 0.4 * smooth(TREELINE - 28, TREELINE, felt)), cols = TREE_COLOURS[type];
-    const t = { x, z, y: h - 0.15, type, s, ry: turn * TAU, color: cols[Math.floor(tint * cols.length)], top: (kit ? 6.2 : 5.2) * s, wild: true };
+    const t = { x, z, y: h - 0.15, type, s, ry: turn * TAU, color: cols[Math.floor(tint * cols.length)], top: (kit ? 6.2 : 5.2) * s, wild: true, chill: cold };
     if (kit) {
       // on the heath the broadleaf trees are the light, airy ones: birches and the open-crowned "normal" trees
       t.family = type === 'round' && dry > 0.5 && kit.models.BirchTree_1 ? (tint < 0.62 || !kit.models.NormalTree_1 ? 'birch' : 'normal') : treeFamily(t);
@@ -181,7 +181,7 @@ function driftsOf(lake) {
  */
 export function growPicks(ix, iz) {
   const R = seedOf(ix, iz, 0x7A11E5), x0 = ix * S, z0 = iz * S, out = [];
-  const mx = x0 + S / 2, mz = z0 + S / 2, wet = moistAt(mx, mz), dry = dryOf(wet), snow = snowOf(snowCold(coldAt(mx, mz, height(mx, mz)), wet));
+  const mx = x0 + S / 2, mz = z0 + S / 2, wet = moistAt(mx, mz), dry = dryOf(wet), chill = coldAt(mx, mz, height(mx, mz)), snow = snowOf(snowCold(chill, wet));
   if (snow > 0.4) return out; // (none under snow)
   const lakes = lakesNear(mx, mz, 220).filter((L) => Math.hypot(L.x - mx, L.z - mz) < L.rmax * PICK.meadow + S * 0.75);
   const tries = lakes.length ? PICK.lakeTries : PICK.tries, thin = 1 - dry * 0.6;
@@ -196,7 +196,7 @@ export function growPicks(ix, iz) {
     if (lt < sandEnd(L) || L.path(x, z) > 0.2 || clearingAt(x, z)) continue;
     const h = height(x, z);
     if (rockAmt(h, slopeOf(x, z), feltAt(x, z, h)) > 0.2) continue;
-    out.push(dressFlower({ id: ix + ':' + iz + ':' + k, x, z, y: h - 0.02, s, ry, keep }, undefined, a, b, c));
+    out.push(dressFlower({ id: ix + ':' + iz + ':' + k, x, z, y: h - 0.02, s, ry, keep, chill }, undefined, a, b, c));
   }
   // the drifts of the lakes here whose middle lies in this square
   for (const L of lakes) {
@@ -208,7 +208,7 @@ export function growPicks(ix, iz) {
         const x = d.x + Math.cos(a) * far * 1.4, z = d.z + Math.sin(a) * far; // drifts are a little long
         const N = lakeAt(x, z);
         if (N.t(x, z) < sandEnd(N) + 0.01 || N.path(x, z) > 0.15 || clearingAt(x, z)) continue;
-        out.push(dressFlower({ id: L.id + ':d' + d.i + ':' + m, x, z, y: height(x, z) - 0.02, s, ry, keep }, d.kind, 0, 0, c));
+        out.push(dressFlower({ id: L.id + ':d' + d.i + ':' + m, x, z, y: height(x, z) - 0.02, s, ry, keep, chill }, d.kind, 0, 0, c));
       }
     }
   }

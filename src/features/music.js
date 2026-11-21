@@ -70,7 +70,7 @@ function pad(t, notes, len) {
   });
 }
 function mood() {
-  const day = cur.day > 0.5, winter = seasonState.name === 'Winter';
+  const day = cur.day > 0.5, winter = seasonState.winterHere;
   return {
     root: day ? 60 : 57,
     scale: day ? [0, 2, 4, 7, 9, 12, 14, 16, 19] : [0, 3, 5, 7, 10, 12, 15, 17, 19],

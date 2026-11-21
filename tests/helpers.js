@@ -8,6 +8,8 @@ export async function open(page, query = '', hash = '#14') {
   page.on('console', (m) => { if (m.type() === 'error' && !/GL Driver|GPU stall/.test(m.text())) errors.push(m.text()); });
   // (a new player gets a world at random: tests play world 1 unless they ask for another)
   if (!/(^|&)seed=/.test(query)) query = query ? query + '&seed=1' : 'seed=1';
+  // (the year turns every 8 real days: tests play summer unless they ask for another season)
+  if (!/(^|&)season=/.test(query)) query += '&season=summer';
   await page.goto('/' + (query ? '?' + query : '') + hash);
   // (a long allowance: headless Chrome draws in software, and a busy machine can take a minute to build the world)
   await page.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });

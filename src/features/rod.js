@@ -28,7 +28,8 @@ itemKind('cone', { name: 'Pine cone', max: 16, icon: ICONS.cone, detail: (it) =>
 let coneView = () => [];
 /** For tests: the pine cones still lying about, and whether they are showing. */
 export const rodView = () => ({ rod: hasRod(), cones: count('cone'), lying: coneView() });
-const winter = () => seasonState.name === 'Winter';
+/** No flowers to speak of where you are (winter, or the cold): the skipper asks for pine cones instead. */
+const winter = () => seasonState.flowerFrac < 0.35;
 
 /** What the skipper thinks of a bouquet (array of "#colour:kind"), when you have no rod yet. */
 export function judgeBouquet(bouquet) {

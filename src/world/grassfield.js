@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { smooth } from '../core/math.js';
+import { SEASON_GLSL, seasonU } from '../core/year.js';
 import { heightAt, slopeAt, lakeAt, nearReserved, onDock, BENCH_SPOT, SPAWN, coldBase, coldAt, dryOf, slopeLook, feltHeight, ASPECT, moistAt, snowCold, snowOf } from '../core/shape.js';
 import { weatherize, bothSides, timeU, windU, camU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
@@ -92,8 +93,8 @@ function tuftGeo(blades, segs) {
 function grassMaterial(map, tex) {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, map: tex || null });
   mat.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, { tGround: { value: map }, uMapOrigin: mapU.origin, uTime: timeU, uWind: windU, uCamG: camU });
-    sh.vertexShader = `
+    Object.assign(sh.uniforms, { tGround: { value: map }, uMapOrigin: mapU.origin, uTime: timeU, uWind: windU, uCamG: camU, uSeason: seasonU });
+    sh.vertexShader = SEASON_GLSL + `
       uniform sampler2D tGround; uniform vec2 uMapOrigin; uniform float uTime; uniform float uWind; uniform vec3 uCamG;
       uniform float uSpacing; uniform float uInner; uniform vec2 uFade; uniform float uScale; uniform float uDensity;
       attribute vec2 aCell;
@@ -123,7 +124,7 @@ function grassMaterial(map, tex) {
           float k = (1.0 - smoothstep(cut - 5.0, cut, d)) * smoothstep(0.25, 0.6, g.y) * smoothstep(uInner - 3.0, uInner, d);
           k *= step(gh(cell + 53.7), uDensity); // the grass-density setting keeps this share of the tufts
           // the climate (g.z cold, g.w dry): grass thins out where snow lies, tuft by tuft, and is gone under a snowfield
-          k *= 1.0 - smoothstep(0.4, 0.62, g.z + (h1 - 0.5) * 0.16);
+          k *= 1.0 - smoothstep(0.4, 0.62, chillNow(g.z) + (h1 - 0.5) * 0.16);
           // meadow patches: taller, lusher grass in drifts, shorter turf between
           float drift = gh(floor(base / 7.0)) * 0.5 + gh(floor(base / 3.1) + 5.0) * 0.5;
           float tall = mix(0.15, 0.42, h3 * 0.5 + drift * 0.5) * uScale * k * (1.0 + g.w * 0.45); // (taller on the heath)
@@ -143,8 +144,8 @@ function grassMaterial(map, tex) {
           transformed = vec3(base.x + p.x, g.x - 0.04 + p.y, base.y + p.z);
           // dark roots, sunlit tips, and a little colour drift from tuft to tuft
           vec3 tuftTint = mix(vec3(0.85, 0.97, 0.85), vec3(1.1, 1.02, 0.82), h2) * (0.85 + 0.25 * drift);
-          tuftTint *= mix(vec3(1.0), vec3(1.34, 1.1, 0.6), g.w);                        // gold on the heath
-          tuftTint = mix(tuftTint, vec3(1.05, 1.1, 1.0), smoothstep(0.25, 0.5, g.z) * 0.5); // frosted pale toward the snow
+          tuftTint *= mix(vec3(1.0), vec3(1.34, 1.1, 0.6), clamp(g.w + (1.0 - smoothstep(-0.5, 0.0, g.z)) * 0.5 * (0.5 - uSeason / 0.75), 0.0, 1.0)); // gold on the heath (and in a warm country's summer)
+          tuftTint = mix(tuftTint, vec3(1.05, 1.1, 1.0), smoothstep(0.25, 0.5, chillNow(g.z)) * 0.5); // frosted pale toward the snow
           ${tex ? '// the painted texture shades root to tip\n          vColor.rgb = tuftTint * 1.15;' : 'vColor.rgb = mix(vec3(0.24, 0.36, 0.15), vec3(0.62, 0.74, 0.34), color.r) * tuftTint;'}
         }`);
     sh.fragmentShader = 'varying float vGust;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>

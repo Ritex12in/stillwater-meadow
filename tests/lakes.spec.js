@@ -23,9 +23,9 @@ test('lakes lie all over the land: each in its own bowl, apart from its neighbou
   expect(a.shoreUnder).toBe(0);
   expect(a.tooClose, 'no two bowls touch').toBe(0);
   expect(a.names, 'with a spread of names').toBeGreaterThan(20);
-  // and no two alike: long ones and round ones, ponds and broad waters, some with a path, some with no beach
-  for (const kind of ['long', 'round', 'small', 'big', 'ringed', 'bare']) expect(a[kind], `some lakes are ${kind}`).toBeGreaterThan(4);
-  expect(a.ringed).toBeLessThan(a.n * 0.6);
+  // and no two alike: long ones and round ones, ponds and broad waters, some with no beach; away from home they are wild (no path round them)
+  for (const kind of ['long', 'round', 'small', 'big', 'bare']) expect(a[kind], `some lakes are ${kind}`).toBeGreaterThan(4);
+  expect(a.ringed, 'only the home lake has a path round it').toBeLessThanOrEqual(1);
   await open(page, 'weather=clear&season=summer', '#12');
   expect((await look()).key, 'the same lakes on another visit').toBe(a.key);
   await open(page, 'seed=5&weather=clear&season=summer', '#12');

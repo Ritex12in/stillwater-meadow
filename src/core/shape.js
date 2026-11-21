@@ -13,6 +13,7 @@
 import { TAU, smooth, clamp, fbm, fbmD, hash, mulberry32 } from './math.js';
 import { seasonState } from './state.js';
 import { worldSeed } from '../systems/save.js';
+import { query } from './env.js';
 
 export const PATH_T = 1.32;       // the path runs round a lake at this many lake-radii
 
@@ -97,6 +98,13 @@ function cellSpot(cx, cz) {
   return { R, x, z, there: there && rangeAt(x, z) < 0.3 };
 }
 // Settled lakes are the ones with things built beside them: a jetty, a fire, a bench (see kitOf).
+/**
+ * Whether lakes away from home are settled (with a jetty, fire, bench and lamps of their own). For
+ * now they are not: away from home the lakes are wild (the owner's decision: lamps and benches out
+ * in the wilds looked out of place). The rules for settled lakes are kept, and `?settlements=1`
+ * turns them on (their tests use it).
+ */
+export const SETTLEMENTS = query.has('settlements');
 // A lake is settled if it outranks every lake in the eight squares round its own, by a rank fixed
 // by the seed. So no two settled lakes are neighbours: they lie half a kilometre apart at the
 // least, each out of sight of the next. The home lake outranks all.
@@ -117,7 +125,7 @@ function lakeOfCell(cx, cz) {
   L = null;
   if (cx === HOME_CX && cz === HOME_CZ) L = HOME;
   else {
-    const { R, there, x, z } = cellSpot(cx, cz), settled = there && settledCell(cx, cz);
+    const { R, there, x, z } = cellSpot(cx, cz), settled = SETTLEMENTS && there && settledCell(cx, cz);
     const size = R(), p3 = R() * TAU, p5 = R() * TAU, p7 = R() * TAU, wob = 0.35 + R() * 1.25, n1 = R(), n2 = R(), long = R(), th = R() * Math.PI, worn = R();
     if (there) {
       // size, how deeply the shore is scalloped, and how long and narrow it is (one in three is nearly round);
@@ -129,7 +137,7 @@ function lakeOfCell(cx, cz) {
       const rain = rainAt(x, z), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(coldAt(x, z, 1));
       const beach = clamp(1 + dry * 0.5 - lush * 0.8 - snow * 0.9, 0.1, 1.5);
       const tint = [1 - lush * 0.3 - dry * 0.12 - snow * 0.12, 1 + lush * 0.04 + dry * 0.16 - snow * 0.04, 1 - lush * 0.2 + dry * 0.12 + snow * 0.12];
-      L = makeLake({ x, z, R0, A3: R0 * 0.13 * wob, P3: p3, A5: R0 * 0.085 * wob, P5: p5, A7: R0 * 0.05 * wob, P7: p7, E, TH: th, beach, ring: settled || worn < 0.25, tint }); // (a settled lake always has its path)
+      L = makeLake({ x, z, R0, A3: R0 * 0.13 * wob, P3: p3, A5: R0 * 0.085 * wob, P5: p5, A7: R0 * 0.05 * wob, P7: p7, E, TH: th, beach, ring: settled || (SETTLEMENTS && worn < 0.25), tint }); // (a settled lake always has its path)
       L.id = key;
       L.settled = settled;
       L.clime = { dry, lush, snow }; // (the country it lies in: what grows and lives at it follows from this)

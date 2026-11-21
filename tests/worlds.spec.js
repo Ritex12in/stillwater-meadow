@@ -116,7 +116,7 @@ test('the backpack holds what you carry in slots, and the compass points true: n
   expect(sunrise.x, 'the sun comes up in the east').toBeGreaterThan(0.5);
 
   // far from home: the home lake is marked, the way it lies, and the nearest shrine is marked too
-  const far = await page.evaluate(() => { const m = window.__meadow, L = m.lakes(3000).filter((q) => q.settled && q.id !== 'home').pop(); m.visitLake(L.id); for (let i = 0; i < 20; i++) m.tick(1 / 30); return { name: L.name }; });
+  const far = await page.evaluate(() => { const m = window.__meadow, L = m.lakes(3000).filter((q) => q.id !== 'home').pop(); m.visitLake(L.id); for (let i = 0; i < 20; i++) m.tick(1 / 30); return { name: L.name }; });
   await expect(page.locator('#toast')).toContainText(far.name);
   const marks = await page.evaluate(() => { const m = window.__meadow; for (let i = 0; i < 20; i++) m.tick(1 / 30); return { view: m.compass(), p: { x: m.player.x, z: m.player.z }, home: m.home, shrine: m.shrines(2500)[0] }; });
   const home = marks.view.marks.find((k) => k.kind === 'home');

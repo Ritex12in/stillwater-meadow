@@ -5,7 +5,7 @@ import { open, step, teleport, press, actions, noErrors } from './helpers.js';
 const settled = (page) => page.evaluate(() => window.__meadow.settled(3000));
 
 test('settled lakes lie far apart, each with its own landmarks; the home lake has them all', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const errors = await open(page, 'weather=clear&season=summer&settlements=1', '#12');
   const a = await settled(page);
   expect(a.length, 'a fair number within three kilometres').toBeGreaterThan(8);
   let gap = Infinity;
@@ -27,13 +27,13 @@ test('settled lakes lie far apart, each with its own landmarks; the home lake ha
     expect(j.moor).toBeLessThan(-0.3);
     expect(j.deck && j.boat).toBe(true);
   }
-  await open(page, 'weather=clear&season=summer', '#12');
+  await open(page, 'weather=clear&season=summer&settlements=1', '#12');
   expect(await settled(page), 'the same on another visit').toEqual(a);
   noErrors(errors);
 });
 
 test('the landmarks follow you from lake to lake: everything works there, and nothing is left behind', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const errors = await open(page, 'weather=clear&season=summer&settlements=1', '#12');
   await page.evaluate(() => { window.__meadow.pack.add('rod'); });
   const there = (await settled(page)).find((L) => L.id !== 'home' && L.kit.dock && L.kit.fire && L.kit.bench);
   await page.evaluate((id) => { window.__meadow.visitLake(id); }, there.id);
@@ -81,7 +81,7 @@ test('the landmarks follow you from lake to lake: everything works there, and no
 });
 
 test('walking, the landmarks move only when the old lake is well behind you, and never while you sit', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const errors = await open(page, 'weather=clear&season=summer&settlements=1', '#12');
   const there = (await settled(page)).find((L) => L.id !== 'home' && L.kit.bench);
   const dry = (x, z) => page.evaluate(([x, z]) => { const g = window.__meadow.geo; for (let r = 0; r < 60; r += 3) for (let a = 0; a < 6.28; a += 0.7) { const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r; if (g.walkable(px, pz)) return { x: px, z: pz }; } return { x, z }; }, [x, z]);
   // a little way from home: they stay
@@ -106,7 +106,7 @@ test('walking, the landmarks move only when the old lake is well behind you, and
 });
 
 test('each place keeps its own: a bouquet left on one bench is not on another, and waits for you', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer', '#11');
+  const errors = await open(page, 'weather=clear&season=summer&settlements=1', '#11');
   await step(page, 1.5);
   for (let k = 0; k < 3; k++) {
     const f = await page.evaluate(() => { const m = window.__meadow; return m.flowers().filter((it) => it.shown).sort((a, b) => Math.hypot(a.x - m.player.x, a.z - m.player.z) - Math.hypot(b.x - m.player.x, b.z - m.player.z))[0]; });
@@ -142,7 +142,7 @@ test('each place keeps its own: a bouquet left on one bench is not on another, a
 });
 
 test('a lake with no jetty has none: no deck to stand on, no boat to board, and its woods are the same with or without the landmarks', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const errors = await open(page, 'weather=clear&season=summer&settlements=1', '#12');
   const all = await settled(page), bare = all.find((L) => !L.kit.dock);
   // the woods round it, before the landmarks have ever been there
   const woods = () => page.evaluate((L) => { const w = window.__meadow.wilds, S = 57.6, cx = Math.floor(L.x / S), cz = Math.floor(L.z / S), out = []; for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) out.push(w.square(cx + dx, cz + dz).map((t) => [t.x, t.z, t.type]), w.rocks(cx + dx, cz + dz).map((r) => [r.x, r.z])); return JSON.stringify(out); }, bare);
@@ -173,7 +173,7 @@ test('a lake with no jetty has none: no deck to stand on, no boat to board, and 
 });
 
 test('the shrine stands at the shrine site nearest you: level ground the land keeps clear, away from every lake, the same sites every time', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const errors = await open(page, 'weather=clear&season=summer&settlements=1', '#12');
   await step(page, 0.5);
   const survey = () => page.evaluate(() => {
     const m = window.__meadow, g = m.geo, S = 57.6;

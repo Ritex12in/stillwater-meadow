@@ -3,7 +3,7 @@
 // North is -z, as the sky has it (the sun rises in the east-north-east, +x a little toward -z,
 // and stands due south, +z, at noon: systems/time.js). The strip shows the half of the horizon
 // you are facing, with the cardinal points and a few named places on it: the home lake, the
-// nearest shrine, and the settled lakes nearest you. Which places it shows is worked out twice
+// nearest shrine, and the lakes nearest you. Which places it shows is worked out twice
 // a second; only their positions follow the camera.
 import * as THREE from 'three';
 import { HOME, lakesNear, shrineSitesNear } from '../core/shape.js';
@@ -29,7 +29,7 @@ export function marksFrom(x, z) {
   if (shrine && Math.hypot(shrine.x - x, shrine.z - z) > 30) out.push({ key: 'shrine:' + shrine.id, name: shrine.name, x: shrine.x, z: shrine.z, kind: 'shrine' });
   for (const L of lakesNear(x, z, 1500)) {
     if (out.length >= MARKS) break;
-    if (!L.settled || L === HOME || Math.hypot(L.x - x, L.z - z) < L.R0 * 2) continue;
+    if (L === HOME || Math.hypot(L.x - x, L.z - z) < L.R0 * 2) continue;
     out.push({ key: 'lake:' + L.id, name: L.name, x: L.x, z: L.z, kind: 'lake' });
   }
   return out;
@@ -99,7 +99,7 @@ export function initCompass() {
   });
 
   // Coming to a place: its name. (The lake you are at changes only once you have left the last one behind.)
-  hooks.lake.push((L) => toast(L === HOME ? `${L.name} · home` : `${L.name}${L.settled ? '' : ' · a wild lake'}${L.frozen ? ', frozen' : ''}`, 3.5));
+  hooks.lake.push((L) => toast(L === HOME ? `${L.name} · home` : `${L.name}${L.frozen ? ' · frozen' : ''}`, 3.5));
   let atShrine = null;
   setInterval(() => {
     const s = shrineSitesNear(player.x, player.z, 40)[0] || null;

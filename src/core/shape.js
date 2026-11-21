@@ -10,7 +10,7 @@
 // scattered over the whole land by its seed (see "Lakes from the seed"); one of them is HOME, the
 // lake you start beside, and the single-lake names (LAKE, lakeR, lakePoint, SPAWN, dockStart, ...)
 // stand for whichever lake the landmarks are at (HOME, until they move).
-import { TAU, smooth, clamp, fbm, hash, mulberry32 } from './math.js';
+import { TAU, smooth, clamp, fbm, fbmD, hash, mulberry32 } from './math.js';
 import { seasonState } from './state.js';
 import { worldSeed } from '../systems/save.js';
 
@@ -187,18 +187,31 @@ export let LAKE = HOME, lakeR = HOME.r;
  * mountains are held back round every lake (`open` is 0 by a lake, 1 away from any), so each lake
  * lies in its own valley. Never below 0.6 m: the only water is the lakes.
  */
+/**
+ * How strongly the mountains' fine relief is worn off their steep sides (see land()). Running water
+ * and falling rock strip the small bumps from a steep slope and leave them on the ridges and the
+ * flats; here the bumps shrink by 1 / (1 + EROSION * slope²), the slope being that of the broad
+ * shape of the mountain beneath them.
+ */
+export const EROSION = 1.0;
+const gH = [0, 0, 0], gC = [0, 0, 0];
 function land(x, z, open) {
   const u = x + SX * 31, v = z + SZ * 31;
   const meadow = 0.6 + fbm(u * 0.018 + 3.1, v * 0.018 - 7.4) * 7.5;
   if (open <= 0) return meadow;
-  const hills = fbm(u * 0.0055 - 9.2, v * 0.0055 + 23.6);
-  let rise = hills * hills * 46;
   const range = rangeAt(x, z);
-  if (range > 0) {
-    const crest = 1 - Math.abs(2 * fbm(u * 0.0038 + 71.1, v * 0.0038 + 5.5) - 1); // ridged: sharp along the tops
-    rise += range * (28 + crest * crest * 205 + fbm(u * 0.021 - 3.3, v * 0.021 + 8.8) * 24 * range);
-  }
-  return meadow + open * rise;
+  if (range <= 0) { const hills = fbm(u * 0.0055 - 9.2, v * 0.0055 + 23.6); return meadow + open * hills * hills * 46; }
+  // the mountains: broad hills and ridged crests (with their slopes, in metres per metre)...
+  fbmD(u * 0.0055 - 9.2, v * 0.0055 + 23.6, gH);
+  fbmD(u * 0.0038 + 71.1, v * 0.0038 + 5.5, gC);
+  const hills = gH[0], f = gC[0], sgn = 2 * f - 1 >= 0 ? 1 : -1;
+  const crest = 1 - Math.abs(2 * f - 1); // ridged: sharp along the tops
+  const kx = 2 * hills * 46 * gH[1] * 0.0055 - range * 2 * crest * 205 * 2 * sgn * gC[1] * 0.0038;
+  const kz = 2 * hills * 46 * gH[2] * 0.0055 - range * 2 * crest * 205 * 2 * sgn * gC[2] * 0.0038;
+  // ...and their fine relief, worn off where that broad shape is steep
+  const wear = 1 / (1 + EROSION * (kx * kx + kz * kz) * open * open);
+  const detail = 0.5 + (fbm(u * 0.021 - 3.3, v * 0.021 + 8.8) - 0.5) * wear;
+  return meadow + open * (hills * hills * 46 + range * (28 + crest * crest * 205 + detail * 24 * range));
 }
 /** How much a spot is in the mountains (0 none .. 1 the heart of a range). */
 function rangeAt(x, z) { return smooth(0.5, 0.72, fbm((x + SX * 31) * 0.0014 + 41.3, (z + SZ * 31) * 0.0014 - 17.9)); }

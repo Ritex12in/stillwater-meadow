@@ -46,6 +46,27 @@ export function vnoise(x, y) {
   const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
+/**
+ * Value noise with its slope: `out` gets [value, d/dx, d/dy]. The value is exactly vnoise(x, y).
+ */
+export function vnoiseD(x, y, out) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), du = 6 * xf * (1 - xf), dv = 6 * yf * (1 - yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1), k = a - b - c + d;
+  out[0] = a + (b - a) * u + (c - a) * v + k * u * v;
+  out[1] = (b - a + k * v) * du;
+  out[2] = (c - a + k * u) * dv;
+  return out;
+}
+const nd = [0, 0, 0];
+/** fbm(x, y) with its slope: `out` gets [value, d/dx, d/dy]. The value is exactly fbm(x, y). */
+export function fbmD(x, y, out) {
+  let s = 0, amp = 0.5, f = 1, n = 0, gx = 0, gy = 0;
+  for (let i = 0; i < 4; i++) { vnoiseD(x * f, y * f, nd); s += amp * nd[0]; gx += amp * f * nd[1]; gy += amp * f * nd[2]; n += amp; amp *= 0.5; f *= 2.03; }
+  out[0] = s / n; out[1] = gx / n; out[2] = gy / n;
+  return out;
+}
 export function fbm(x, y) {
   let s = 0, amp = 0.5, f = 1, n = 0;
   for (let i = 0; i < 4; i++) { s += amp * vnoise(x * f, y * f); n += amp; amp *= 0.5; f *= 2.03; }

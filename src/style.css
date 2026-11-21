@@ -53,7 +53,7 @@ body.quiet .brand { opacity: 0.45; }
 .hint b { color: var(--ink); font-weight: 700; }
 .hint.gone { opacity: 0; }
 /* the compass: the half of the horizon you face, with a few named places on it */
-.compass { position: fixed; top: var(--top); left: 50%; transform: translateX(-50%); width: clamp(220px, 32vw, 440px); height: 54px; pointer-events: none; background: linear-gradient(180deg, rgba(10, 16, 20, 0.42), rgba(10, 16, 20, 0.18) 60%, rgba(10, 16, 20, 0)); border-radius: 10px; overflow: hidden; transition: opacity 0.8s ease;
+.compass { position: fixed; top: var(--top); left: 50%; transform: translateX(-50%); width: clamp(240px, calc(100vw - 990px), 440px); height: 54px; pointer-events: none; background: linear-gradient(180deg, rgba(10, 16, 20, 0.42), rgba(10, 16, 20, 0.18) 60%, rgba(10, 16, 20, 0)); border-radius: 10px; overflow: hidden; transition: opacity 0.8s ease;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); }
 .compass::before { content: ""; position: absolute; left: 50%; top: 2px; width: 1px; height: 8px; background: var(--ink); opacity: 0.8; }
 .compass .track { position: absolute; left: 50%; top: 0; height: 100%; border-top: 1px solid rgba(255, 255, 255, 0.22); width: 0; }
@@ -67,7 +67,7 @@ body.quiet .brand { opacity: 0.45; }
 .compass .mark b { font-weight: 700; }
 .compass .mark.dot b, .compass .mark.dot i { visibility: hidden; }
 .compass .mark i { font-style: normal; font-size: 9.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-@media (max-width: 900px) { .compass { top: calc(var(--top) + 50px); } .toast { top: calc(var(--top) + 108px); } }
+@media (max-width: 1240px) { .compass { top: calc(var(--top) + 50px); width: clamp(240px, 46vw, 400px); } .toast { top: calc(var(--top) + 108px); } }
 
 /* ── toolbar ── */
 .toolbar { position: fixed; top: var(--top); right: var(--right); display: flex; gap: 6px; }

@@ -326,6 +326,10 @@ test('seasons by place: the year turns every 8 days; cold uplands whiten and the
   expect(r.warmSnow, 'warm country: no snow in midwinter').toBe(0);
   expect(r.warmLeaves, 'and its trees in leaf').toBe('summer');
   expect(r.bad, 'no time of year at home without a way to the rod').toEqual([]);
+  // the World panel says how it is where you stand
+  await page.evaluate(() => window.__meadow.year.hold(0.78));
+  await page.click('button[data-panel="worldPanel"]');
+  await expect(page.locator('#hereNow')).toContainText('Here: Mid autumn');
   noErrors(errors);
 });
 

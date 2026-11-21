@@ -1,6 +1,7 @@
 // The World popover: time of day (live or picked), weather, season, and the places about you, in one place.
 import { timeCtl, setManual, goLive, formatHour, onTimeModeChange } from '../systems/time.js';
 import { wx, setWeather, goAutoWeather, onWeatherChange } from '../systems/weather.js';
+import { seasonState } from '../core/state.js';
 import { worldSeed, worldSeedText, seedOf, randomSeed, goToWorld, worldAddress } from '../systems/save.js';
 
 const $ = (id) => document.getElementById(id);
@@ -56,8 +57,23 @@ function initSeed() {
   });
 }
 
+/** What it is like where you stand: the time of the year, and the season and weather here. */
+export function hereText() {
+  const st = seasonState, p = typeof st.phase === 'number' ? st.phase : 0.5;
+  const into = ((((p + 0.125) % 1) + 1) % 1) * 4 % 1, part = into < 0.34 ? 'Early' : into < 0.67 ? 'Mid' : 'Late';
+  const season = (st.name || 'Summer').toLowerCase(), bits = [`${part} ${season}`];
+  const sky = { rain: 'rain', storm: 'a thunderstorm', fog: 'fog', snow: 'snowing' }[wx.type];
+  if (sky) bits.push(sky);
+  if (st.winterHere && st.name !== 'Winter') bits.push('snow lies here');
+  else if (!st.winterHere && st.name === 'Winter') bits.push('mild here');
+  else if (st.leavesHere === 'autumn' && st.name !== 'Autumn') bits.push('the leaves have turned here');
+  return 'Here: ' + bits.join(' · ');
+}
+
 export function initWorldPanel() {
   initSeed();
+  const here = $('hereNow'), panel = $('worldPanel');
+  if (here) { const say = () => { if (!panel.hidden) here.textContent = hereText(); }; setInterval(say, 2000); new MutationObserver(say).observe(panel, { attributes: true, attributeFilter: ['hidden'] }); }
   const slider = $('timeSlider'), out = $('timeOut'), live = $('liveBtn');
   slider.addEventListener('input', () => setManual(+slider.value / 60));
   live.addEventListener('click', goLive);

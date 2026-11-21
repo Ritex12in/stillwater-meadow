@@ -37,7 +37,7 @@ import { wx, WX_LABEL, buildWeather, updateWeather, updatePrecip, weatherModify,
 import { quality, initQuality, tickQuality, onQualityChange, loadingStarted, loadingFinished } from './systems/quality.js';
 import { grassU, updateGrassMap } from './world/grassfield.js';
 import { farForest } from './world/farforest.js';
-import { updateWilds, settleWilds, wildStats, growSquare } from './world/wilds.js';
+import { updateWilds, settleWilds, wildStats, growSquare, growRocks, growSmall } from './world/wilds.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
 import { store, onSave, flush } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
@@ -314,7 +314,7 @@ window.__meadow = {
   // the ground's tiles: what is loaded, and ways to bring it up to date without waiting for frames
   ground: { stats: groundStats, update: updateGround, pump: pumpGround, settle: settleGround },
   // the trees beyond the valley: what is loaded, a way to bring it up to date, and one square's trees
-  wilds: { stats: wildStats, settle: settleWilds, square: growSquare },
+  wilds: { stats: wildStats, settle: settleWilds, square: growSquare, rocks: growRocks, small: (ix, iz) => growSmall(ix, iz, growSquare(ix, iz)) },
   /** How many objects the scene holds (it must not creep up as you travel). */
   objects: () => { let n = 0; scene.traverse(() => { n++; }); return n; },
   hour: () => wrap24(timeCtl.hour),

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TAU, mulberry32, fbm } from '../core/math.js';
 import { height, lakeT, lakeR, pathAmt, nearReserved, onDock, LAKE, PATH_T, BENCH_SPOT, SPAWN, WORLD_LIMIT } from '../core/shape.js';
-import { col, weatherize, addWind, bothSides, instancedVariants, softEdges, neonAtNight } from '../core/materials.js';
+import { col, weatherize, addWind, bothSides, instancedVariants, slotSet, softEdges, neonAtNight } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { world } from '../core/state.js';
 
@@ -115,9 +115,9 @@ export function buildWildflowers() {
   const blooms = softEdges(neonAtNight(bothSides(addWind(new THREE.MeshLambertMaterial({ map: kit.tex.flowers, alphaTest: 0.5, vertexColors: true }), 0.4, FADE))));
   const grassMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ color: '#9cb85a', vertexColors: true }), 0.6, [16, 34]), 'lam')); // dense model: kept near
   const o = { cell: 30, far: FADE[1] }, lupins = lupinClump();
-  const sub = (k) => (it) => (it.kind === k ? 0 : -1);
+  const sub = (k) => (it) => (it.kind === k ? 0 : -1), daisyGeo = daisyClump();
   world.wild = [
-    instancedVariants([daisyClump()], plain, items, sub(0), o),
+    instancedVariants([daisyGeo], plain, items, sub(0), o),
     // its own material: three r128 doesn't recompile a shared one for meshes with per-instance colour
     instancedVariants([lupins.florets], neonAtNight(bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.15, FADE), 'lam'))), items, sub(1), o),
     instancedVariants([lupins.greens], bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.15, FADE), 'lam')), items.map((it) => Object.assign({}, it, { color: null })), sub(1), o), // same sway as the florets
@@ -128,4 +128,23 @@ export function buildWildflowers() {
   const rockMat = weatherize(new THREE.MeshStandardMaterial({ map: kit.tex.pathrocks, roughness: 0.9, vertexColors: true }), 'std');
   instancedVariants(['Pebble_Round_1', 'Pebble_Round_2', 'Pebble_Round_3'].map((n) => piece(n, 0.12, /./)[0]), rockMat, pebbles, (p) => p.kind, { cell: 40, far: 60, cast: false });
   world.wildCount = items.length;
+  // The same clumps out in the wilds (world/wilds.js): daisies, lupins and red tulips, in fixed
+  // slots refilled as you walk. They join world.wild, so winter and the wildflower setting hide
+  // them with the rest. (Each set shares its material with the valley's set of the same flower.)
+  const wild = [
+    slotSet([daisyGeo], plain, 420),
+    slotSet([lupins.florets], world.wild[1].material, 260, { colored: true }),
+    slotSet([lupins.greens], world.wild[2].material, 260),
+    slotSet([piece('Flower_3_Group', 0.5, /Leaves/)[0]], leaves, 200),
+    slotSet([piece('Flower_3_Group', 0.5, /Flowers/)[0]], blooms, 200),
+  ];
+  world.wild.push(...wild);
+  world.setWildFlowers = (list) => {
+    wild[0].setItems(list, sub(0));
+    wild[1].setItems(list, sub(1)); wild[2].setItems(list, sub(1));
+    wild[3].setItems(list, sub(2)); wild[4].setItems(list, sub(2));
+    return wild.reduce((a, w) => a + w.dropped, 0);
+  };
+  /** Lupin colours, for whoever plants them. */
+  world.lupinColours = purples;
 }

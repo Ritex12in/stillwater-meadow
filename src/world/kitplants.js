@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { TAU, lerp, mulberry32, fbm } from '../core/math.js';
 import { height, lakeT, pathAmt, SPAWN, nearReserved } from '../core/shape.js';
-import { std, col, weatherize, addWind, bothSides, instancedVariants, lodSet, cutoutDepth, treeWarp, softEdges, neonAtNight } from '../core/materials.js';
+import { std, col, weatherize, addWind, bothSides, instancedVariants, lodSet, slotSet, cutoutDepth, treeWarp, softEdges, neonAtNight } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { variantAt } from './detail.js';
 import { world } from '../core/state.js';
@@ -14,6 +14,7 @@ export const KIT_GRASS_FADE = [6, 22];   // detailed grass thins out from near y
 export const KIT_FLOWER_FADE = [26, 54];
 const UNDERGROWTH_FADE = [40, 55];
 const FAR_KEEP = 0.4; // share of leaf cards a far tree keeps
+const ROCK_SLOTS = 96; // how many wild boulders of one shape can be drawn at once
 
 const tex = (n) => kit.tex[n];
 /** Tree crowns: the leaf material, swaying a little at the top and rustling as gusts pass. */
@@ -203,14 +204,32 @@ export function kitRocks(rocks, opts) {
   const mat = weatherize(std('#ffffff', { map: tex('rocks'), flatShading: false }), 'std');
   // the rock texture is dark and mossy; lift the per-rock greys so the shore reads as before
   const items = rocks.map((r) => Object.assign({}, r, { sx: r.sx * 0.95, sz: r.sz * 0.95, sy: r.sy * 1.2, color: r.color.clone().multiplyScalar(2.4) }));
-  if (!kit.models.Rock_1) { instancedVariants(geos, mat, items, (r) => variantAt(r.x, r.z, 3, 11), opts); return; }
+  // the wilds' boulders (world/wilds.js) use the same shapes, in fixed slots refilled as you walk
+  const wildMedium = slotSet(geos, mat, ROCK_SLOTS, { cast: true, colored: true });
+  const meadow = !!kit.models.Rock_1;
+  const pick = (r) => (meadow ? variantAt(r.x, r.z, 8, 11) : variantAt(r.x, r.z, 3, 11));
+  let wildCrag = null;
+  world.setWildRocks = (list) => {
+    for (const r of list) {
+      if (r.shape !== undefined) continue;
+      // (decided once per rock: which shape, and that shape's own proportions and brightness)
+      const p = pick(r);
+      r.crag = p >= 3; r.shape = r.crag ? p - 3 : p;
+      if (r.crag) r.color = r.color.clone().multiplyScalar(1.6);
+      else { r.sx *= 0.95; r.sz *= 0.95; r.sy *= 1.2; r.color = r.color.clone().multiplyScalar(2.4); }
+    }
+    wildMedium.setItems(list, (r) => (r.crag ? -1 : r.shape));
+    if (wildCrag) wildCrag.setItems(list, (r) => (r.crag ? r.shape : -1));
+    return wildMedium.dropped + (wildCrag ? wildCrag.dropped : 0);
+  };
+  if (!meadow) { instancedVariants(geos, mat, items, (r) => variantAt(r.x, r.z, 3, 11), opts); return; }
   // with the meadow pack, half the rocks are its light, craggy boulders
-  const pick = (r) => variantAt(r.x, r.z, 8, 11);
   instancedVariants(geos, mat, items, (r) => (pick(r) < 3 ? pick(r) : -1), opts);
   const crags = [1, 2, 3, 4, 5].map((i) => first(fit(pieces('Rock_' + i), 1.2), /Rock/));
   const cragMat = weatherize(std('#ffffff', { map: tex('crag'), flatShading: false }), 'std');
   const cragItems = rocks.map((r) => Object.assign({}, r, { color: r.color.clone().multiplyScalar(1.6) }));
   instancedVariants(crags, cragMat, cragItems, (r) => (pick(r) >= 3 ? pick(r) - 3 : -1), opts);
+  wildCrag = slotSet(crags, cragMat, ROCK_SLOTS, { cast: true, colored: true });
 }
 
 // ───────────── grass near you ─────────────
@@ -276,15 +295,28 @@ export function buildUndergrowth(treeSpots) {
   const leafMat = (map) => softEdges(weatherize(wind(std('#ffffff', { map, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true }), 0.05), 'std'));
   // the two bushes are laid out on different leaf textures
   const o = { cast: true, shadowRange: UNDERGROWTH_FADE[1], cell: 40, far: UNDERGROWTH_FADE[1] };
-  world.bushes = instancedVariants([bushPlain], leafMat(tex('leaves_bush')), bushes, (b) => (b.flowers ? -1 : 0), Object.assign({ depthMat: cutoutDepth(tex('leaves_bush')) }, o));
+  const bushMat = leafMat(tex('leaves_bush'));
+  world.bushes = instancedVariants([bushPlain], bushMat, bushes, (b) => (b.flowers ? -1 : 0), Object.assign({ depthMat: cutoutDepth(tex('leaves_bush')) }, o));
   world.bushesInBloom = instancedVariants([first(bushFl, /Leaves/)], leafMat(tex('leaves_round')), bushes, (b) => (b.flowers ? 0 : -1), Object.assign({ depthMat: cutoutDepth(tex('leaves_round')) }, o));
   const bloom = softEdges(neonAtNight(bothSides(wind(new THREE.MeshLambertMaterial({ map: tex('flowers'), alphaTest: 0.5, vertexColors: true }), 0.05)), 0.8));
   world.bushBlooms = instancedVariants([first(bushFl, /Flowers/)], bloom, bushes.map((b) => Object.assign({}, b, { color: null })), (b) => (b.flowers ? 0 : -1), { cell: 40, far: UNDERGROWTH_FADE[1] });
   const leafy = softEdges(bothSides(wind(new THREE.MeshLambertMaterial({ map: tex('leaves'), alphaTest: 0.5, vertexColors: true }), 0.3)));
-  world.ferns = instancedVariants([shadeByHeight(first(fit(pieces('Fern_1'), 0.45), /Leaves/), 0.6, 1.1)], leafy, ferns, () => 0, { cell: 40, far: UNDERGROWTH_FADE[1] });
+  const fernGeo = shadeByHeight(first(fit(pieces('Fern_1'), 0.45), /Leaves/), 0.6, 1.1);
+  world.ferns = instancedVariants([fernGeo], leafy, ferns, () => 0, { cell: 40, far: UNDERGROWTH_FADE[1] });
   const leafyNear = softEdges(bothSides(addWind(new THREE.MeshLambertMaterial({ map: tex('leaves'), alphaTest: 0.5, vertexColors: true }), 0.3, [22, 32])));
   world.clover = instancedVariants([shadeByHeight(first(fit(pieces('Clover_1'), 0.3), /Leaves/), 0.6, 1.1)], leafyNear, clover, () => 0, { cell: 30, far: 32 });
   const shroomMat = wind(std('#ffffff', { map: tex('mushrooms'), flatShading: false }), 0);
-  world.mushrooms = instancedVariants([first(fit(pieces('Mushroom_Common'), 0.22), /Mushroom/)], shroomMat, shrooms, () => 0, { cell: 40, far: UNDERGROWTH_FADE[1] });
+  const shroomGeo = first(fit(pieces('Mushroom_Common'), 0.22), /Mushroom/);
+  world.mushrooms = instancedVariants([shroomGeo], shroomMat, shrooms, () => 0, { cell: 40, far: UNDERGROWTH_FADE[1] });
   world.undergrowth = { bushes: bushes.length, ferns: ferns.length, clover: clover.length, mushrooms: shrooms.length };
+  // the same plants out in the wilds (world/wilds.js): fixed slots, refilled as you walk
+  const wild = {
+    bushes: slotSet([bushPlain], bushMat, 160, { cast: true, colored: true, depthMat: cutoutDepth(tex('leaves_bush')) }),
+    ferns: slotSet([fernGeo], leafy, 360),
+    shrooms: slotSet([shroomGeo], shroomMat, 360),
+  };
+  world.setWildUndergrowth = (list) => {
+    for (const k in wild) wild[k].setItems(list[k], () => 0);
+    return wild.bushes.dropped + wild.ferns.dropped + wild.shrooms.dropped;
+  };
 }

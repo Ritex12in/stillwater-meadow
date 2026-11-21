@@ -123,3 +123,35 @@ test('without the nature models the land and its woods still work (hand-built tr
   await step(page, 1);
   noErrors(errors);
 });
+
+test('the wilds are furnished: each square has its own boulders, bushes and flower drifts, the same every time', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const grown = await page.evaluate(() => {
+    const w = window.__meadow.wilds, flat = (list) => JSON.stringify(list.map((t) => [t.x, t.z, t.y, t.s, t.kind]));
+    const small = (ix, iz) => { const s = w.small(ix, iz); return flat(s.bushes) + flat(s.ferns) + flat(s.shrooms) + flat(s.flowers); };
+    let rocks = 0, plants = 0, best = null;
+    for (let iz = -9; iz <= 9; iz++) for (let ix = -9; ix <= 9; ix++) {
+      if (Math.hypot(ix, iz) < 3.5) continue;
+      const s = w.small(ix, iz), n = s.bushes.length + s.ferns.length + s.shrooms.length + s.flowers.length;
+      rocks += w.rocks(ix, iz).length; plants += n;
+      if (!best || n > best.n) best = { ix, iz, n };
+    }
+    return { rocks, plants, best, sameRocks: flat(w.rocks(7, -5)) === flat(w.rocks(7, -5)), sameSmall: small(best.ix, best.iz) === small(best.ix, best.iz) };
+  });
+  expect(grown.sameRocks).toBe(true);
+  expect(grown.sameSmall).toBe(true);
+  expect(grown.rocks, 'boulders lie about').toBeGreaterThan(200);
+  expect(grown.plants, 'and small plants grow').toBeGreaterThan(800);
+  // stand in the lushest square: its plants and the boulders round it are set out, and none goes undrawn
+  const there = await page.evaluate(({ ix, iz }) => {
+    const m = window.__meadow, x = (ix + 0.5) * 57.6, z = (iz + 0.5) * 57.6;
+    m.player.x = x; m.player.z = z; m.player.slide = null;
+    m.ground.settle(x, z); m.wilds.settle(x, z);
+    for (let i = 0; i < 30; i++) m.tick(1 / 30);
+    return m.wilds.stats();
+  }, grown.best);
+  expect(there.small).toBeGreaterThan(grown.best.n - 1);
+  expect(there.rocks).toBeGreaterThan(0);
+  expect(there.dropped).toBe(0);
+  noErrors(errors);
+});

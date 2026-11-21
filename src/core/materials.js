@@ -236,6 +236,56 @@ export function instancedVariants(geos, mat, items, variantOf, opts = {}) {
   };
 }
 
+/**
+ * Things that come and go as you walk (the wilds' rocks, bushes and flowers): one InstancedMesh
+ * per shape with a fixed number of slots, refilled with `setItems(items, variantOf)`. Nothing is
+ * allocated or thrown away after it is made; items past the last slot are counted in `dropped`.
+ * Meant for things that only exist near the camera, so the meshes are never culled as a whole.
+ */
+export function slotSet(geos, mat, capacity, opts = {}) {
+  const meshes = geos.map((geo) => {
+    const m = new THREE.InstancedMesh(geo, mat, capacity);
+    if (opts.colored) m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3);
+    m.count = 0; m.visible = false;
+    m.frustumCulled = false;
+    m.castShadow = !!opts.cast;
+    m.receiveShadow = opts.receive !== false;
+    if (opts.depthMat) m.customDepthMaterial = opts.depthMat;
+    if (!opts.cast) m.layers.set(1); // small plants live on layer 1
+    scene.add(m);
+    return m;
+  });
+  const fill = new Int32Array(geos.length);
+  let dropped = 0, on = true;
+  return {
+    meshes,
+    material: mat,
+    get dropped() { return dropped; },
+    setItems(items, variantOf) {
+      fill.fill(0); dropped = 0;
+      for (const it of items) {
+        const v = variantOf(it);
+        if (v < 0) continue;
+        const m = meshes[v], k = fill[v];
+        if (k >= capacity) { dropped++; continue; }
+        fill[v]++;
+        if (!it.m16) it.m16 = composeItem(it).toArray(new Float32Array(16)); // (kept on the item: refills only copy it)
+        m.instanceMatrix.array.set(it.m16, k * 16);
+        if (m.instanceColor && it.color) it.color.toArray(m.instanceColor.array, k * 3);
+      }
+      meshes.forEach((m, v) => {
+        m.count = fill[v];
+        m.visible = on && m.count > 0;
+        if (!m.count) return;
+        m.instanceMatrix.updateRange.offset = 0; m.instanceMatrix.updateRange.count = m.count * 16;
+        m.instanceMatrix.needsUpdate = true;
+        if (m.instanceColor) { m.instanceColor.updateRange.offset = 0; m.instanceColor.updateRange.count = m.count * 3; m.instanceColor.needsUpdate = true; }
+      });
+    },
+    set visible(v) { on = v; meshes.forEach((m) => { m.visible = v && m.count > 0; }); },
+  };
+}
+
 // ───────────── distance: what gets drawn, and what casts shadows ─────────────
 const ranged = [], lodSets = [];
 const faded = new WeakMap(); // materials already given a cross-fade (several sets share one)

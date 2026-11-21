@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TAU, rng, rand, pick, smooth, fbm, vnoise, angDiff, mulberry32 } from '../core/math.js';
 import { height, lakeT, lakeR, lakePoint, pathAmt, SPAWN, onDock, dockStart, DOCK_A, nearReserved, BENCH_SPOT, PATH_T, LAKE, WORLD_LIMIT } from '../core/shape.js';
-import { std, col, weatherize, addWind, bothSides, instanced, instancedChunks, instancedVariants, lodSet, softEdges, neonAtNight } from '../core/materials.js';
+import { std, col, weatherize, addWind, bothSides, instanced, instancedChunks, instancedVariants, lodSet, slotSet, softEdges, neonAtNight } from '../core/materials.js';
 import { pineFarGeos, crownFarGeos, pineTrunkFarGeos, crownTrunkFarGeos, pineGeos, crownGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
 import { world, obstacles } from '../core/state.js';
 import { kit, fit } from '../core/assets.js';
@@ -131,7 +131,12 @@ export function buildRocks() {
   }
   const opts = { cast: true, cell: 60, shadowRange: SHADOW_RANGE };
   if (kit) kitRocks(rocks, opts);
-  else instancedChunks(new THREE.IcosahedronGeometry(1, 0), weatherize(std('#ffffff'), 'std'), rocks, opts);
+  else {
+    const geo = new THREE.IcosahedronGeometry(1, 0), mat = weatherize(std('#ffffff'), 'std');
+    instancedChunks(geo, mat, rocks, opts);
+    const wild = slotSet([geo], mat, 300, { cast: true, colored: true }); // the wilds' boulders (world/wilds.js)
+    world.setWildRocks = (list) => { wild.setItems(list, () => 0); return wild.dropped; };
+  }
 }
 
 export function buildGrass() {

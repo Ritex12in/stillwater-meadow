@@ -29,8 +29,8 @@ Each one leaves the game playable and tested.
 | 1 | **Prepare the code.** Lakes and the places beside them become data that code asks for by position, instead of constants. | The world is bit-for-bit the same (`tools/fingerprint.mjs`) and every test passes. | done |
 | 2a | **Endless ground.** Land from a world seed (`?seed=`), drawn in tiles round the camera at five sizes; the painted mountain ring replaced by real far terrain; grass, clouds and birds follow the player; the walk limit removed (steep slopes block instead). The valley's own trees and flowers still stand where they did. | Tile buffers stop growing over repeated 2 km trips (`tests/world.spec.js`); same seed, same land. Smoothness still needs a look on a real GPU. | done |
 | 2b | **Trees everywhere.** Each 57.6 m square beyond the valley grows its own trees from the seed; real models near the player, cards further off; the camera, walkers, animals and seasons treat them like the valley's. | A square regrows identically; no tree is dropped for want of a slot; repeated 2 km trips leave the scene's object count unchanged (`tests/world.spec.js`). | done |
-| 2c | **Small plants and rocks beyond the valley.** Boulders, bushes, ferns, wildflowers and pickable flowers per square. The valley's own build-once plants stay until milestone 4 retires the valley. | Same checks as 2b. | next |
-| 3 | **Biomes.** Meadow, forest, hills, mountains and snow, blending into each other. | |
+| 2c | **Small plants and rocks beyond the valley.** Boulders (with the tree models), and in the squares closest to the player bushes, ferns, mushrooms and drifts of daisies, lupins and tulips. The valley's own build-once plants stay until milestone 4 retires the valley. Picking flowers out there waits for milestone 4 too. | A square regrows identically; nothing dropped (`tests/world.spec.js`). | done |
+| 3 | **Biomes.** Meadow, forest, hills, mountains and snow, blending into each other. | | next |
 | 4 | **Lakes and landmarks everywhere.** The fixed home goes. | |
 | 5 | **Travelling.** Companions keep up; the save holds seed and position; a way to find places again. | |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. | |
@@ -133,7 +133,12 @@ or dropped once a pack is chosen.
   refills the `lodSet`s through `world.roundTop.setItems`. Models stop at `MODEL_FAR`.
 - Seasons: each round tree carries its own palette (`pal`) and current colour (`shown`). The
   valley's are drawn from the runtime stream as before; wild trees hash their position.
-- `window.__meadow.wilds` (`stats`, `settle`, `square`) and `objects()` are there for tests.
+- Boulders and small plants (milestone 2c) are drawn by `slotSet`s (`core/materials.js`): one
+  InstancedMesh per shape with a fixed number of slots, sharing the valley's geometry and
+  materials. Each builder hands the wilds a refill function (`world.setWildRocks`,
+  `world.setWildUndergrowth`, `world.setWildFlowers`). Boulders come with the "near" squares;
+  small plants only with the "close" ones (`WILD.closeIn`), grown lazily by `growSmall`.
+- `window.__meadow.wilds` (`stats`, `settle`, `square`, `rocks`, `small`) and `objects()` are there for tests.
 
 ## Tools
 

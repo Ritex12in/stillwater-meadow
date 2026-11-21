@@ -65,6 +65,7 @@ import { initDanceCam } from './features/dancecam.js';
 import { initDanceMusic } from './features/dancemusic.js';
 import { initFoley } from './features/foley.js';
 import { ferry, boatSeat, BOARD_POINT, boat } from './characters/boat.js';
+import { updateLakeLife, updateLifeLake, lifeLake, lifeStats, lifeOf } from './world/lakelife.js';
 import { seasonNow } from './features/seasons.js';
 
 let renderer;
@@ -141,7 +142,8 @@ function travelTo(x, z, faceX, faceZ) {
   player.x = x; player.z = z; player.slide = null; player.y = groundAt(x, z);
   if (faceX !== undefined) { player.rot = Math.atan2(faceX - x, faceZ - z); camState.yaw = Math.atan2(x - faceX, z - faceZ); }
   updateAnchor(0, true); // (if this is another settled lake, its jetty, fire and bench are here when you arrive)
-  settleGround(x, z); settleWilds(x, z); updateWater(x, z);
+  updateLifeLake(0, x, z, true);
+  settleGround(x, z); settleWilds(x, z); updateWater(x, z); updateLakeLife(x, z);
   flush();
 }
 /** The lakes within reach, for the Places list and the tests. */
@@ -190,6 +192,7 @@ for (const [name, init] of Object.entries(features)) {
 resize();
 // the landmarks stand where you are: at the settled lake you last left them by, or the one nearest you now
 updateAnchor(0, true);
+updateLifeLake(0, player.x, player.z, true); // (and the ducks, the heron and the mist are at the lake you are at)
 
 // ── Hotkeys ──
 bindKey('KeyH', () => togglePanel('controls'));
@@ -287,6 +290,7 @@ export function tick(dt) {
   safe('boat', () => updateBoat(dt, clock.elapsed, cur.eve, cur.day));
   safe('player', () => updatePlayer(dt, updatePetting));
   safe('places', () => updateAnchor(dt));
+  safe('lake life', () => updateLifeLake(dt, player.x, player.z));
   safe('camera', () => updateCamera(dt, player));
   audio.listener.x = camera.position.x; audio.listener.z = camera.position.z; audio.listener.yaw = camState.yaw;
   safe('animals', () => { for (const a of animals) updateAnimal(a, dt, clock.elapsed); separateAnimals(); });
@@ -323,6 +327,7 @@ function frame(now) {
   pumpGround(3);
   updateWilds(camera.position.x, camera.position.z);
   updateWater(camera.position.x, camera.position.z);
+  updateLakeLife(camera.position.x, camera.position.z);
   renderNow();
   requestAnimationFrame(frame);
 }
@@ -350,6 +355,9 @@ window.__meadow = {
   seed: WORLD.seed,
   /** Lakes: those about you, the ones with water drawn just now, and a way to go to one or to any spot. */
   lakes: lakesAbout, waterLakes, visitLake, travelTo,
+  /** Lake life: the lake the creatures are at, and the reeds and lilies drawn just now. */
+  life: () => Object.assign({ lake: lifeLake.id }, lifeStats),
+  lakeLife: (id) => { const L = lakesNear(player.x, player.z, 6000).find((q) => q.id === id); if (!L) return null; const l = lifeOf(L); return { reeds: l.reeds.length, heads: l.heads.length, pads: l.pads.length, blooms: l.blooms.length, key: JSON.stringify([l.reeds, l.pads].map((list) => list.map((it) => [it.x, it.z, it.s]))) }; },
   /** The landmarks: which lake they stand at, what it has, the settled lakes about, and a way to send them to one. */
   anchor: anchorId, get kit() { return Object.assign({}, KIT); }, settled: settledAbout, boatShown: () => boat.visible,
   moveAnchor: (id) => { const L = lakesNear(player.x, player.z, 6000).find((q) => q.id === id); return !!L && moveAnchor(L); },

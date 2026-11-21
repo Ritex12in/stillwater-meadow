@@ -6,7 +6,7 @@ import { TAU, clamp, lerp, damp, smooth, rnd } from '../core/math.js';
 import { query } from '../core/env.js';
 import { lakePoint, heightAt } from '../core/shape.js';
 import { glowTex, wxU, windU } from '../core/materials.js';
-import { seasonState } from '../core/state.js';
+import { seasonState, hooks } from '../core/state.js';
 import { makeFalling } from '../world/particles.js';
 import { waterU } from '../world/water.js';
 import { voice, audio } from './audio.js';
@@ -137,13 +137,17 @@ export function buildWeather() {
   })();
   for (let i = 0; i < 16; i++) {
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, transparent: true, depthWrite: false, opacity: 0 }));
-    const pt = lakePoint(rnd() * TAU, rnd(0.2, 1.7));
-    sp.position.set(pt.x, Math.max(heightAt(pt.x, pt.z), 0) + rnd(0.6, 1.6), pt.z);
+    const a = rnd() * TAU, tt = rnd(0.2, 1.7), pt = lakePoint(a, tt), lift = rnd(0.6, 1.6);
+    sp.position.set(pt.x, Math.max(heightAt(pt.x, pt.z), 0) + lift, pt.z);
     sp.scale.set(rnd(16, 28), rnd(3.5, 6), 1);
     sp.visible = false;
     scene.add(sp);
-    mists.push({ sp, bx: pt.x, p: rnd() * TAU });
+    mists.push({ sp, bx: pt.x, p: rnd() * TAU, a, tt, lift });
   }
+  // you have come to another lake: the mist lies over that one (each wisp at its own place round it)
+  hooks.lake.push((lake) => {
+    for (const m of mists) { const pt = lake.point(m.a, m.tt); m.bx = pt.x; m.sp.position.set(pt.x, Math.max(heightAt(pt.x, pt.z), 0) + m.lift, pt.z); }
+  });
 
   rainbowMat = new THREE.ShaderMaterial({
     uniforms: { uAmt: { value: 0 } },

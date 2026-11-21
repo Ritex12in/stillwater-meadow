@@ -85,6 +85,18 @@ export function initDucks() {
     hero.elbows[1].rotation.x = lerp(hero.elbows[1].rotation.x, -0.9 * (player.throwT / 0.5), e); // wound up, then flung straight
   });
 
+  // The ducks are at the lake you are at (not a frozen one, where they would have nowhere to swim):
+  // they turn up on its water once you have left the last lake out of sight.
+  hooks.lake.push((lake) => {
+    if (lake.frozen) return;
+    for (const d of ducks) {
+      let p = null;
+      for (let k = 0; k < 14 && !p; k++) { const q = lake.point(rnd() * TAU, rnd(0.2, 0.7)); if (heightAt(q.x, q.z) < -0.25 && !onDock(q.x, q.z)) p = q; }
+      if (!p) p = { x: lake.x, z: lake.z };
+      Object.assign(d, { x: p.x, z: p.z, target: null, next: 0, chasing: false, stuckT: 0 });
+    }
+  });
+
   hooks.frame.push((dt, t) => {
     const fz = frozen();
     nearestDuck = Infinity;

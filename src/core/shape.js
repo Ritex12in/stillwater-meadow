@@ -115,6 +115,7 @@ function lakeOfCell(cx, cz) {
       L = makeLake({ x, z, R0, A3: R0 * 0.13 * wob, P3: p3, A5: R0 * 0.085 * wob, P5: p5, A7: R0 * 0.05 * wob, P7: p7, E, TH: th, beach, ring: settled || worn < 0.25, tint }); // (a settled lake always has its path)
       L.id = key;
       L.settled = settled;
+      L.clime = { dry, lush, snow }; // (the country it lies in: what grows and lives at it follows from this)
       L.frozen = snow > 0.6;
       const first = L.frozen ? NAME_COLD : NAME_A;
       L.name = first[Math.floor(n1 * first.length)] + NAME_B[Math.floor(n2 * NAME_B.length)];

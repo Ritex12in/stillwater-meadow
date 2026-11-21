@@ -44,8 +44,8 @@ Each one leaves the game playable and tested.
 | 3 | **Kinds of country.** A climate (cold, rain) read from the seed: snowfields and pines in the cold, golden heath with a few birches where it is dry, thick dark-green woods where it is wet, mild meadow between, and rare blossom groves. The ground, grass, trees, boulders and flowers all follow it, and far tiles show it from a distance. | Each kind exists within 2.6 km and grows its own trees; the valley stays mild (`tests/world.spec.js`). | done |
 | 4a | **Places from the seed, lakes first.** A grid of places, each chosen from the land and climate round it. Lakes of varied size and shape, each in its own valley: water, reeds, lilies, ducks, jumping fish, fishing; frozen all year in snow country; seen from afar. The save holds seed and position; a list to jump to places. The home valley still stands. | Height is continuous between neighbouring lakes; a lake is the same every visit; water is drawn from a fixed pool (`tests/lakes.spec.js`). | done |
 | 4b-1 | **Landmarks that follow you.** Settled lakes (each outranking its eight neighbours, so at least half a kilometre apart) have a kit worked out from the seed and checked against the land: a jetty with the boat and skipper where the shore allows, a campfire with logs, a bench with lawn chairs and path lamps; each turned its own way. One of each object, moved to the nearest settled lake when the old one is well behind. Each place keeps its own state (bench bouquet, boat bouquet, fire). | Home is bit-for-bit unchanged; there and back leaves seats, obstacles and scene objects as they were; a bouquet stays at its own bench across a reload (`tests/places.spec.js`). | done |
-| 4b-2 | **Lake life at every lake.** Reeds and lilies per lake from fixed slots; ducks, the heron and the mist follow the lake you are at. | Same checks. | next |
-| 4c | **The valley goes.** Start beside a generated lake with the full set. The shrine is rebuilt in blossom groves (its geometry is baked to the ground it stands on, so it is rebuilt, not moved). The fixed valley and its hand-placed plants, fences and pebbles are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
+| 4b-2 | **Lake life at every lake.** Reeds and lily pads per lake, worked out from the lake and its country and drawn from fixed slots for the three nearest; the ducks, the heron, the frogs and the mist are at the lake you are at (not ducks on ice). | Each lake's are the same every visit; none undrawn; a tour of lakes leaves the scene as it was (`tests/lakes.spec.js`). | done |
+| 4c | **The valley goes.** (next) Start beside a generated lake with the full set. The shrine is rebuilt in blossom groves (its geometry is baked to the ground it stands on, so it is rebuilt, not moved). The fixed valley and its hand-placed plants, fences and pebbles are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
 | 4d | **More to discover, and a backpack.** Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | |
@@ -182,8 +182,23 @@ or dropped once a pack is chosen.
   bouquets and fire while the landmarks are elsewhere; `store.benchBouquet`/`boatBouquet` are
   always the current place's, named by `store.anchor` (so old saves and features work unchanged).
 - A lake's bowl is wider, in radii, for small lakes (`lake.bowl`), or they lie in a pit.
-- Still home-only until 4b-2 and 4c: reeds, lilies and frogs, ducks, the heron, mist, the fences,
-  pebbles, the snowman, the animals' homes, the shrine, pickable flowers, pine cones, deer.
+- Still home-only until 4c: the fences, pebbles, the snowman, the animals' homes, the shrine,
+  pickable flowers, pine cones, deer.
+
+## How lake life works (milestone 4b-2)
+
+- `world/lakelife.js`: `lifeOf(lake)` gives a lake's reeds, reed heads, lily pads and lilies from
+  its own seed, its size and its `clime` (thick beds and many lilies in lush country, few reeds on
+  the heath, straw-coloured stalks and no lilies round a frozen lake), keeping reeds off the jetty
+  if it has one. Kept on the lake (`lake.life`). The home lake's are the ones
+  `buildReedsAndPads` has always laid out from the layout stream (it still takes the same draws).
+- They are drawn by four `slotSet`s made in `world/vegetation.js`; `updateLakeLife` refills them
+  for the three lakes nearest the camera when that set changes. `world.padMesh`/`bloomMesh` are
+  two of those sets, so the seasons and the evening glow reach every lake's lilies.
+- "The lake you are at" (`lifeLake`): changes when you are within 150 m of another lake and the
+  old one is 240 m behind (or at once on arriving by the Places list and at load). `hooks.lake`
+  then tells the ducks (`features/ducks.js`: put on that lake's water, unless it is frozen), the
+  heron and the frogs (`features/wildlife.js`) and the mist (`systems/weather.js`).
 
 ## How the lakes work (milestone 4a)
 

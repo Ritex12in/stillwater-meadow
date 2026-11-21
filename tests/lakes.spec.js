@@ -88,3 +88,60 @@ test('the world remembers where you were, and the Places list takes you to a lak
   expect(Math.hypot(start.x - spot.x, start.z - spot.z)).toBeLessThan(2);
   noErrors(errors);
 });
+
+test('every lake has its own reeds and lilies, and the ducks and the heron are at the lake you are at', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const survey = () => page.evaluate(() => {
+    const m = window.__meadow, lakes = m.lakes(2500).filter((L) => L.id !== 'home');
+    return lakes.map((L) => Object.assign({ id: L.id, frozen: L.frozen, beach: L.beach }, m.lakeLife(L.id)));
+  });
+  const a = await survey();
+  expect(a.filter((L) => L.reeds > 0).length, 'nearly every lake has reeds').toBeGreaterThan(a.length * 0.8);
+  expect(a.filter((L) => !L.frozen && L.pads > 0).length, 'many have lilies').toBeGreaterThan(a.length * 0.3);
+  expect(a.filter((L) => L.frozen && L.pads > 0).length, 'none on ice').toBe(0);
+  const lush = a.filter((L) => L.beach < 0.5 && !L.frozen), heath = a.filter((L) => L.beach > 1.2);
+  const mean = (list, k) => list.reduce((s, L) => s + L[k], 0) / list.length;
+  expect(lush.length).toBeGreaterThan(2);
+  expect(heath.length).toBeGreaterThan(2);
+  expect(mean(lush, 'reeds'), 'reed beds are thick in lush country, thin on the heath').toBeGreaterThan(mean(heath, 'reeds') * 1.5);
+  // the home lake keeps the reeds and lilies it has always had, drawn with the rest
+  const home = await page.evaluate(() => { const m = window.__meadow; return { own: m.lakeLife('home'), drawn: m.life() }; });
+  expect(home.own.reeds).toBeGreaterThan(300);
+  expect(home.own.pads).toBe(54);
+  expect(home.drawn.lake).toBe('home');
+  expect(home.drawn.reeds).toBeGreaterThanOrEqual(home.own.reeds);
+  expect(home.drawn.dropped).toBe(0);
+  // go to a pond with lilies: the ducks are on its water, and bread is on offer
+  const pond = a.filter((L) => !L.frozen && L.pads > 5)[0];
+  const there = await page.evaluate((id) => {
+    const m = window.__meadow, g = m.geo; m.visitLake(id);
+    for (let i = 0; i < 30; i++) m.tick(1 / 30);
+    const L = m.lakes(300).find((q) => q.id === id), ducks = m.ducks().ducks;
+    return { life: m.life(), afloat: ducks.filter((d) => Math.hypot(d.x - L.x, d.z - L.z) < L.rmax && g.height(d.x, d.z) < 0).length, of: ducks.length };
+  }, pond.id);
+  expect(there.life.lake).toBe(pond.id);
+  expect(there.afloat, 'all the ducks are afloat on this lake').toBe(there.of);
+  expect(there.life.reeds).toBeGreaterThan(0);
+  expect(there.life.dropped).toBe(0);
+  // a frozen lake: the ducks do not follow you onto the ice
+  const ice = a.find((L) => L.frozen);
+  const cold = await page.evaluate((id) => { const m = window.__meadow; m.visitLake(id); for (let i = 0; i < 30; i++) m.tick(1 / 30); const L = m.lakes(300).find((q) => q.id === id); return { life: m.life(), onIce: m.ducks().ducks.filter((d) => Math.hypot(d.x - L.x, d.z - L.z) < L.rmax).length }; }, ice.id);
+  expect(cold.life.lake).toBe(ice.id);
+  expect(cold.onIce).toBe(0);
+  // lake after lake, twice round: nothing piles up, nothing goes undrawn
+  const tour = await page.evaluate((ids) => {
+    const m = window.__meadow, counts = [];
+    let dropped = 0;
+    for (let round = 0; round < 3; round++) { for (const id of ids) { m.visitLake(id); for (let i = 0; i < 200; i++) m.ground.update(m.player.x, m.player.z); for (let i = 0; i < 5; i++) m.tick(1 / 30); dropped += m.life().dropped; } counts.push(m.counts()); }
+    return { counts, dropped };
+  }, a.slice(0, 6).map((L) => L.id));
+  expect(tour.dropped).toBe(0);
+  expect(tour.counts[2]).toEqual(tour.counts[1]);
+  // and each lake's are the same on another visit
+  // (the game reopens where you last stood, so the lakes about you are not all the same ones: compare those seen both times)
+  await open(page, 'weather=clear&season=summer', '#12');
+  const again = new Map((await survey()).map((L) => [L.id, L.key])), both = a.filter((L) => again.has(L.id));
+  expect(both.length).toBeGreaterThan(10);
+  expect(both.every((L) => again.get(L.id) === L.key), 'the same reeds and lilies every time').toBe(true);
+  noErrors(errors);
+});

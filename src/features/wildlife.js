@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, lerp, damp, smooth, rnd } from '../core/math.js';
-import { LAKE, lakeAt, lakeT, lakePoint, heightAt, walkable, dockStart } from '../core/shape.js';
+import { lakeAt, lakeT, heightAt, walkable } from '../core/shape.js';
 import { std, enableShadows, glowTex } from '../core/materials.js';
 import { hooks, seasonState, world } from '../core/state.js';
 import { clock } from '../core/clock.js';
@@ -13,6 +13,7 @@ import { cur, timeCtl } from '../systems/time.js';
 import { wx } from '../systems/weather.js';
 import { treeSpots } from '../world/vegetation.js';
 import { spawnRipple } from '../world/effects.js';
+import { lifeLake, lifeOf } from '../world/lakelife.js';
 import { hoot, croak, kraak, snort, plop } from './voices.js';
 
 const frozen = () => seasonState.ice > 0.5;
@@ -49,17 +50,24 @@ function makeHeron() {
 }
 
 export function initWildlife() {
-  const base = Math.atan2(dockStart.z - LAKE.z, dockStart.x - LAKE.x);
-  const heronSpots = [1.4, 2.6, 3.9, 5.0].map((o) => lakePoint(base + o, 0.97));
+  // the heron's four standing places round the lake it is at, counted from the jetty (or from where one would be)
+  let heronLake = lifeLake, heronSpots = [];
+  const siteHeron = (lake) => {
+    heronLake = lake;
+    const base = Math.PI / 2 + 0.55 + (lake.turn || 0);
+    heronSpots = [1.4, 2.6, 3.9, 5.0].map((o) => lake.point(base + o, 0.97));
+  };
+  siteHeron(lifeLake);
   const heron = makeHeron();
   const placeHeron = (i) => {
     heron.spot = i;
     const p = heronSpots[i];
     heron.g.position.set(p.x, Math.max(heightAt(p.x, p.z), -0.3), p.z);
-    heron.heading = Math.atan2(LAKE.x - p.x, LAKE.z - p.z) + rnd(-0.6, 0.6);
+    heron.heading = Math.atan2(heronLake.x - p.x, heronLake.z - p.z) + rnd(-0.6, 0.6);
     heron.g.rotation.set(0, heron.heading, 0);
   };
   placeHeron(1);
+  hooks.lake.push((lake) => { siteHeron(lake); placeHeron(1); }); // (you have come to another lake: the heron is fishing there)
 
   // fish jumping
   const jumpers = [0, 1].map(() => {
@@ -97,6 +105,15 @@ export function initWildlife() {
     frogs.push({ g, throat, puff: 0 });
   }
   let croakIn = 3;
+  // you have come to another lake: the frogs are on its lily pads (if it has any)
+  hooks.lake.push((lake) => {
+    const here = lifeOf(lake).pads;
+    frogs.forEach((f, i) => {
+      const pad = here.length ? here[(i * 5 + 2) % here.length] : null;
+      f.away = !pad;
+      if (pad) f.g.position.set(pad.x + ((i % 3) - 1) * 0.12, 0.06, pad.z + (((i * 2) % 3) - 1) * 0.12);
+    });
+  });
 
   // deer
   const deerSpots = [];
@@ -225,7 +242,7 @@ export function initWildlife() {
 
     // frogs
     const showFrogs = seasonState.bugs > 0.5 && seasonState.ice < 0.3;
-    frogs.forEach((f) => { f.g.visible = showFrogs; });
+    frogs.forEach((f) => { f.g.visible = showFrogs && !f.away; });
     if (showFrogs) {
       croakIn -= dt;
       if ((wx.wet > 0.25 || cur.eve > 0.4) && croakIn <= 0) {

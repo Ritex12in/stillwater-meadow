@@ -3,12 +3,13 @@
 import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TAU, rng, rand, pick, smooth, fbm, vnoise, angDiff, mulberry32 } from '../core/math.js';
-import { height, lakeT, lakeR, lakePoint, pathAmt, SPAWN, onDock, dockStart, DOCK_A, nearReserved, BENCH_SPOT, PATH_T, LAKE, WORLD_LIMIT } from '../core/shape.js';
-import { std, col, weatherize, addWind, bothSides, instanced, instancedChunks, instancedVariants, lodSet, slotSet, softEdges, neonAtNight } from '../core/materials.js';
+import { height, lakeT, lakeR, lakePoint, pathAmt, SPAWN, onDock, dockStart, DOCK_A, nearReserved, BENCH_SPOT, PATH_T, LAKE, WORLD_LIMIT, HOME } from '../core/shape.js';
+import { std, col, weatherize, addWind, bothSides, instancedChunks, instancedVariants, lodSet, slotSet, softEdges, neonAtNight } from '../core/materials.js';
 import { pineFarGeos, crownFarGeos, pineTrunkFarGeos, crownTrunkFarGeos, pineGeos, crownGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
 import { world, obstacles } from '../core/state.js';
 import { kit, fit } from '../core/assets.js';
 import { kitTrees, kitRocks, kitFlowerParts, KIT_FLOWER_COLOURS } from './kitplants.js';
+import { setLakeLifeSets, updateLakeLife } from './lakelife.js';
 import { buildGrassField } from './grassfield.js';
 export { buildUndergrowth } from './kitplants.js';
 
@@ -274,8 +275,6 @@ export function buildReedsAndPads() {
       reeds.push({ x: p.x, z: p.z, y: h, s: rand(0.7, 1.25), rx: rand(-0.12, 0.12), rz: rand(-0.12, 0.12), ry: rng() * TAU, color: pick(['#6b7f3a', '#7f8f45', '#5a7034'].map(col)) });
     }
   }
-  instancedChunks(new THREE.ConeGeometry(0.035, 1.5, 3).translate(0, 0.75, 0), addWind(std('#ffffff'), 0.07), reeds, { cell: 30 });
-  instancedChunks(new THREE.CylinderGeometry(0.045, 0.045, 0.24, 5).translate(0, 1.15, 0), addWind(std('#6e4a2e'), 0.07), reeds.filter((_, i) => i % 3 === 0), { cell: 30 });
 
   const pads = [], blooms = [];
   for (let c = 0; c < 9; c++) {
@@ -288,6 +287,18 @@ export function buildReedsAndPads() {
     }
   }
   world.padItems = pads;
-  world.padMesh = instanced(new THREE.CylinderGeometry(0.55, 0.55, 0.03, 9, 1, false, 0.35, TAU - 0.35), std('#ffffff'), pads, { receive: true });
-  world.bloomMesh = instanced(lilyGeo(), std('#ffffff', { emissive: '#4a2a3e', vertexColors: true, flatShading: false }), blooms);
+  // Every lake has reeds and lilies (world/lakelife.js works them out for the others); they are
+  // all drawn from these fixed slots, refilled for whichever lakes are near. The ones laid out
+  // above are the home lake's, as they have always been.
+  const sets = {
+    reeds: slotSet([new THREE.ConeGeometry(0.035, 1.5, 3).translate(0, 0.75, 0)], addWind(std('#ffffff'), 0.07), 2400, { colored: true }),
+    heads: slotSet([new THREE.CylinderGeometry(0.045, 0.045, 0.24, 5).translate(0, 1.15, 0)], addWind(std('#6e4a2e'), 0.07), 820, { colored: true }),
+    pads: slotSet([new THREE.CylinderGeometry(0.55, 0.55, 0.03, 9, 1, false, 0.35, TAU - 0.35)], std('#ffffff'), 440, { colored: true }),
+    blooms: slotSet([lilyGeo()], std('#ffffff', { emissive: '#4a2a3e', vertexColors: true, flatShading: false }), 150, { colored: true }),
+  };
+  HOME.life = { reeds, heads: reeds.filter((_, i) => i % 3 === 0), pads, blooms };
+  world.padMesh = sets.pads;     // (the seasons hide the lilies in winter through these two,
+  world.bloomMesh = sets.blooms; //  and the evening makes the flowers glow)
+  setLakeLifeSets(sets);
+  updateLakeLife(HOME.x, HOME.z);
 }

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, lerp, rnd, turnTo } from '../core/math.js';
-import { LAKE, lakeT, lakePoint, heightAt, onDock, waterAhead } from '../core/shape.js';
+import { lakeAt, lakeT, lakePoint, heightAt, onDock, waterAhead } from '../core/shape.js';
 import { std } from '../core/materials.js';
 import { hooks, seasonState } from '../core/state.js';
 import { player, hero } from '../characters/player.js';
@@ -103,7 +103,7 @@ export function initDucks() {
       else {
         if (d.chasing) { d.chasing = false; d.target = null; } // the bread is gone: drift off somewhere new
         d.next -= dt;
-        if (d.next <= 0 || !d.target) { d.target = lakePoint(Math.atan2(d.z - LAKE.z, d.x - LAKE.x) + rnd(-0.6, 0.6), rnd(0.2, 0.8)); d.next = rnd(6, 16); }
+        if (d.next <= 0 || !d.target) { const lake = lakeAt(d.x, d.z); d.target = lake.point(Math.atan2(d.z - lake.z, d.x - lake.x) + rnd(-0.6, 0.6), rnd(0.2, 0.8)); d.next = rnd(6, 16); } // (somewhere else on the lake it is on)
       }
       const bx = boat.position.x - d.x, bz = boat.position.z - d.z;
       if (Math.hypot(bx, bz) < 4) { d.target = { x: d.x - bx * 2, z: d.z - bz * 2 }; speed = 0.9; }

@@ -20,6 +20,8 @@ export const waterU = {
   fogNear: { value: 50 },
   fogFar: { value: 220 },
   lakeC: { value: new THREE.Vector2(LAKE.x, LAKE.z) },
+  lakeShape: { value: new THREE.Vector4(LAKE.R0, LAKE.A3, LAKE.A5, LAKE.A7) }, // the lake's outline (see makeLake in core/shape.js)
+  lakePhase: { value: new THREE.Vector3(LAKE.P3, LAKE.P5, LAKE.P7) },
   uRain: { value: 0 },
   uIce: { value: 0 },
   uIceLight: { value: 1 },
@@ -46,7 +48,7 @@ export function buildWater() {
       uniform float uTime; uniform float uRain; uniform float uIce; uniform float uIceLight; uniform float uSnowIce; uniform float uLight;
       uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyTop; uniform vec3 skyHorizon;
       uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun;
-      uniform float fogNear; uniform float fogFar; uniform vec2 lakeC;
+      uniform float fogNear; uniform float fogFar; uniform vec2 lakeC; uniform vec4 lakeShape; uniform vec3 lakePhase;
       uniform vec3 lampW[12]; uniform float lampAmt; uniform float uStars;
       varying vec3 vWP;
       vec2 wave(vec2 p, vec2 d, float f, float s, float a) {
@@ -88,7 +90,7 @@ export function buildWater() {
       float lakeT(vec2 p) {
         vec2 d = p - lakeC;
         float a = atan(d.y, d.x);
-        float R = 30.0 + 4.0 * sin(3.0 * a) + 2.5 * cos(5.0 * a + 1.3) + 1.5 * sin(7.0 * a + 0.4);
+        float R = lakeShape.x + lakeShape.y * sin(3.0 * a + lakePhase.x) + lakeShape.z * cos(5.0 * a + lakePhase.y) + lakeShape.w * sin(7.0 * a + lakePhase.z);
         return length(d) / R;
       }
       void main() {

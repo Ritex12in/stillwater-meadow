@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, lerp, damp, smooth, rnd } from '../core/math.js';
-import { LAKE, lakeT, lakePoint, heightAt, walkable, dockStart } from '../core/shape.js';
+import { LAKE, lakeAt, lakeT, lakePoint, heightAt, walkable, dockStart } from '../core/shape.js';
 import { std, enableShadows, glowTex } from '../core/materials.js';
 import { hooks, seasonState, world } from '../core/state.js';
 import { clock } from '../core/clock.js';
@@ -186,7 +186,7 @@ export function initWildlife() {
       jumpIn = rnd(4, 10);
       const j = jumpers.find((q) => q.t >= 1);
       for (let i = 0; j && i < 10; i++) {
-        const p = lakePoint(rnd() * TAU, rnd(0.25, 0.85));
+        const p = lakeAt(player.x, player.z).point(rnd() * TAU, rnd(0.25, 0.85)); // (in the lake nearest you)
         if (Math.hypot(p.x - player.x, p.z - player.z) > 40) continue;
         j.from.set(p.x, 0, p.z); j.dir = rnd() * TAU; j.t = 0; j.g.visible = true;
         spawnRipple(p.x, p.z, 0.6); plop(p.x, p.z, 0.7);

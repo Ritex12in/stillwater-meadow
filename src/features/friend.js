@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, clamp, damp, lerp, turnTo, mulberry32 } from '../core/math.js';
-import { SPAWN, FIRE_SPOT, lakePoint, groundAt, animalWalkable, walkable, onIce, nearestShore, ICE_Y } from '../core/shape.js';
+import { SPAWN, FIRE_SPOT, lakePoint, lakeAt, groundAt, animalWalkable, walkable, onIce, nearestShore, ICE_Y } from '../core/shape.js';
 import { hooks, pushOut, world, seasonState, seats } from '../core/state.js';
 import { windU, timeU } from '../core/materials.js';
 import { makeKid, KIDS, moveAttachments } from '../characters/kid.js';
@@ -127,7 +127,7 @@ export function initFriend() {
   /** Somewhere to stroll to: a spot round the lake shore or out in the meadow, reachable in a straight line. */
   const pickTarget = () => {
     for (let i = 0; i < 20; i++) {
-      const p = r() < 0.6 ? lakePoint(r() * TAU, 1.15 + r() * 0.5) : { x: st.x + (r() - 0.5) * 40, z: st.z + (r() - 0.5) * 40 };
+      const p = r() < 0.6 ? lakeAt(st.x, st.z).point(r() * TAU, 1.15 + r() * 0.5) : { x: st.x + (r() - 0.5) * 40, z: st.z + (r() - 0.5) * 40 }; // (the shore of the lake nearest her)
       const d = Math.hypot(p.x - st.x, p.z - st.z);
       if (d < 6 || d > 45) continue;
       let ok = true;

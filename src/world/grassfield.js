@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { smooth } from '../core/math.js';
-import { heightAt, slopeAt, lakeAt, nearReserved, onDock, BENCH_SPOT, SPAWN, coldAt, rainAt, dryOf, northness, feltHeight, ASPECT } from '../core/shape.js';
+import { heightAt, slopeAt, lakeAt, nearReserved, onDock, BENCH_SPOT, SPAWN, coldAt, dryOf, northness, feltHeight, ASPECT, moistAt, snowCold, snowOf } from '../core/shape.js';
 import { weatherize, bothSides, timeU, windU, camU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { onShrineGround } from './shrine.js';
@@ -43,7 +43,11 @@ export function updateGrassMap(cx, cz) {
     for (let i = 0; i < MAP_N; i++) {
       const o = (j * MAP_N + i) * 4, oi = i + dx, oj = j + dz;
       if (oi >= 0 && oi < MAP_N && oj >= 0 && oj < MAP_N) { const q = (oj * MAP_N + oi) * 4; mapNext[o] = mapData[q]; mapNext[o + 1] = mapData[q + 1]; mapNext[o + 2] = mapData[q + 2]; mapNext[o + 3] = mapData[q + 3]; }
-      else { const x = (ix + i) * MAP_STEP, z = (iz + j) * MAP_STEP, h = heightAt(x, z), north = northness(x, z, h); mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h, north); mapNext[o + 2] = coldAt(x, z, h + ASPECT * north); mapNext[o + 3] = dryOf(rainAt(x, z)); }
+      else { const x = (ix + i) * MAP_STEP, z = (iz + j) * MAP_STEP, h = heightAt(x, z), north = northness(x, z, h), wet = moistAt(x, z), chill = coldAt(x, z, h + ASPECT * north), cold = snowCold(chill, wet);
+        // (on the tundra, cold country too dry for snow, the grass is sparse, low and tawny)
+        const tundra = smooth(0.42, 0.65, chill) * (1 - snowOf(cold));
+        mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h, north) * (1 - 0.55 * tundra); mapNext[o + 2] = cold; mapNext[o + 3] = Math.max(dryOf(wet), tundra * 0.85);
+      }
     }
   }
   [mapData, mapNext] = [mapNext, mapData];

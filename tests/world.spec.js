@@ -251,3 +251,33 @@ test('flowers to pick grow wherever the land allows: far from home too, each rem
   expect(await sign(), 'the same flowers after a reload').toBe(before);
   noErrors(errors);
 });
+
+test('nature: trees give out at a treeline, north faces hold more snow, cold dry country is snowless tundra, and water greens dry country', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const r = await page.evaluate(async () => {
+    const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
+    const SH = await import(url('/src/core/shape.js')), m = window.__meadow;
+    // the highest tree in mild country stands near the treeline, and none far above it
+    let top = 0;
+    for (let iz = -40; iz <= 40; iz++) for (let ix = -40; ix <= 40; ix++) for (const t of m.wilds.square(ix, iz)) if (SH.coldBase(t.x, t.z) < 0.05) top = Math.max(top, t.y);
+    // snow at the same heights on slopes facing north and south
+    const sn = [[0, 0], [0, 0]];
+    let tundra = [0, 0], taiga = [0, 0], oasis = null;
+    for (let z = -2800; z < 2800; z += 29) for (let x = -2800; x < 2800; x += 29) {
+      const y = SH.height(x, z);
+      if (y > 85 && y < 140 && SH.coldBase(x, z) < 0.1) { const n = SH.northness(x, z, y), s = SH.snowOf(SH.coldAt(x, z, y + SH.ASPECT * n)); if (n > 0.4) { sn[0][0] += s; sn[0][1]++; } else if (n < -0.4) { sn[1][0] += s; sn[1][1]++; } }
+      if (y < 40 && SH.coldBase(x, z) > 0.7) { const w = SH.moistAt(x, z), s = SH.snowOf(SH.snowCold(SH.coldAt(x, z, y), w)); if (w < 0.33) { tundra[0] += s; tundra[1]++; } else if (w > 0.5) { taiga[0] += s; taiga[1]++; } }
+    }
+    // by a lake in dry country, the ground is wetter than the rain alone
+    for (const L of m.lakes(4000)) { const x = L.x + L.rmax * 1.4, z = L.z; if (SH.rainAt(x, z) < 0.42) { oasis = { rain: SH.rainAt(x, z), moist: SH.moistAt(x, z) }; break; } }
+    return { top, north: sn[0][0] / sn[0][1], south: sn[1][0] / sn[1][1], counts: [sn[0][1], sn[1][1], tundra[1], taiga[1]], tundra: tundra[0] / tundra[1], taiga: taiga[0] / taiga[1], oasis, line: SH.TREELINE };
+  });
+  expect(r.top, 'no tree far above the treeline').toBeLessThan(r.line + 8);
+  expect(r.top, 'woods reach up toward it').toBeGreaterThan(r.line - 20);
+  expect(r.counts.every((n) => n > 20), 'enough of each kind of ground to compare: ' + r.counts).toBe(true);
+  expect(r.north - r.south, 'north faces are snowier').toBeGreaterThan(0.2);
+  expect(r.taiga - r.tundra, 'cold and wet is snowier than cold and dry').toBeGreaterThan(0.3);
+  expect(r.oasis, 'a lake in dry country').not.toBeNull();
+  expect(r.oasis.moist).toBeGreaterThan(r.oasis.rain);
+  noErrors(errors);
+});

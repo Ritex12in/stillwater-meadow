@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { smooth, fbm } from '../core/math.js';
-import { height, lakeAt, setGroundSampler, northness, feltHeight, ASPECT, TREELINE, coldAt, rainAt, dryOf, lushOf, snowOf } from '../core/shape.js';
+import { height, lakeAt, setGroundSampler, northness, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -48,7 +48,8 @@ const EDGE_OF = [(k) => k, (k) => TILE_N * V + k, (k) => k * V, (k) => k * V + T
 let groundMat = null, textured = false;
 const g1 = col('#5c9040'), g2 = col('#86b44e'), g3 = col('#3d7034'), sand = col('#dcc895'), bed = col('#7a7856');
 const dirt = col('#c4ab7c'), moss = col('#5c7444'), rock = col('#8d8b7d'), heath = col('#b9a35c'), snowy = col('#eef2f8');
-const MOSS_TINT = new THREE.Color(0.8, 0.85, 0.7), c = new THREE.Color();
+const MOSS_TINT = new THREE.Color(0.8, 0.85, 0.7), TUNDRA_TINT = new THREE.Color(1.02, 0.86, 0.66), c = new THREE.Color();
+const tundra = col('#8c8458');
 
 /**
  * How rocky the ground is (0 grass .. 1 bare rock): slopes too steep to hold soil (from about 35
@@ -157,7 +158,9 @@ function* fill(t) {
       const north = northness(x, z, h), felt = feltHeight(x, z, h, north);
       const wRock = rockAmt(h, slope, felt) * 0.85, wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6;
       // the climate here: snow lies longer on slopes facing north, and not on cliffs; lush country is a deeper green
-      const rain = rainAt(x, z), dry = dryOf(rain), cold = coldAt(x, z, h + ASPECT * north) * (1 - smooth(0.9, 1.5, slope) * 0.55);
+      const rain = moistAt(x, z), dry = dryOf(rain), chill = coldAt(x, z, h + ASPECT * north), cold = snowCold(chill, rain) * (1 - smooth(0.9, 1.5, slope) * 0.55);
+      // cold country where little snow lies (it is too dry) is tundra: low olive-brown moss and sedge
+      const wTundra = smooth(0.42, 0.65, chill) * (1 - snowOf(cold));
       // (clime: cold, dry, and whether this is a lake seen from too far off to have its own sheet of water)
       const pond = t.lv > 0 && h < 0.02 ? 1 : 0;
       if (pond) { pos[k * 3 + 1] = 0.02; nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }
@@ -167,10 +170,10 @@ function* fill(t) {
         // the grass patches become a tint around 1 (the texture brings the colour); weights go apart
         // keep only a little of the patch hue, and its brightness relative to the average green
         const L = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
-        c.setRGB(1 + (c.r / L - 1) * 0.25, 1 + (c.g / L - 1) * 0.25, 1 + (c.b / L - 1) * 0.25).multiplyScalar(L / 0.32 * 0.88).lerp(MOSS_TINT, wMoss);
+        c.setRGB(1 + (c.r / L - 1) * 0.25, 1 + (c.g / L - 1) * 0.25, 1 + (c.b / L - 1) * 0.25).multiplyScalar(L / 0.32 * 0.88).lerp(MOSS_TINT, wMoss).lerp(TUNDRA_TINT, wTundra * 0.7);
         spl[k * 4] = wSand; spl[k * 4 + 1] = wBed; spl[k * 4 + 2] = wDirt; spl[k * 4 + 3] = wRock;
       } else {
-        c.lerp(heath, dry * 0.75).lerp(sand, wSand).lerp(bed, wBed).lerp(dirt, wDirt).lerp(moss, wMoss).lerp(rock, wRock).lerp(snowy, snowOf(cold) * 0.9);
+        c.lerp(heath, dry * 0.75).lerp(tundra, wTundra * 0.6).lerp(sand, wSand).lerp(bed, wBed).lerp(dirt, wDirt).lerp(moss, wMoss).lerp(rock, wRock).lerp(snowy, snowOf(cold) * 0.9);
       }
       cols[k * 3] = c.r; cols[k * 3 + 1] = c.g; cols[k * 3 + 2] = c.b;
     }

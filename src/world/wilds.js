@@ -18,7 +18,7 @@
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
 // walk.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
-import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, aboveTrees, TREELINE, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
+import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -56,7 +56,7 @@ export function growSquare(ix, iz) {
     if (lakeT(x, z) < 1.22 || clearingAt(x, z)) continue; // (not in the water, nor where a lake's path, jetty, fire and bench are, nor on the shrine's ground)
     const h = height(x, z), felt = feltAt(x, z, h), line = aboveTrees(felt);
     if (line >= 1) continue; // (above the treeline)
-    const cold = coldAt(x, z, h), rain = rainAt(x, z), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(cold), grove = groveAt(x, z) * (1 - snow);
+    const cold = coldAt(x, z, h), rain = moistAt(x, z), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(snowCold(cold, rain)), grove = groveAt(x, z) * (1 - snowOf(cold)); // (no blossom in the cold, snowy or not)
     // woods in broad patches with open country between, and clumps and clearings inside a wood;
     // lush country is wooded nearly everywhere, the heath and the snowfields hardly at all
     // (and thinning out toward the treeline)
@@ -91,7 +91,7 @@ export function growRocks(ix, iz) {
     if (lakeT(x, z) < 1.15 || clearingAt(x, z)) continue;
     const h = height(x, z), rocky = rockAmt(h, slopeOf(x, z), feltAt(x, z, h));
     // (more of them on the dry heath and in the cold, where little else stands)
-    if (keep > 0.07 + rocky * 0.8 + smooth(30, 70, h) * 0.15 + dryOf(rainAt(x, z)) * 0.16 + snowOf(coldAt(x, z, h)) * 0.08) continue;
+    if (keep > 0.07 + rocky * 0.8 + smooth(30, 70, h) * 0.15 + dryOf(moistAt(x, z)) * 0.16 + snowOf(coldAt(x, z, h)) * 0.08) continue;
     const s = 0.4 + size * size * (1.1 + rocky * 1.3);
     rocks.push({ x, z, y: h - s * 0.25, s, sx: s * (0.9 + a * 0.6), sy: s * (0.55 + b * 0.35), sz: s * (0.9 + c * 0.4), ry: turn * TAU, rx: tilt * 0.4 - 0.2, color: ROCK_COLS[Math.floor(tint * ROCK_COLS.length)] });
   }
@@ -106,7 +106,7 @@ export function growSmall(ix, iz, trees) {
   // (the land's own formula, not the drawn tiles: a square must come out the same whether or not its ground is loaded)
   const fits = (x, z) => { if (lakeT(x, z) <= 1.16 || clearingAt(x, z)) return false; const h = height(x, z); return rockAmt(h, slopeOf(x, z), feltAt(x, z, h)) < 0.2; };
   // the climate, taken once at the square's middle (it changes over hundreds of metres)
-  const mx = x0 + S / 2, mz = z0 + S / 2, mh = height(mx, mz), rain = rainAt(mx, mz), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(coldAt(mx, mz, mh));
+  const mx = x0 + S / 2, mz = z0 + S / 2, mh = height(mx, mz), rain = moistAt(mx, mz), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(snowCold(coldAt(mx, mz, mh), rain));
   for (const t of trees) {
     const bush = R(), fern = R(), shroom = R(), a1 = R() * TAU, d1 = r(2.2, 3.6), a2 = R() * TAU, d2 = r(1.0, 2.2), a3 = R() * TAU;
     if (snow > 0.5) continue; // (under snow: nothing small)
@@ -125,7 +125,7 @@ export function growSmall(ix, iz, trees) {
   for (let k = 0; k < 5; k++) {
     const cx = x0 + R() * S, cz = z0 + R() * S, fav = Math.floor(R() * 3), n = 6 + Math.floor(R() * 9), rad = r(2, 5), keep = R();
     // (few on the heath, none in the snow; a blossom grove is carpeted, mostly with tulips)
-    const grove = groveAt(cx, cz);
+    const grove = groveAt(cx, cz) * (1 - snowOf(coldAt(cx, cz, mh)));
     const meadow = Math.max(smooth(0.46, 0.6, fbm(cx * 0.021 + 77.7, cz * 0.021 - 41.3)) * (1 - woodAt(cx, cz) * 0.8) * (1 - dry * 0.7), grove) * (1 - snow);
     for (let m = 0; m < n; m++) {
       const a = R() * TAU, d = rad * Math.sqrt(R()), x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d, any = R() < 0.65 ? fav : Math.floor(R() * 3), s = r(0.8, 1.25), ry = r(0, TAU), tint = R();
@@ -168,7 +168,7 @@ function driftsOf(lake) {
  */
 export function growPicks(ix, iz) {
   const R = seedOf(ix, iz, 0x7A11E5), x0 = ix * S, z0 = iz * S, out = [];
-  const mx = x0 + S / 2, mz = z0 + S / 2, dry = dryOf(rainAt(mx, mz)), snow = snowOf(coldAt(mx, mz, height(mx, mz)));
+  const mx = x0 + S / 2, mz = z0 + S / 2, wet = moistAt(mx, mz), dry = dryOf(wet), snow = snowOf(snowCold(coldAt(mx, mz, height(mx, mz)), wet));
   if (snow > 0.4) return out; // (none under snow)
   const lakes = lakesNear(mx, mz, 220).filter((L) => Math.hypot(L.x - mx, L.z - mz) < L.rmax * PICK.meadow + S * 0.75);
   const tries = lakes.length ? PICK.lakeTries : PICK.tries, thin = 1 - dry * 0.6;

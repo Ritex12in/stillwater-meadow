@@ -6,7 +6,7 @@ import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug, query } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU, updateDetail, neonU } from './core/materials.js';
-import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME } from './core/shape.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, moistAt, snowCold, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME } from './core/shape.js';
 import { hooks, seasonState, seats, world, obstacles } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU } from './world/sky.js';
@@ -375,7 +375,7 @@ window.__meadow = {
   /** What the scene holds besides the ground's own pooled tiles (which fill up once and are then reused), and the lists things are registered in. */
   counts: () => { let n = 0; scene.traverse(() => { n++; }); return { objects: n - groundStats().parts, obstacles: obstacles.length, seats: seats.length }; },
   /** The climate at a spot: how much snow lies, how parched, how lush, how much of a blossom grove (each 0..1). */
-  climate: (x, z) => { const rain = rainAt(x, z); return { snow: snowOf(coldAt(x, z, height(x, z))), dry: dryOf(rain), lush: lushOf(rain), grove: groveAt(x, z) }; },
+  climate: (x, z) => { const wet = moistAt(x, z), cold = coldAt(x, z, height(x, z)); return { snow: snowOf(snowCold(cold, wet)), cold, wet, dry: dryOf(wet), lush: lushOf(wet), grove: groveAt(x, z) }; },
   // the ground's tiles: what is loaded, and ways to bring it up to date without waiting for frames
   ground: { stats: groundStats, update: updateGround, pump: pumpGround, settle: settleGround },
   // the trees beyond the valley: what is loaded, a way to bring it up to date, and one square's trees

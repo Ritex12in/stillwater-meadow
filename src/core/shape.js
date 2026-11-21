@@ -263,6 +263,25 @@ export function height(x, z) {
 //   wet   -> lush dark-green country, thick mixed woods, ferns and mushrooms
 // and here and there a blossom grove. Round the home lake the country is always mild.
 const mild = (x, z) => smooth(140, 330, Math.hypot(x - HOME.x, z - HOME.z)); // (0 by the home lake, 1 beyond it)
+// ── Moisture, and what temperature and moisture make together ──
+// As in nature (and in Minecraft, which picks its biomes from temperature and humidity), the kind
+// of country comes from how cold and how wet it is together: mild and wet, thick lush woods; mild
+// and dry, golden heath; cold and wet, deep snow and dark pine woods (taiga); cold and dry, bare
+// tundra where little snow lies, for snow needs moisture as well as cold. The ground is wetter near
+// water, so a lake's shores are greener than the country about it.
+/** How much wetter (in rain's units) dry ground is right by a lake, fading out over a few lake-radii (never past middling: water greens dry country, it does not make a swamp of mild). */
+export const WATER_WET = 0.08;
+/** How much less snowy cold, dry country is (in coldAt's units): the tundra. */
+export const SNOW_DRY = 0.3;
+/** How wet the ground is (0 parched .. 1 soaked): the rain, and, in dry country, more of it near a lake. */
+export function moistAt(x, z) {
+  const rain = rainAt(x, z);
+  if (rain >= 0.5) return rain;
+  return Math.min(0.5, rain + WATER_WET * (1 - smooth(1.2, 3.5, lakeAt(x, z).t(x, z))));
+}
+/** Cold, as far as snow goes (pass to snowOf): cold needs moisture to give snow. */
+export const snowCold = (cold, moist) => cold - SNOW_DRY * (1 - smooth(0.33, 0.45, moist));
+
 /** How cold the country is at a spot, before its height: 0 mild .. 1 frozen. */
 export function coldBase(x, z) {
   const n = fbm((x + SX * 17) * 0.0011 - 63.4, (z + SZ * 17) * 0.0011 + 28.9);
@@ -463,7 +482,7 @@ export function homeShrineSite() {
   for (let a = 0; a < TAU; a += TAU / 60) {
     for (let r = L.rmax * 2.4; r <= L.rmax * 12; r += 7) {
       const x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r, h = rawHeight(x, z);
-      if (h < 0.8 || h > 70 || snowOf(coldAt(x, z, h)) > 0.15 || !clearOfLakes(x, z)) continue;
+      if (h < 0.8 || h > 70 || snowOf(snowCold(coldAt(x, z, h), moistAt(x, z))) > 0.15 || !clearOfLakes(x, z)) continue;
       const score = reliefAt(x, z, h) + (r / L.rmax) * 0.45; // (level first; of two as level, the nearer)
       if (!best || score < best.score) best = { x, z, score };
     }
@@ -483,7 +502,7 @@ function shrineOfCell(cx, cz) {
     const x = (cx + 0.25 + R() * 0.5) * SHRINE_CELL, z = (cz + 0.25 + R() * 0.5) * SHRINE_CELL;
     if (groveAt(x, z) < SHRINE_GROVE) continue;
     const h = rawHeight(x, z);
-    if (h < 1 || h > 48 || snowOf(coldAt(x, z, h)) > 0.15 || Math.hypot(x - home.x, z - home.z) < SHRINE_APART || !clearOfLakes(x, z)) continue;
+    if (h < 1 || h > 48 || snowOf(snowCold(coldAt(x, z, h), moistAt(x, z))) > 0.15 || Math.hypot(x - home.x, z - home.z) < SHRINE_APART || !clearOfLakes(x, z)) continue;
     const relief = reliefAt(x, z, h);
     if (relief < SHRINE_RELIEF && (!best || relief < best.relief)) best = { x, z, h, relief };
   }

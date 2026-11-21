@@ -1,4 +1,5 @@
-// The lake: sky reflection with Fresnel, layered waves, rain rings, shoreline foam and winter ice.
+// The lake: sky reflection with Fresnel, layered waves, rain rings, lacy shoreline foam, stars
+// glinting in it at night, and winter ice.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { LAKE } from '../core/shape.js';
@@ -26,6 +27,7 @@ export const waterU = {
   uLight: { value: 1 },
   lampW: { value: [] },          // lamp lanterns, world space (set in main.js)
   lampAmt: { value: 0 },
+  uStars: skyU.stars,            // the night sky's stars, glinting in the ripples
 };
 
 export function buildWater() {
@@ -45,7 +47,7 @@ export function buildWater() {
       uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyTop; uniform vec3 skyHorizon;
       uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun;
       uniform float fogNear; uniform float fogFar; uniform vec2 lakeC;
-      uniform vec3 lampW[12]; uniform float lampAmt;
+      uniform vec3 lampW[12]; uniform float lampAmt; uniform float uStars;
       varying vec3 vWP;
       vec2 wave(vec2 p, vec2 d, float f, float s, float a) {
         return d * cos(dot(p, d) * f + uTime * s) * f * a;
@@ -125,10 +127,23 @@ export function buildWater() {
           }
         }
         c += lampGlint * (1.0 - uIce);
+        // stars in the water: the reflected sky broken into cells, a few holding a star that the
+        // ripples make wink on and off
+        if (uStars > 0.01 && r.y > 0.0) {
+          vec2 sp = r.xz / (r.y + 0.15) * 48.0, sid = floor(sp);
+          float sh = hash21(sid);
+          vec2 sf = fract(sp) - 0.5 - (vec2(hash21(sid + 3.1), hash21(sid + 7.7)) - 0.5) * 0.6;
+          float glint = pow(sh, 11.0) * exp(-dot(sf, sf) * 55.0) * (0.55 + 0.45 * sin(uTime * 2.6 + sh * 90.0));
+          c += vec3(0.8, 0.88, 1.0) * glint * 2.2 * uStars * (0.4 + fres) * (1.0 - uIce);
+        }
         // gentle foam where the water laps the shore
         float band = smoothstep(0.86, 0.95, t) * (1.0 - smoothstep(0.985, 1.03, t));
         float lap = 0.55 + 0.45 * sin(t * 140.0 - uTime * 1.3 + sin(p.x * 0.7 + p.y * 0.5) * 2.0);
-        c = mix(c, vec3(0.93, 0.95, 0.96) * uLight, band * lap * 0.32 * (1.0 - uIce));
+        // lacy foam: thin ridges of drifting noise, so the edge breaks into threads and holes
+        float l1 = 1.0 - abs(2.0 * vn(p * 1.6 + vec2(uTime * 0.12, -uTime * 0.09)) - 1.0);
+        float l2 = 1.0 - abs(2.0 * vn(p * 3.7 - vec2(uTime * 0.2, uTime * 0.15) + 4.0) - 1.0);
+        float lace = clamp(pow(l1, 7.0) + pow(l2, 9.0) * 0.7 + pow(l1 * l2, 2.5) * 0.5, 0.0, 1.0);
+        c = mix(c, vec3(0.93, 0.95, 0.96) * uLight, band * clamp(lap * 0.45 + lace * 0.8, 0.0, 1.0) * 0.4 * (1.0 - uIce));
         // winter: pale ice, dusted with snow
         vec3 ice = mix(vec3(0.7, 0.8, 0.88), vec3(0.84, 0.9, 0.96), 0.45 + 0.18 * sin(p.x * 0.21 + sin(p.y * 0.13) * 2.0) + 0.12 * sin(p.y * 0.37 + p.x * 0.11)) * uIceLight;
         ice = mix(ice, vec3(0.94, 0.96, 1.0) * uIceLight, uSnowIce * (0.2 + 0.6 * smoothstep(0.3, 0.7, hash21(floor(p * 0.9)))));

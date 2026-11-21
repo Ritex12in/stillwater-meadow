@@ -30,3 +30,23 @@ export function setShadowSize(size) {
   sun.shadow.mapSize.set(size, size);
   if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
 }
+
+// The shadow square follows you. Moved freely, its texel grid slides across the ground and every
+// shadow edge crawls as you walk; snapping its centre to whole texels (in the light's own
+// right/up axes, the same ones three's lookAt gives the shadow camera) keeps the edges still.
+const lx = new THREE.Vector3(), ly = new THREE.Vector3(), lz = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), c = new THREE.Vector3();
+/** Put the sun (or moon) light `dist` away along `lightDir`, aimed at `center`, snapped to the shadow map's texels. */
+export function placeSun(center, lightDir, dist = 140) {
+  c.copy(center);
+  lz.copy(lightDir).normalize();
+  lx.crossVectors(UP, lz);
+  if (lx.lengthSq() > 1e-6) {
+    lx.normalize();
+    ly.crossVectors(lz, lx);
+    const cam = sun.shadow.camera, texel = (cam.right - cam.left) / sun.shadow.mapSize.x;
+    const sx = Math.round(c.dot(lx) / texel) * texel, sy = Math.round(c.dot(ly) / texel) * texel, sz = c.dot(lz);
+    c.copy(lx).multiplyScalar(sx).addScaledVector(ly, sy).addScaledVector(lz, sz);
+  }
+  sun.target.position.copy(c);
+  sun.position.copy(c).addScaledVector(lz, dist);
+}

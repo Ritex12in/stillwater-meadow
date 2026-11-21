@@ -413,3 +413,56 @@ export function treeWarp(mat) {
 export function cutoutDepth(map, alphaTest = 0.5) {
   return new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest });
 }
+
+/**
+ * Soft leaf edges: cut-out leaves, petals and grass cards get antialiased edges through
+ * alpha-to-coverage instead of a hard alpha test. The texture's alpha is first sharpened to a
+ * one-pixel ramp around the cut-off (so leaves keep their shape and thickness), then the
+ * multisampled buffer turns that ramp into partial coverage. Without multisampling the
+ * sharpened alpha behaves just like the old alpha test. Apply it last (after addWind, which
+ * replaces onBeforeCompile).
+ */
+export function softEdges(mat) {
+  const prev = mat.onBeforeCompile, baseKey = mat.customProgramCacheKey();
+  mat.alphaToCoverage = true;
+  mat.onBeforeCompile = (sh, r) => {
+    prev.call(mat, sh, r);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <alphatest_fragment>', `#ifdef ALPHATEST
+      #if __VERSION__ >= 300
+        diffuseColor.a = clamp((diffuseColor.a - ALPHATEST) / max(fwidth(diffuseColor.a), 1e-4) + 0.5, 0.0, 1.0);
+        if (diffuseColor.a < 0.01) discard;
+      #else
+        if (diffuseColor.a < ALPHATEST) discard;
+      #endif
+      #endif`);
+  };
+  mat.customProgramCacheKey = () => baseKey + '|soft';
+  return mat;
+}
+
+/** How strongly the flowers glow (0 by day, 1 deep in the night); set each frame from the time of day. */
+export const neonU = { value: 0 };
+/**
+ * Neon flowers: at night petals light up in their own colour, pushed to full saturation and
+ * bright enough for the glow (bloom) to catch them. Green parts of a texture (stems, sepals) stay dark.
+ * Added before the haze, so far-off flowers still melt into the night. Apply after addWind.
+ */
+export function neonAtNight(mat, k = 1) {
+  const prev = mat.onBeforeCompile, baseKey = mat.customProgramCacheKey();
+  mat.onBeforeCompile = (sh, r) => {
+    prev.call(mat, sh, r);
+    sh.uniforms.uNeon = neonU;
+    sh.fragmentShader = 'uniform float uNeon;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `if (uNeon > 0.001) {
+        vec3 nc = diffuseColor.rgb;
+        float nm = max(max(nc.r, nc.g), nc.b), nl = min(min(nc.r, nc.g), nc.b);
+        vec3 vivid = nc / max(nm, 1e-3);
+        vivid = mix(vec3(0.75, 0.85, 1.0), (vivid - nl / max(nm, 1e-3) * 0.6) / (1.0 - nl / max(nm, 1e-3) * 0.6 + 1e-3), smoothstep(0.04, 0.25, (nm - nl) / max(nm, 1e-3)));
+        float petal = 1.0 - smoothstep(0.0, 0.06, nc.g - max(nc.r, nc.b));
+        // a white-hot core under the colour, like a neon tube, so the glow (bloom) haloes even deep violets
+        gl_FragColor.rgb = max(gl_FragColor.rgb, (vivid * 1.5 + 0.3) * petal * uNeon * ${(1.0 * k).toFixed(3)}); // (max, not add: petals still lit by the dusk do not blow out)
+      }
+      #include <fog_fragment>`);
+  };
+  mat.customProgramCacheKey = () => baseKey + '|neon' + k;
+  return mat;
+}

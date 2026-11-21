@@ -5,13 +5,13 @@ import * as THREE from 'three';
 import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
-import { timeU, updateDetail } from './core/materials.js';
+import { timeU, updateDetail, neonU } from './core/materials.js';
 import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT } from './core/shape.js';
 import { hooks, seasonState, seats, world } from './core/state.js';
 import { clock } from './core/clock.js';
-import { buildSky, sky, skyU, starMat } from './world/sky.js';
+import { buildSky, sky, skyU } from './world/sky.js';
 import { buildMountains, tintMountains } from './world/mountains.js';
-import { buildLights, hemi, ambient, sun } from './world/lights.js';
+import { buildLights, hemi, ambient, sun, placeSun } from './world/lights.js';
 import { buildTerrain, groundU } from './world/terrain.js';
 import { buildWater, waterU } from './world/water.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots } from './world/vegetation.js';
@@ -183,7 +183,8 @@ function applySky() {
   skyU.topColor.value.copy(cur.top);
   skyU.horizonColor.value.copy(cur.horizon);
   skyU.sunColor.value.copy(cur.glow);
-  starMat.opacity = cur.stars;
+  skyU.stars.value = cur.stars;
+  neonU.value = (1 - smooth(-10, -2, solar.sunElev)) * (1 - wx.fog * 0.4) * (1 - wx.snow * 0.85); // the flowers glow neon once the sun is well down (dimmed under snow)
   tintMountains(cur, sunDir, seasonState.coverFloor || 0);
   groundU.bloom.value = seasonState.flowerFrac ?? 1;
   const wildOn = seasonState.name !== 'Winter' && world.wildAllowed !== false; // the wildflowers die back under the snow (or are switched off)
@@ -238,10 +239,12 @@ function runHooks(list, name, ...args) {
   }
 }
 let actionTimer = 0;
+const sunAim = new THREE.Vector3();
 export function tick(dt) {
   clock.elapsed += dt;
   timeU.value += dt * (reduceMotion ? 0.35 : 1) * (1 + wx.wind * 0.7);
   waterU.uTime.value = clock.elapsed * (reduceMotion ? 0.4 : 1);
+  skyU.uTime.value = waterU.uTime.value;
   safe('weather', () => updateWeather(dt, { hour: timeCtl.hour, sunElev: solar.sunElev, center: player }));
   safe('time', () => { advanceTime(dt); applySky(); });
   safe('boat', () => updateBoat(dt, clock.elapsed, cur.eve, cur.day));
@@ -255,8 +258,8 @@ export function tick(dt) {
   safe('sound', () => updateBeds(dt, { nearWater: 1 - smooth(1.0, 1.9, lakeT(player.x, player.z)), day: cur.day, eve: cur.eve, rain: wx.rain, storm: wx.storm, snow: wx.snow, wind: wx.wind, bugs: seasonState.bugs }));
   runHooks(hooks.frame, 'a feature', dt, clock.elapsed, camera);
   sky.position.copy(camera.position);
-  sun.position.set(camTarget.x + lightDir.x * 140, camTarget.y - 1.55 + lightDir.y * 140, camTarget.z + lightDir.z * 140);
-  sun.target.position.set(camTarget.x, camTarget.y - 1.55, camTarget.z);
+  sunAim.set(camTarget.x, camTarget.y - 1.55, camTarget.z);
+  placeSun(sunAim, lightDir);
   safe('detail', () => updateDetail(camera, camTarget));
   updateAtmosphere(camera, sunDir, cur.glow, 1, lampSpots, cur.eve);
   actionTimer -= dt;

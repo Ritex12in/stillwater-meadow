@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TAU, mulberry32, fbm } from '../core/math.js';
 import { height, lakeT, lakeR, pathAmt, nearReserved, onDock, LAKE, PATH_T, BENCH_SPOT, SPAWN, WORLD_LIMIT } from '../core/shape.js';
-import { col, weatherize, addWind, bothSides, instancedVariants } from '../core/materials.js';
+import { col, weatherize, addWind, bothSides, instancedVariants, softEdges, neonAtNight } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { world } from '../core/state.js';
 
@@ -110,16 +110,16 @@ export function buildWildflowers() {
 
   // geometry for kinds: 0 daisy, 1 lupin (tinted), 2 red tulip clump, 3 yellow bells, 4 broad plant, 5 wispy grass
   const piece = (name, h, re) => { const p = fit(Object.fromEntries(Object.entries(kit.models[name]).map(([k, g]) => [k, g.clone()])), h); return Object.entries(p).filter(([k]) => re.test(k)).map(([, g]) => g); };
-  const plain = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.25, FADE), 'lam'));
-  const leaves = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ map: kit.tex.leaves, alphaTest: 0.5, vertexColors: true }), 0.4, FADE), 'lam'));
-  const blooms = bothSides(addWind(new THREE.MeshLambertMaterial({ map: kit.tex.flowers, alphaTest: 0.5, vertexColors: true }), 0.4, FADE));
+  const plain = neonAtNight(bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.25, FADE), 'lam')), 0.7);
+  const leaves = softEdges(bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ map: kit.tex.leaves, alphaTest: 0.5, vertexColors: true }), 0.4, FADE), 'lam')));
+  const blooms = softEdges(neonAtNight(bothSides(addWind(new THREE.MeshLambertMaterial({ map: kit.tex.flowers, alphaTest: 0.5, vertexColors: true }), 0.4, FADE))));
   const grassMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ color: '#9cb85a', vertexColors: true }), 0.6, [16, 34]), 'lam')); // dense model: kept near
   const o = { cell: 30, far: FADE[1] }, lupins = lupinClump();
   const sub = (k) => (it) => (it.kind === k ? 0 : -1);
   world.wild = [
     instancedVariants([daisyClump()], plain, items, sub(0), o),
     // its own material: three r128 doesn't recompile a shared one for meshes with per-instance colour
-    instancedVariants([lupins.florets], bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.15, FADE), 'lam')), items, sub(1), o),
+    instancedVariants([lupins.florets], neonAtNight(bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.15, FADE), 'lam'))), items, sub(1), o),
     instancedVariants([lupins.greens], bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.15, FADE), 'lam')), items.map((it) => Object.assign({}, it, { color: null })), sub(1), o), // same sway as the florets
     instancedVariants([piece('Flower_3_Group', 0.5, /Leaves/)[0], piece('Flower_4_Group', 0.5, /Leaves/)[0]], leaves, items, (it) => (it.kind === 2 || it.kind === 3 ? it.kind - 2 : -1), o),
     instancedVariants([piece('Flower_3_Group', 0.5, /Flowers/)[0], piece('Flower_4_Group', 0.5, /Flowers/)[0]], blooms, items, (it) => (it.kind === 2 || it.kind === 3 ? it.kind - 2 : -1), o),

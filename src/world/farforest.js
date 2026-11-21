@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, mulberry32, fbm, smooth } from '../core/math.js';
 import { heightAt, lakeT, TERRAIN, WORLD_LIMIT } from '../core/shape.js';
-import { weatherize, camU } from '../core/materials.js';
+import { weatherize, camU, softEdges } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { RANGES, rangeHeight, mountainU } from './mountains.js';
 import { groundU } from './terrain.js';
@@ -122,7 +122,7 @@ function cards(list, atlas, cells, distant) {
   g.setAttribute('aLeafy', new THREE.InstancedBufferAttribute(leafy, 1));
   g.setAttribute('color', new THREE.InstancedBufferAttribute(col, 3));
   g.instanceCount = n;
-  const m = new THREE.Mesh(g, weatherize(cardMaterial(atlas, cells, distant), 'lam'));
+  const m = new THREE.Mesh(g, softEdges(weatherize(cardMaterial(atlas, cells, distant), 'lam')));
   m.frustumCulled = false;
   scene.add(m);
   return m;

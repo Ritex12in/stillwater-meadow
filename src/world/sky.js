@@ -1,8 +1,10 @@
-// Gradient sky dome with sun, a phased moon, and stars.
+// Gradient sky dome with sun, a phased moon, and a night sky drawn per pixel: stars that stay a
+// pixel or two wide at any resolution and twinkle, a Milky Way band with dark dust lanes, and a
+// moon with faint seas on its face.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { GRADE_GLSL } from '../core/atmosphere.js';
-import { rng, rand, TAU, mulberry32 } from '../core/math.js';
+import { rng, rand } from '../core/math.js';
 
 export const skyU = {
   topColor: { value: new THREE.Color() },
@@ -12,10 +14,47 @@ export const skyU = {
   moonDir: { value: new THREE.Vector3(0, 1, 0) },
   moonAmt: { value: 0 },
   moonPhase: { value: 0.5 },   // 0 new, 0.5 full, 1 new again
+  stars: { value: 0 },         // how much of the night sky shows (0 by day or under cloud)
+  uTime: { value: 0 },         // star twinkle clock (set with the lake's, so it slows with reduced motion)
+  uPA: { value: 0.001 },       // the angle one screen pixel covers, so stars stay pin sharp
 };
 
 export let sky = null;
-export const starMat = new THREE.PointsMaterial({ size: 1.6 * Math.min(window.devicePixelRatio || 1, 2), sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, fog: false, depthWrite: false });
+
+// GLSL for the night sky (hash noise only, so it also runs on WebGL 1)
+const NIGHT_GLSL = `
+vec3 h33(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
+float vn3(vec3 x) {
+  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(h33(i).x, h33(i + vec3(1.0, 0.0, 0.0)).x, f.x), mix(h33(i + vec3(0.0, 1.0, 0.0)).x, h33(i + vec3(1.0, 1.0, 0.0)).x, f.x), f.y),
+             mix(mix(h33(i + vec3(0.0, 0.0, 1.0)).x, h33(i + vec3(1.0, 0.0, 1.0)).x, f.x), mix(h33(i + vec3(0.0, 1.0, 1.0)).x, h33(i + vec3(1.0, 1.0, 1.0)).x, f.x), f.y), f.z);
+}
+float fbm3(vec3 p) { return vn3(p) * 0.5 + vn3(p * 2.03 + 5.1) * 0.3 + vn3(p * 4.1 + 9.7) * 0.2; }
+// one shell of stars: one candidate per cell of a grid laid over the sky, most of them too faint to see
+vec3 starShell(vec3 d, float sc, float pw, float gain, float seed, float boost) {
+  vec3 p = d * sc, h = h33(floor(p) + seed);
+  vec3 q = fract(p) - 0.5 - (h - 0.5) * 0.5;
+  float r0 = uPA * sc, r2 = dot(q, q) / (r0 * r0);          // distance in pixels, squared
+  float b = pow(h.x, pw) * gain * boost;
+  float tw = 0.75 + 0.25 * sin(uTime * (1.3 + h.y * 3.5) + h.z * 60.0);
+  vec3 tint = mix(vec3(0.72, 0.82, 1.0), vec3(1.0, 0.88, 0.72), h.z * h.z);
+  return tint * b * tw * (exp(-r2 * 1.4) + exp(-r2 * 0.25) * 0.05);
+}
+vec3 nightSky(vec3 d) {
+  // Milky Way: a warped band across the sky, brighter in a clumpy core, cut by dark dust lanes
+  vec3 G = normalize(vec3(0.42, 0.38, 0.82));
+  float f1 = fbm3(d * 3.0 + 1.7), f2 = fbm3(d * 7.5 + f1 * 2.0);
+  float gw = dot(d, G) + (f1 - 0.5) * 0.16, band = exp(-gw * gw * 13.0);
+  float core = band * smoothstep(0.3, 0.75, f1 * 0.5 + f2 * 0.6);
+  float lane = smoothstep(0.45, 0.62, fbm3(d * 5.0 + vec3(9.0, 2.0, 5.0) + f2 * 1.2)) * exp(-gw * gw * 40.0);
+  vec3 c = mix(vec3(0.09, 0.12, 0.24), vec3(0.2, 0.19, 0.24), smoothstep(0.45, 0.8, f2)) * (band * 0.25 + core * 0.55) * (1.0 - lane * 0.75);
+  float boost = 1.0 + 1.5 * core;                            // more stars where the band is
+  c += starShell(d, 150.0, 9.0, 0.55, 0.0, boost);
+  c += starShell(d, 95.0, 15.0, 1.3, 17.3, boost);
+  c += starShell(d, 52.0, 24.0, 2.6, 41.9, 1.0);
+  return c * (1.0 - lane * 0.5);
+}
+`;
 
 export function buildSky() {
   sky = new THREE.Mesh(
@@ -34,7 +73,9 @@ export function buildSky() {
       fragmentShader: GRADE_GLSL + `
         uniform vec3 topColor; uniform vec3 horizonColor; uniform vec3 sunColor; uniform vec3 sunDir;
         uniform vec3 moonDir; uniform float moonAmt; uniform float moonPhase;
+        uniform float stars; uniform float uTime; uniform float uPA;
         varying vec3 vDir;
+        ` + NIGHT_GLSL + `
         void main() {
           vec3 d = normalize(vDir);
           float h = d.y;
@@ -42,6 +83,7 @@ export function buildSky() {
           vec3 c = mix(horizonColor, topColor, pow(smoothstep(0.0, 1.0, max(h, 0.0)), 0.5));
           c = mix(c, horizonColor * 0.92, smoothstep(0.0, -0.3, h));
           float s = max(dot(d, normalize(sunDir)), 0.0);
+          if (stars > 0.01) c += nightSky(d) * stars * smoothstep(0.0, 0.12, h);
           c += sunColor * (pow(s, 5.0) * 0.16 + pow(s, 40.0) * 0.3 + pow(s, 2.0) * 0.08) * (1.0 - 0.4 * max(h, 0.0)); // same glow as meadowHaze (core/atmosphere.js)
           c = mix(c, vec3(1.0, 0.97, 0.9) * (0.6 + 0.6 * sunColor), smoothstep(0.99935, 0.9997, s) * above);
           // moon: a disc lit from one side according to its phase
@@ -59,46 +101,26 @@ export function buildSky() {
           float a = moonPhase * 6.2831853;
           vec3 sunSide = vec3(sin(a), 0.0, -cos(a));  // lit hemisphere turns as the phase advances
           float lit = smoothstep(-0.08, 0.08, dot(vec3(q, z), sunSide));
-          vec3 moonCol = mix(vec3(0.16, 0.18, 0.24), vec3(0.97, 0.95, 0.87), lit);
+          float maria = fbm3(vec3(q * 2.6, 3.0));               // darker seas on the bright side
+          vec3 moonCol = mix(vec3(0.16, 0.18, 0.24), vec3(0.97, 0.95, 0.87) * (1.0 - 0.2 * smoothstep(0.4, 0.68, maria)), lit);
           c = mix(c, moonCol, disc * moonAmt * above);
           gl_FragColor = vec4(meadowGrade(c), 1.0);
         }`,
     })
   );
   sky.renderOrder = -1;
+  // keep the stars one or two pixels wide whatever the resolution or zoom
+  const px = new THREE.Vector2();
+  sky.onBeforeRender = (renderer, _scene, cam) => {
+    if (!cam.isPerspectiveCamera) return;
+    renderer.getDrawingBufferSize(px);
+    skyU.uPA.value = 2 * Math.tan(THREE.MathUtils.degToRad(cam.fov / cam.zoom) / 2) / Math.max(px.y, 1);
+  };
   scene.add(sky);
-
-  const pos = [], cols = [];
-  for (let i = 0; i < 1500; i++) {
-    const y = Math.pow(rng(), 0.8) * 0.98 + 0.02, a = rng() * TAU, r = Math.sqrt(1 - y * y);
-    pos.push(Math.cos(a) * r * 650, y * 650, Math.sin(a) * r * 650);
-    const b = rand(0.45, 1), warm = rng() < 0.2 ? 0.88 : 1;
-    cols.push(b, b * (warm < 1 ? 0.95 : 1), b * warm);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-  const stars = new THREE.Points(g, starMat);
-  stars.frustumCulled = false;
-  sky.add(stars);
-  // a second, fainter field (its own random stream, so the layout stream is untouched), denser in
-  // a band across the sky like the Milky Way
-  const r = mulberry32(9001), p2 = [], c2 = [];
-  for (let i = 0; i < 3500; i++) {
-    let x = r() * 2 - 1, y = r(), z = r() * 2 - 1;
-    if (i % 2) { const t = r() * TAU; x = Math.cos(t); z = Math.sin(t) * 0.35 + (r() - 0.5) * 0.25; y = 0.25 + Math.abs(Math.sin(t)) * 0.7 + (r() - 0.5) * 0.15; }
-    const l = Math.hypot(x, y, z) || 1;
-    if (y / l < 0.03) continue;
-    p2.push(x / l * 640, y / l * 640, z / l * 640);
-    const b = 0.25 + r() * r() * 0.6;
-    c2.push(b * 0.92, b * 0.95, b);
-  }
-  const g2 = new THREE.BufferGeometry();
-  g2.setAttribute('position', new THREE.Float32BufferAttribute(p2, 3));
-  g2.setAttribute('color', new THREE.Float32BufferAttribute(c2, 3));
-  const faint = new THREE.Points(g2, starMat);
-  faint.frustumCulled = false;
-  sky.add(faint);
+  // The stars used to be point sprites placed with the shared layout random stream; they are drawn
+  // in the dome's shader now, but the stream still advances as it did (4 draws a star, 1500 stars)
+  // so everything placed after the sky lands exactly where it always has.
+  for (let i = 0; i < 1500; i++) { rng(); rng(); rand(0, 1); rng(); }
 }
 
 /** Moon phase for a date: 0 = new, 0.5 = full. */

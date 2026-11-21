@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { TAU, lerp, mulberry32, fbm } from '../core/math.js';
 import { height, lakeT, pathAmt, SPAWN, nearReserved } from '../core/shape.js';
-import { std, col, weatherize, addWind, bothSides, instancedVariants, lodSet, cutoutDepth, treeWarp } from '../core/materials.js';
+import { std, col, weatherize, addWind, bothSides, instancedVariants, lodSet, cutoutDepth, treeWarp, softEdges, neonAtNight } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { variantAt } from './detail.js';
 import { world } from '../core/state.js';
@@ -17,7 +17,7 @@ const FAR_KEEP = 0.4; // share of leaf cards a far tree keeps
 
 const tex = (n) => kit.tex[n];
 /** Tree crowns: the leaf material, swaying a little at the top and rustling as gusts pass. */
-const crownStd = (map) => weatherize(addWind(std('#ffffff', { map, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true }), 0.0022, null, null, 0.07), 'std');
+const crownStd = (map) => softEdges(weatherize(addWind(std('#ffffff', { map, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true }), 0.0022, null, null, 0.07), 'std'));
 const pieces = (name) => kit.models[name];
 const first = (parts, re) => Object.entries(parts).find(([k]) => re.test(k))[1];
 /** The kit keeps wind weights in its vertex colours; give small plants a root-to-tip shade instead. */
@@ -205,9 +205,9 @@ export const KIT_FLOWER_COLOURS = { 5: col('#e7785c'), 6: col('#f2c53d') };
 export function kitFlowerParts(flowers) {
   const f3 = fit(pieces('Flower_3_Single'), 0.62), f4 = fit(pieces('Flower_4_Single'), 0.6);
   [f3, f4].forEach((m) => Object.values(m).forEach((g) => shadeByHeight(g, 0.7, 1.1)));
-  const fade = (m) => bothSides(addWind(m, 0.6, KIT_FLOWER_FADE));
+  const fade = (m) => softEdges(bothSides(addWind(m, 0.6, KIT_FLOWER_FADE)));
   const leafMat = fade(new THREE.MeshLambertMaterial({ map: tex('leaves'), alphaTest: 0.5, vertexColors: true }));
-  const petalMat = bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ map: tex('flowers'), alphaTest: 0.5, vertexColors: true }), 0.6, KIT_FLOWER_FADE), 'lam'));
+  const petalMat = softEdges(neonAtNight(bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ map: tex('flowers'), alphaTest: 0.5, vertexColors: true }), 0.6, KIT_FLOWER_FADE), 'lam'))));
   const plain = flowers.map((f) => Object.assign({}, f, { color: null }));
   const kind = (f) => (f.kind >= 5 ? f.kind - 5 : -1);
   const o = { cell: 40, far: KIT_FLOWER_FADE[1] };
@@ -249,16 +249,16 @@ export function buildUndergrowth(treeSpots) {
   const bushPlain = roundNormals(first(fit(pieces('Bush_Common'), 1.0, 0.1), /Leaves/));
   const bushFl = fit(pieces('Bush_Common_Flowers'), 1.0, 0.1);
   Object.values(bushFl).forEach(roundNormals);
-  const leafMat = (map) => weatherize(wind(std('#ffffff', { map, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true }), 0.05), 'std');
+  const leafMat = (map) => softEdges(weatherize(wind(std('#ffffff', { map, alphaTest: 0.5, side: THREE.DoubleSide, flatShading: false, vertexColors: true }), 0.05), 'std'));
   // the two bushes are laid out on different leaf textures
   const o = { cast: true, shadowRange: UNDERGROWTH_FADE[1], cell: 40, far: UNDERGROWTH_FADE[1] };
   world.bushes = instancedVariants([bushPlain], leafMat(tex('leaves_bush')), bushes, (b) => (b.flowers ? -1 : 0), Object.assign({ depthMat: cutoutDepth(tex('leaves_bush')) }, o));
   world.bushesInBloom = instancedVariants([first(bushFl, /Leaves/)], leafMat(tex('leaves_round')), bushes, (b) => (b.flowers ? 0 : -1), Object.assign({ depthMat: cutoutDepth(tex('leaves_round')) }, o));
-  const bloom = bothSides(wind(new THREE.MeshLambertMaterial({ map: tex('flowers'), alphaTest: 0.5, vertexColors: true }), 0.05));
+  const bloom = softEdges(neonAtNight(bothSides(wind(new THREE.MeshLambertMaterial({ map: tex('flowers'), alphaTest: 0.5, vertexColors: true }), 0.05)), 0.8));
   world.bushBlooms = instancedVariants([first(bushFl, /Flowers/)], bloom, bushes.map((b) => Object.assign({}, b, { color: null })), (b) => (b.flowers ? 0 : -1), { cell: 40, far: UNDERGROWTH_FADE[1] });
-  const leafy = bothSides(wind(new THREE.MeshLambertMaterial({ map: tex('leaves'), alphaTest: 0.5, vertexColors: true }), 0.3));
+  const leafy = softEdges(bothSides(wind(new THREE.MeshLambertMaterial({ map: tex('leaves'), alphaTest: 0.5, vertexColors: true }), 0.3)));
   world.ferns = instancedVariants([shadeByHeight(first(fit(pieces('Fern_1'), 0.45), /Leaves/), 0.6, 1.1)], leafy, ferns, () => 0, { cell: 40, far: UNDERGROWTH_FADE[1] });
-  const leafyNear = bothSides(addWind(new THREE.MeshLambertMaterial({ map: tex('leaves'), alphaTest: 0.5, vertexColors: true }), 0.3, [22, 32]));
+  const leafyNear = softEdges(bothSides(addWind(new THREE.MeshLambertMaterial({ map: tex('leaves'), alphaTest: 0.5, vertexColors: true }), 0.3, [22, 32])));
   world.clover = instancedVariants([shadeByHeight(first(fit(pieces('Clover_1'), 0.3), /Leaves/), 0.6, 1.1)], leafyNear, clover, () => 0, { cell: 30, far: 32 });
   const shroomMat = wind(std('#ffffff', { map: tex('mushrooms'), flatShading: false }), 0);
   world.mushrooms = instancedVariants([first(fit(pieces('Mushroom_Common'), 0.22), /Mushroom/)], shroomMat, shrooms, () => 0, { cell: 40, far: UNDERGROWTH_FADE[1] });

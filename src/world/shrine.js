@@ -11,7 +11,7 @@ import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtil
 import { scene } from '../core/render.js';
 import { TAU, mulberry32 } from '../core/math.js';
 import { height, heightAt, lakeT, pathAmt, LAKE, SPAWN, FIRE_SPOT, BENCH_SPOT, WORLD_LIMIT } from '../core/shape.js';
-import { std, weatherize, addWind, cutoutDepth, glowTex } from '../core/materials.js';
+import { std, weatherize, addWind, cutoutDepth, glowTex, softEdges, neonAtNight } from '../core/materials.js';
 import { kit } from '../core/assets.js';
 import { cherryHero } from './proctrees.js';
 import { world, obstacles, hooks } from '../core/state.js';
@@ -155,7 +155,7 @@ function fuse(root) {
 function flowerCarpet(s, R) {
   const g = new THREE.Group();
   if (!kit || !kit.models.Flower_4_Clump) return g;
-  const mat = new THREE.MeshLambertMaterial({ map: kit.tex.meadow_flowers, alphaTest: 0.5, side: THREE.DoubleSide });
+  const mat = softEdges(neonAtNight(new THREE.MeshLambertMaterial({ map: kit.tex.meadow_flowers, alphaTest: 0.5, side: THREE.DoubleSide }), 0.8));
   const spots = [[], []];
   for (let i = 0; i < 6000 && spots[0].length + spots[1].length < 1500; i++) {
     const a = R() * TAU, d = Math.sqrt(R()) * (GROVE_R + 5), x = s.x + Math.cos(a) * d, z = s.z + Math.sin(a) * d;

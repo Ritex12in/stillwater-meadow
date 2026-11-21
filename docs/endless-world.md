@@ -321,6 +321,29 @@ Picking weather in the World panel overrides it where you stand; Auto is the lan
 **5. Then.** The World panel says what it is like where you stand ("Here: early spring, light
 rain"); dark skies and rain curtains in the direction of a far storm come after.
 
+## Plan: more biomes (asked 2026-11-22, not decided yet)
+
+The owner shared a mood board of twelve biomes to add, saved as
+[reference/biomes-moodboard.png](reference/biomes-moodboard.png): Verdant Plains, Enchanted Forest,
+Cherry Blossom Valley, Snowy Highlands, Crystal Caverns, Golden Desert, Volcanic Wasteland,
+Floating Islands, Coastal Isles, Mystic Swamp, Windy Cliffs, Aurora Tundra. It is a reference for
+the look and the variety wanted, not art to copy.
+
+Proposed approach (Minecraft-style): biomes chosen from a few broad fields that also shape the
+land: temperature and moisture (have), distance from the sea (sea, coast, inland), ruggedness
+(plains, hills, cliffs, mountains), and a rare "wonder" field for the fantasy ones; blended at
+their edges. Proposed order, after seasons and weather (the warm regions are needed): (1) northern
+lights and tundra details, Verdant Plains tuning, petals drifting in blossom valleys; (2) Golden
+Desert, Mystic Swamp, Enchanted Forest; (3) Windy Cliffs with rivers and waterfalls; (4) Coastal
+Isles with the ocean; (5) Volcanic Wasteland; (6) crystal grottos and floating islands as rare
+wonders. The ground is a height map, so caves and overhangs need separate pieces (crystal
+grottos instead of caverns; floating islands as their own meshes).
+
+Open questions put to the owner: whether the fantasy biomes (floating islands, crystal caverns,
+glowing forests, lava) come in as rare wonders or not at all, given the "follow natural laws"
+direction; whether the buildings in the pictures (castles, ruins, pagodas, huts, windmill, ships)
+stay out for now, as decided for manmade things, or ruins only are allowed; and the order.
+
 ## How nature shapes the land (after milestone 4d, step 1)
 
 The owner asked for terrain, climate and plants that follow natural laws, and left the choice of

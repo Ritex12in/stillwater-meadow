@@ -276,15 +276,29 @@ export function lodFade(mat, band) {
  * `opts.band` both are drawn and cross-fade (see lodFade). Instances are re-sorted only when
  * something crosses a boundary. The handle edits by index in `items`; `variantOf` may return -1
  * for items this set doesn't draw.
+ *
+ * The items can be swapped for another list at any time (`setItems`): trees come and go as you
+ * walk. For that, give `opts.capacity` (slots per shape; nothing is ever reallocated, and items
+ * past it are counted in `dropped`) and say whether the items carry colours (`opts.colored`).
+ * `opts.maxDist` stops drawing the far shape beyond that distance (something cheaper takes over).
  */
 export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
   const band = opts.band || [(opts.near || 55) - 10, (opts.near || 55) + 5];
   const in2 = band[0] ** 2, out2 = band[1] ** 2, lift = opts.lift || 3, radius = opts.radius || 3.5;
-  const n = items.length, kind = items.map(variantOf);
-  const mats = new Float32Array(n * 16);
-  items.forEach((it, i) => composeItem(it).toArray(mats, i * 16));
-  const colors = items.map((it) => (it.color ? it.color.clone() : null));
-  const counts = nearGeos.map((_, v) => kind.filter((k) => k === v).length);
+  const max2 = (opts.maxDist || Infinity) ** 2;
+  let n = 0, kind = [], mats = new Float32Array(0), colors = [], state = new Uint8Array(0), dirty = true, dropped = 0;
+  const load = (list) => {
+    items = list; n = list.length; kind = list.map(variantOf);
+    if (mats.length < n * 16) mats = new Float32Array(Math.ceil(n * 1.4) * 16);
+    // (a tree's matrix is kept on the tree: several sets draw the same one, and a refill then copies 16 numbers instead of composing them)
+    list.forEach((it, i) => { if (it.m16) mats.set(it.m16, i * 16); else { composeItem(it).toArray(mats, i * 16); if (opts.capacity) it.m16 = mats.slice(i * 16, i * 16 + 16); } });
+    colors = list.map((it) => { const c = it.shown || it.color; return c ? c.clone() : null; }); // (`shown`: the colour the season gives it)
+    state = new Uint8Array(n).fill(255);
+    dirty = true;
+  };
+  load(items);
+  const counts = nearGeos.map((_, v) => opts.capacity || kind.filter((k) => k === v).length);
+  const colored = opts.colored !== undefined ? opts.colored : !!colors[0];
   const fade = (m) => {
     const was = faded.get(m);
     if (!was) { lodFade(m, band); faded.set(m, band.join()); } else if (was !== band.join()) console.warn('lodSet: one material, two fade bands');
@@ -297,7 +311,8 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
   const mk = (geo, cap, cast, material = mat) => {
     const m = new THREE.InstancedMesh(geo, material, Math.max(cap, 1));
     if (cast) m.customDepthMaterial = depth;
-    if (colors[0]) m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(cap, 1) * 3), 3);
+    if (colored) m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(cap, 1) * 3), 3);
+    m.userData.cap = Math.max(cap, 1);
     m.count = 0; m.visible = false;
     m.frustumCulled = false; // placement is handled here
     m.castShadow = cast; m.receiveShadow = true;
@@ -307,10 +322,14 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
   const nearM = nearGeos.map((g, v) => mk(g, counts[v], !!opts.cast));
   const farM = farGeos.map((g, v) => mk(g, counts[v], false, opts.farMat || mat));
   // state per item: bit 1 = near shape drawn, bit 2 = far shape drawn (both inside the band)
-  const state = new Uint8Array(n).fill(255), fill = new Int32Array(nearGeos.length * 2);
-  let dirty = true, on = true;
+  const fill = new Int32Array(nearGeos.length * 2);
+  let on = true;
   const set = {
-    count: n,
+    get count() { return n; },
+    /** How many items found no free slot at the last re-sort (0 unless `capacity` is too small). */
+    get dropped() { return dropped; },
+    /** Draw another list of items instead. */
+    setItems: load,
     material: mat,
     update(cam) {
       let changed = dirty;
@@ -319,19 +338,22 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
         let st = 0;
         if (on && kind[i] >= 0) {
           if (d2 < out2) st |= 1;
-          if (d2 > in2) { SPH.center.set(it.x, it.y + lift * sc, it.z); SPH.radius = radius * sc; if (FR.intersectsSphere(SPH)) st |= 2; }
+          if (d2 > in2 && d2 < max2) { SPH.center.set(it.x, it.y + lift * sc, it.z); SPH.radius = radius * sc; if (FR.intersectsSphere(SPH)) st |= 2; }
         }
         if (st !== state[i]) { state[i] = st; changed = true; }
       }
       if (!changed) return;
       dirty = false;
+      dropped = 0;
       fill.fill(0);
       for (let i = 0; i < n; i++) {
         for (let f = 0; f < 2; f++) {
           if (!(state[i] & (f + 1))) continue;
-          const m = f === 0 ? nearM[kind[i]] : farM[kind[i]], k = fill[kind[i] * 2 + f]++;
+          const m = f === 0 ? nearM[kind[i]] : farM[kind[i]], k = fill[kind[i] * 2 + f];
+          if (k >= m.userData.cap) { dropped++; continue; }
+          fill[kind[i] * 2 + f]++;
           m.instanceMatrix.array.set(mats.subarray(i * 16, i * 16 + 16), k * 16);
-          if (colors[i]) colors[i].toArray(m.instanceColor.array, k * 3);
+          if (colors[i] && m.instanceColor) colors[i].toArray(m.instanceColor.array, k * 3);
         }
       }
       [nearM, farM].forEach((list, f) => list.forEach((m, v) => {
@@ -341,7 +363,7 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
         if (m.instanceColor) m.instanceColor.needsUpdate = true;
       }));
     },
-    setColorAt(i, c) { colors[i].copy(c); dirty = true; },
+    setColorAt(i, c) { if (colors[i]) { colors[i].copy(c); dirty = true; } },
     commit() {},
     set visible(v) { on = v; dirty = true; },
   };

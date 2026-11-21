@@ -58,3 +58,68 @@ test('one seed, one world: the same seed gives the same land and another seed a 
   expect(b).toEqual(a);
   expect(c).not.toEqual(a);
 });
+
+test('woods beyond the valley: each square grows the same trees every time, and near you they are real trees', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  // a square is always the same, however often it is grown
+  const same = await page.evaluate(() => {
+    const w = window.__meadow.wilds, list = (ix, iz) => JSON.stringify(w.square(ix, iz).map((t) => [t.x, t.z, t.type, t.s]));
+    let trees = 0, best = null;
+    for (let iz = -12; iz <= 12; iz++) for (let ix = -12; ix <= 12; ix++) { const n = w.square(ix, iz).length; trees += n; if (!best || n > best.n) best = { ix, iz, n }; }
+    return { repeat: list(best.ix, best.iz) === list(best.ix, best.iz), trees, best };
+  });
+  expect(same.repeat).toBe(true);
+  expect(same.trees, 'there are woods out there').toBeGreaterThan(1500);
+  expect(same.best.n, 'and thick ones').toBeGreaterThan(15);
+  // stand in the thickest square: its trees are drawn as models, block the way, and none is dropped for want of room
+  const there = await page.evaluate(({ ix, iz }) => {
+    const m = window.__meadow, x = (ix + 0.5) * 57.6, z = (iz + 0.5) * 57.6, before = m.trees().length;
+    m.player.x = x; m.player.z = z; m.player.slide = null;
+    m.ground.settle(x, z); m.wilds.settle(x, z);
+    for (let i = 0; i < 30; i++) m.tick(1 / 30);
+    return { before, after: m.trees().length, stats: m.wilds.stats(), wild: m.trees().filter((t) => t.wild).length };
+  }, same.best);
+  expect(there.wild).toBeGreaterThan(same.best.n - 1);
+  expect(there.stats.near).toBe(there.wild);
+  expect(there.stats.cards).toBeGreaterThan(there.stats.near);
+  expect(there.stats.dropped).toBe(0);
+  noErrors(errors);
+});
+
+test('travelling far and back, again and again, leaves the scene holding exactly what it held', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const trip = () => page.evaluate(() => {
+    const m = window.__meadow;
+    const go = (x, z) => { m.player.x = x; m.player.z = z; m.player.slide = null; m.ground.settle(x, z); for (let i = 0; i < 200; i++) m.ground.update(x, z); m.wilds.settle(x, z); for (let i = 0; i < 10; i++) m.tick(1 / 30); };
+    go(2000, 300);
+    const out = m.wilds.stats();
+    go(0, 20);
+    return { out, back: m.wilds.stats(), objects: m.objects(), trees: m.trees().length };
+  });
+  const first = await trip(), second = await trip(), third = await trip();
+  expect(first.out.cards, 'trees were met on the way').toBeGreaterThan(200);
+  expect(second.out).toEqual(first.out);
+  expect(third.back).toEqual(second.back);
+  expect(third.objects, 'no meshes are left behind').toBe(second.objects);
+  expect(third.trees).toBe(second.trees);
+  expect(third.out.dropped + third.back.dropped).toBe(0);
+  noErrors(errors);
+});
+
+test('without the nature models the land and its woods still work (hand-built trees)', async ({ page }) => {
+  const errors = await open(page, 'assets=0&weather=clear&season=summer', '#12');
+  const out = await page.evaluate(() => {
+    const m = window.__meadow, w = m.wilds;
+    let best = null;
+    for (let iz = -10; iz <= 10; iz++) for (let ix = -10; ix <= 10; ix++) { const n = w.square(ix, iz).length; if (!best || n > best.n) best = { ix, iz, n }; }
+    const x = (best.ix + 0.5) * 57.6, z = (best.iz + 0.5) * 57.6;
+    m.player.x = x; m.player.z = z; m.player.slide = null;
+    m.ground.settle(x, z); w.settle(x, z);
+    for (let i = 0; i < 30; i++) m.tick(1 / 30);
+    return { stats: w.stats(), wild: m.trees().filter((t) => t.wild).length };
+  });
+  expect(out.wild).toBeGreaterThan(10);
+  expect(out.stats.dropped).toBe(0);
+  await step(page, 1);
+  noErrors(errors);
+});

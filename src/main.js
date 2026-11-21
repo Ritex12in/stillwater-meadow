@@ -37,6 +37,7 @@ import { wx, WX_LABEL, buildWeather, updateWeather, updatePrecip, weatherModify,
 import { quality, initQuality, tickQuality, onQualityChange, loadingStarted, loadingFinished } from './systems/quality.js';
 import { grassU, updateGrassMap } from './world/grassfield.js';
 import { farForest } from './world/farforest.js';
+import { updateWilds, settleWilds, wildStats, growSquare } from './world/wilds.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
 import { store, onSave, flush } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
@@ -117,6 +118,8 @@ buildBoat();
 buildEffects();
 buildWeather();
 registerPetting();
+// (after everything above, which is laid out once round the valley's own trees)
+settleWilds(SPAWN.x, SPAWN.z);
 
 // ── Interface and systems ──
 initHud();
@@ -281,6 +284,7 @@ function frame(now) {
   // the ground: choose the tiles round the camera, and spend a few milliseconds making new ones
   updateGround(camera.position.x, camera.position.z);
   pumpGround(3);
+  updateWilds(camera.position.x, camera.position.z);
   renderNow();
   requestAnimationFrame(frame);
 }
@@ -308,6 +312,10 @@ window.__meadow = {
   seed: WORLD.seed,
   // the ground's tiles: what is loaded, and ways to bring it up to date without waiting for frames
   ground: { stats: groundStats, update: updateGround, pump: pumpGround, settle: settleGround },
+  // the trees beyond the valley: what is loaded, a way to bring it up to date, and one square's trees
+  wilds: { stats: wildStats, settle: settleWilds, square: growSquare },
+  /** How many objects the scene holds (it must not creep up as you travel). */
+  objects: () => { let n = 0; scene.traverse(() => { n++; }); return n; },
   hour: () => wrap24(timeCtl.hour),
 };
 if (debug) import('./debug.js').then((m) => m.initDebug(window.__meadow)).catch((e) => console.error(e));

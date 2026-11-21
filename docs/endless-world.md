@@ -28,7 +28,8 @@ Each one leaves the game playable and tested.
 |---|---|---|---|
 | 1 | **Prepare the code.** Lakes and the places beside them become data that code asks for by position, instead of constants. | The world is bit-for-bit the same (`tools/fingerprint.mjs`) and every test passes. | done |
 | 2a | **Endless ground.** Land from a world seed (`?seed=`), drawn in tiles round the camera at five sizes; the painted mountain ring replaced by real far terrain; grass, clouds and birds follow the player; the walk limit removed (steep slopes block instead). The valley's own trees and flowers still stand where they did. | Tile buffers stop growing over repeated 2 km trips (`tests/world.spec.js`); same seed, same land. Smoothness still needs a look on a real GPU. | done |
-| 2b | **Plants per tile.** Trees, rocks, flowers and undergrowth grown on each tile from its own seed and removed behind the player; the valley's build-once plants retired. | Walking 2 km out and back leaves instanced-mesh and geometry counts where they were. | next |
+| 2b | **Trees everywhere.** Each 57.6 m square beyond the valley grows its own trees from the seed; real models near the player, cards further off; the camera, walkers, animals and seasons treat them like the valley's. | A square regrows identically; no tree is dropped for want of a slot; repeated 2 km trips leave the scene's object count unchanged (`tests/world.spec.js`). | done |
+| 2c | **Small plants and rocks beyond the valley.** Boulders, bushes, ferns, wildflowers and pickable flowers per square. The valley's own build-once plants stay until milestone 4 retires the valley. | Same checks as 2b. | next |
 | 3 | **Biomes.** Meadow, forest, hills, mountains and snow, blending into each other. | |
 | 4 | **Lakes and landmarks everywhere.** The fixed home goes. | |
 | 5 | **Travelling.** Companions keep up; the save holds seed and position; a way to find places again. | |
@@ -60,17 +61,20 @@ Each one leaves the game playable and tested.
 
 Found while preparing milestone 1; each line is work for the milestone named.
 
-**Centred on the origin (milestone 2b)**
-- `world/vegetation.js`: tree density by distance from the origin; flower drifts inside the limit.
-- `world/kitplants.js`, `world/wildflowers.js`, `world/shrine.js`, `world/farforest.js`: placement
-  loops bounded by distance from the origin.
+**Centred on the origin (milestones 2c and 4)**
+- `world/vegetation.js`: the valley's trees (within 155 m of the origin, denser further out), its
+  rocks and its flower drifts.
+- `world/kitplants.js`, `world/wildflowers.js`, `world/shrine.js`: placement loops bounded by
+  distance from the origin.
+- `world/wilds.js` leaves a hole of 155 m round the origin for the valley's own trees
+  (`WILD.valley`); milestone 4 closes it.
 
-**Built once (milestone 2b)**
-- Everything planted in `main.js` "Build the world" runs once, in an order that fixes every
-  position, from the shared layout stream.
-- `world/farforest.js`: tree cards on the hills just outside the old valley.
-- The helpers in `core/materials.js` (`instancedChunks`, `lodSet`) add meshes that are never
-  removed; streaming needs versions that hand back something disposable (or pooled).
+**Built once (milestones 2c and 4)**
+- Everything planted in `main.js` "Build the world" except the trees runs once, in an order that
+  fixes every position, from the shared layout stream.
+- `instancedChunks`/`instancedVariants` in `core/materials.js` add meshes that are never removed.
+  Streamed things must use fixed slots that are refilled, as `lodSet` (with `capacity`) and the
+  tree cards now do: nothing is allocated or disposed while you walk.
 
 **Far from the origin (milestone 5)**
 - Shader hashes are wrapped (`mod`) in the ground and grass so they stay random far out; the wind
@@ -115,6 +119,21 @@ or dropped once a pack is chosen.
   show as pale shapes; fog, rain and snow push it back to full.
 - `world/grassfield.js` keeps a 144 x 144 map of height and "grass grows here" round the camera
   and shifts it as the camera moves.
+
+## How the trees work (milestone 2b)
+
+- `world/wilds.js` cuts the land into the ground's 57.6 m squares. `growSquare(ix, iz)` is pure:
+  the square's seed gives candidate spots, kept where there is a wood (broad noise patches), not
+  on rock or cliffs (`rockAmt`, the same test the grass and ground texture use), with more pines
+  higher up. Squares within `WILD.load` of the camera are kept, two new ones a frame.
+- Every tree in a kept square has a card (`world/farforest.js`: one mesh of 6,000 slots, refilled).
+  Cards grow in with distance in the vertex shader (`CARD_IN`), so nothing pops.
+- Squares near the camera also hand their trees to the real tree sets: `setWildTrees` in
+  `world/vegetation.js` appends them to `treeSpots` (after the valley's, which stay first) and
+  refills the `lodSet`s through `world.roundTop.setItems`. Models stop at `MODEL_FAR`.
+- Seasons: each round tree carries its own palette (`pal`) and current colour (`shown`). The
+  valley's are drawn from the runtime stream as before; wild trees hash their position.
+- `window.__meadow.wilds` (`stats`, `settle`, `square`) and `objects()` are there for tests.
 
 ## Tools
 

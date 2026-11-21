@@ -7,7 +7,8 @@ export async function open(page, query = '', hash = '#14') {
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/GL Driver|GPU stall/.test(m.text())) errors.push(m.text()); });
   await page.goto('/' + (query ? '?' + query : '') + hash);
-  await page.waitForFunction(() => window.__meadow && window.__meadow.player);
+  // (a long allowance: headless Chrome draws in software, and a busy machine can take a minute to build the world)
+  await page.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });
   return errors;
 }
 

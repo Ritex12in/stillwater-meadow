@@ -1,7 +1,7 @@
 // Seasons: follow the calendar (or pick one). Spring blossom and petals, summer green, autumn
 // colours and falling leaves, winter snow cover and a frozen lake you can walk on.
 import * as THREE from 'three';
-import { clamp, damp, rnd } from '../core/math.js';
+import { clamp, damp, rnd, mulberry32, hash } from '../core/math.js';
 import { query } from '../core/env.js';
 import { glowTex } from '../core/materials.js';
 import { hooks, seasonState as st, world } from '../core/state.js';
@@ -29,13 +29,39 @@ const P = {
 };
 
 let mode = 'auto', season = 'summer', blend = 1;
-let palettes = null, shown = null, falling = null, particleAmt = 0;
+let falling = null, particleAmt = 0, ready = false;
+
+// Every round tree has a crown colour for each season (`pal`) and the colour it is showing now
+// (`shown`, which drifts toward the season's when the season turns). The valley's trees drew
+// theirs from the runtime random stream when the game began; trees met later, out in the wilds,
+// take theirs from a hash of where they stand, so a tree is the same colour every time you pass.
+const SPRING_BLOSSOM = ['#f4c1d0', '#f7d6e0', '#ffffff', '#eeb0c4'], SPRING_GREEN = ['#86c25a', '#9ccd62', '#7ab84e'];
+const AUTUMN = { maple: ['#c4422a', '#d9582b', '#b8352c', '#e0722e'], birch: ['#e8c547', '#f0d35a', '#e3b03b'], other: ['#d9822b', '#e3a33b', '#c4542d', '#e8c547', '#b0452a', '#cf6a2c', '#9aa040'] };
+const WINTER = ['#7d7264', '#6f665a', '#857a6a'];
+const pickWith = (roll) => (arr) => new THREE.Color(arr[Math.floor(roll() * arr.length)]);
+const springOf = (it, roll) => (it.type === 'blossom' || roll() < 0.3 ? pickWith(roll)(SPRING_BLOSSOM) : pickWith(roll)(SPRING_GREEN));
+// maples blaze red and orange, birches turn gold, the rest a mix
+const autumnOf = (it, roll) => pickWith(roll)(AUTUMN[it.family] || AUTUMN.other);
+function palOf(it) {
+  if (!it.pal) {
+    const roll = mulberry32(Math.floor(hash(Math.round(it.x * 9) + 5, Math.round(it.z * 9) - 3) * 4294967296));
+    it.pal = { spring: springOf(it, roll), summer: it.color.clone(), autumn: autumnOf(it, roll), winter: pickWith(roll)(WINTER) };
+  }
+  return it.pal;
+}
+/** Give a tree the colour it should be showing (called for trees as they come into view). */
+function tintTree(it) {
+  if (!ready) return;
+  if (!it.shown) it.shown = new THREE.Color();
+  it.shown.copy(palOf(it)[season]);
+}
+const roundTrees = () => world.roundItems || [];
 const buttons = () => Array.from(document.querySelectorAll('#season button'));
 
 function writeTrees() {
   const t = world.roundTop;
   if (!t) return;
-  shown.forEach((c, i) => t.setColorAt(i, c));
+  roundTrees().forEach((it, i) => { if (!it.shown) tintTree(it); t.setColorAt(i, it.shown); });
   t.commit();
 }
 function syncUi() {
@@ -51,7 +77,7 @@ function apply(next, instant) {
   st.dayOfYear = mode === 'auto' ? null : MID_DAY[season];
   blend = instant ? 1 : 0;
   if (instant) {
-    shown.forEach((c, i) => c.copy(palettes[season][i]));
+    roundTrees().forEach(tintTree);
     writeTrees();
     st.ice = P[season].ice; st.coverFloor = P[season].cover; st.bugs = P[season].bugs;
     world.grassMat.color.setRGB(...P[season].grass);
@@ -89,16 +115,12 @@ export function initSeasons() {
   const q = query.get('season');
   mode = ORDER.includes(q) ? q : store.season || 'auto';
   season = mode === 'auto' ? calendarSeason() : mode;
-  const items = world.roundItems || [];
-  const pickFrom = (arr) => new THREE.Color(arr[Math.floor(rnd() * arr.length)]);
-  palettes = {
-    spring: items.map((it) => (it.type === 'blossom' || rnd() < 0.3 ? pickFrom(['#f4c1d0', '#f7d6e0', '#ffffff', '#eeb0c4']) : pickFrom(['#86c25a', '#9ccd62', '#7ab84e']))),
-    summer: items.map((it) => it.color.clone()),
-    // maples blaze red and orange, birches turn gold, the rest a mix
-    autumn: items.map((it) => pickFrom(it.family === 'maple' ? ['#c4422a', '#d9582b', '#b8352c', '#e0722e'] : it.family === 'birch' ? ['#e8c547', '#f0d35a', '#e3b03b'] : ['#d9822b', '#e3a33b', '#c4542d', '#e8c547', '#b0452a', '#cf6a2c', '#9aa040'])),
-    winter: items.map(() => pickFrom(['#7d7264', '#6f665a', '#857a6a'])),
-  };
-  shown = items.map((it) => it.color.clone());
+  // the valley's trees: season by season, in the order (and with the draws) they have always had
+  const items = world.valleyRoundItems || world.roundItems || [];
+  const spring = items.map((it) => springOf(it, rnd)), autumn = items.map((it) => autumnOf(it, rnd)), winter = items.map(() => pickWith(rnd)(WINTER));
+  items.forEach((it, i) => { it.pal = { spring: spring[i], summer: it.color.clone(), autumn: autumn[i], winter: winter[i] }; it.shown = it.color.clone(); });
+  ready = true;
+  world.tintTree = tintTree;
   falling = makeFalling({ count: 500, box: [48, 14, 48], speed: [0.5, 1.0], size: 0.16, map: glowTex, sway: 0.8, colors: ['#ffffff'] });
 
   buttons().forEach((b) => b.addEventListener('click', () => setMode(b.dataset.season)));
@@ -110,8 +132,8 @@ export function initSeasons() {
     const p = P[season];
     if (blend < 1) {
       blend = Math.min(1, blend + dt / 4);
-      shown.forEach((c, i) => c.lerp(palettes[season][i], clamp(dt * 1.5, 0, 1)));
-      if (blend >= 1) shown.forEach((c, i) => c.copy(palettes[season][i]));
+      const k = clamp(dt * 1.5, 0, 1);
+      roundTrees().forEach((it) => { if (!it.shown) tintTree(it); else if (blend >= 1) it.shown.copy(palOf(it)[season]); else it.shown.lerp(palOf(it)[season], k); });
       writeTrees();
     }
     // the lake only freezes while the boat is safely moored

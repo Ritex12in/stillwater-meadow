@@ -5,14 +5,17 @@
 // drawn in three draw calls (the hills, and one per mountain range).
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
-import { mulberry32, fbm, smooth } from '../core/math.js';
-import { heightAt, lakeT, WORLD_LIMIT } from '../core/shape.js';
+import { hash } from '../core/math.js';
 import { weatherize, camU, softEdges } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
-import { groundU } from './terrain.js';
+import { TREE_HEIGHT } from './kitplants.js';
+import { groundU, farHaze } from './terrain.js';
 
 /** The card meshes, so the distant-forest setting can hide them. */
 export const farForest = [];
+/** Cards grow in across this band of distance (metres); nearer than it, the real tree models stand. */
+export const CARD_IN = [96, 114];
+const CARD_SLOTS = 6000;   // how many cards can be drawn at once
 
 const CELL_W = 256, CELL_H = 512;
 // which model each atlas cell shows, its leaf texture and bark texture
@@ -85,7 +88,10 @@ function cardMaterial(atlas, cells, distant) {
       .replace('#include <beginnormal_vertex>', `vec3 toCam = uCamF - aPos; toCam.y = 0.0; toCam = normalize(toCam + vec3(1e-4, 0.0, 0.0));
         vec3 objectNormal = normalize(vec3(toCam.x * 0.6, 1.0, toCam.z * 0.6));`)
       .replace('#include <begin_vertex>', `vec3 right = vec3(toCam.z, 0.0, -toCam.x);
-        vec3 transformed = aPos + right * position.x * aSize.x + vec3(0.0, position.y * aSize.y, 0.0);
+        // a card grows out of the ground as you leave its tree behind, and sinks back as you come
+        // near, where the real tree stands (each at its own distance, so a wood doesn't change as one)
+        float grow = smoothstep(${CARD_IN[0].toFixed(1)}, ${CARD_IN[1].toFixed(1)}, distance(aPos.xz, uCamF.xz) + (aRand - 0.5) * 8.0);
+        vec3 transformed = aPos + (right * position.x * aSize.x + vec3(0.0, position.y * aSize.y, 0.0)) * grow;
         ${distant ? 'vMW = transformed;' : ''}`)
       .replace('#include <uv_vertex>', `#include <uv_vertex>
         vUv = vec2((aCell + uv.x) / ${cells.toFixed(1)}, uv.y);`)
@@ -98,63 +104,64 @@ function cardMaterial(atlas, cells, distant) {
         gl_FragColor.rgb = mix(gl_FragColor.rgb, meadowHaze(uHaze, uGlow, fdir, uSun), ${(+distant).toFixed(2)});
         #include <fog_fragment>`);
     }
+    if (!distant) farHaze(sh); // (the same haze as the ground they stand on, or they would glow pale against it)
   };
   mat.customProgramCacheKey = () => 'farforest' + (distant ? '-d' + distant : '');
   return mat;
 }
 
-function cards(list, atlas, cells, distant) {
+const SIZES = { aPos: 3, aSize: 2, aCell: 1, aRand: 1, aLeafy: 1, color: 3 };
+let set = null;
+
+/** One mesh of CARD_SLOTS cards, all its buffers made once at full size (their contents are rewritten as trees come and go). */
+function cards(atlas, cells) {
   const base = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
   const g = new THREE.InstancedBufferGeometry();
   g.index = base.index;
   ['position', 'normal', 'uv'].forEach((k) => g.setAttribute(k, base.attributes[k]));
-  const n = list.length, pos = new Float32Array(n * 3), size = new Float32Array(n * 2), cell = new Float32Array(n), rand = new Float32Array(n), leafy = new Float32Array(n), col = new Float32Array(n * 3);
-  list.forEach((t, i) => {
-    pos.set([t.x, t.y, t.z], i * 3); size.set([t.w, t.h], i * 2); cell[i] = t.cell; rand[i] = t.r; col.set([t.c.r, t.c.g, t.c.b], i * 3);
-    leafy[i] = /common|normal|maple|birch/.test(t.fam) ? 1 : 0; // these turn in autumn; pines and blossom don't
-  });
-  g.setAttribute('aPos', new THREE.InstancedBufferAttribute(pos, 3));
-  g.setAttribute('aSize', new THREE.InstancedBufferAttribute(size, 2));
-  g.setAttribute('aCell', new THREE.InstancedBufferAttribute(cell, 1));
-  g.setAttribute('aRand', new THREE.InstancedBufferAttribute(rand, 1));
-  g.setAttribute('aLeafy', new THREE.InstancedBufferAttribute(leafy, 1));
-  g.setAttribute('color', new THREE.InstancedBufferAttribute(col, 3));
-  g.instanceCount = n;
-  const m = new THREE.Mesh(g, softEdges(weatherize(cardMaterial(atlas, cells, distant), 'lam')));
+  const arr = {};
+  for (const k in SIZES) { arr[k] = new Float32Array(CARD_SLOTS * SIZES[k]); g.setAttribute(k, new THREE.InstancedBufferAttribute(arr[k], SIZES[k])); }
+  g.instanceCount = 0;
+  const m = new THREE.Mesh(g, softEdges(weatherize(cardMaterial(atlas, cells, false), 'lam')));
   m.frustumCulled = false;
   scene.add(m);
-  return m;
+  return { mesh: m, geo: g, arr };
 }
 
-/** Plant the far forest. Needs the renderer once, to paint the tree pictures. */
+const GREENS = { pine: ['#3d6b45', '#4a7a4c', '#355f40'], slimpine: ['#3f6e47', '#4b7d4e'], common: ['#6fa04a', '#7fb050', '#5d9142'], normal: ['#7aab4e', '#8ab85a'], maple: ['#76a64c', '#86b356'], birch: ['#9cc061', '#8db857'], blossom: ['#f0b8c8', '#e9a6bc'] };
+const tmp = new THREE.Color();
+/** The card that stands for a tree: its picture, size and tint (fixed by where the tree stands). */
+function cardOf(t) {
+  const fam = set.idx[t.family] !== undefined ? t.family : t.type === 'pine' ? 'pine' : t.type === 'blossom' && set.idx.blossom !== undefined ? 'blossom' : 'common';
+  const cell = set.idx[fam] !== undefined ? set.idx[fam] : 0, px = Math.round(t.x * 7), pz = Math.round(t.z * 7);
+  const r1 = hash(px + 11, pz), r2 = hash(px, pz + 23), r3 = hash(px - 5, pz - 9), greens = GREENS[fam] || GREENS.common;
+  tmp.set(greens[Math.floor(r1 * greens.length)]).multiplyScalar(0.9 + r2 * 0.2);
+  const h = (TREE_HEIGHT[fam] || 6.2) * t.s * set.aspects[cell]; // the card is taller than the tree when the crown is wide
+  return { h, w: h * (CELL_W / CELL_H), cell, r: r3, c: [tmp.r, tmp.g, tmp.b], leafy: /common|normal|maple|birch/.test(fam) ? 1 : 0 }; // (leafy ones turn in autumn; pines and blossom don't)
+}
+
+/** Show a card for each of these trees (replacing the last lot). Returns how many found no free slot. */
+export function setFarTrees(trees) {
+  if (!set) return 0;
+  const n = Math.min(trees.length, CARD_SLOTS), a = set.arr;
+  for (let i = 0; i < n; i++) {
+    const t = trees[i], c = t.card || (t.card = cardOf(t));
+    a.aPos[i * 3] = t.x; a.aPos[i * 3 + 1] = t.y - 0.25; a.aPos[i * 3 + 2] = t.z;
+    a.aSize[i * 2] = c.w; a.aSize[i * 2 + 1] = c.h;
+    a.aCell[i] = c.cell; a.aRand[i] = c.r; a.aLeafy[i] = c.leafy;
+    a.color[i * 3] = c.c[0]; a.color[i * 3 + 1] = c.c[1]; a.color[i * 3 + 2] = c.c[2];
+  }
+  for (const k in SIZES) set.geo.attributes[k].needsUpdate = true;
+  set.geo.instanceCount = n;
+  return trees.length - n;
+}
+
+/** Paint the tree pictures (this needs the renderer, once) and make the cards. They stay empty until setFarTrees. */
 export function buildFarForest(renderer) {
   if (!kit) return;
   const { texture, fams, aspects } = bakeAtlas(renderer);
-  const idx = Object.fromEntries(fams.map((f, i) => [f.name, i]));
-  const r = mulberry32(80021), c = new THREE.Color();
-  const greens = { pine: ['#3d6b45', '#4a7a4c', '#355f40'], slimpine: ['#3f6e47', '#4b7d4e'], common: ['#6fa04a', '#7fb050', '#5d9142'], normal: ['#7aab4e', '#8ab85a'], maple: ['#76a64c', '#86b356'], birch: ['#9cc061', '#8db857'], blossom: ['#f0b8c8', '#e9a6bc'] };
-  const pickFam = (mix) => { const x = r(); let acc = 0; for (const [k, p] of mix) { acc += p; if (x < acc && idx[k] !== undefined) return k; } return 'pine'; };
-  const tree = (x, y, z, h, mix) => {
-    const fam = pickFam(mix), cell = idx[fam];
-    c.set(greens[fam][Math.floor(r() * greens[fam].length)]).multiplyScalar(0.9 + r() * 0.2);
-    const ch = h * aspects[cell]; // the card is taller than the tree when the crown is wide
-    return { x, y, z, h: ch, w: ch * (CELL_W / CELL_H), cell, r: r(), c: c.clone(), fam };
-  };
-
-  // 1. the hills round the meadow, past where you can walk: woods in clumps, clearings between
-  const hills = [], half = 177;
-  for (let i = 0; i < 30000 && hills.length < 4600; i++) {
-    const x = (r() * 2 - 1) * half, z = (r() * 2 - 1) * half, d = Math.hypot(x, z);
-    if (d < WORLD_LIMIT + 3 || lakeT(x, z) < 1.3) continue;
-    const y = heightAt(x, z);
-    // woods in clumps with clearings between, thinning toward the outer rim so the skyline stays
-    // open and the mountains behind still show over it
-    const rim = smooth(140, 176, Math.max(Math.abs(x), Math.abs(z)));
-    if (fbm(x * 0.035 + 9, z * 0.035 - 4) < 0.42 + 0.08 * Math.sin(x * 0.01) + rim * 0.3) continue;
-    const h = 5 + r() * 5;
-    hills.push(tree(x, y - 0.4, z, h, [['pine', 0.25], ['slimpine', 0.22], ['common', 0.14], ['normal', 0.12], ['maple', 0.11], ['birch', 0.09], ['blossom', 0.07]]));
-  }
-  farForest.push(cards(hills, texture, fams.length, false));
-
-
+  set = cards(texture, fams.length);
+  set.idx = Object.fromEntries(fams.map((f, i) => [f.name, i]));
+  set.aspects = aspects;
+  farForest.push(set.mesh);
 }

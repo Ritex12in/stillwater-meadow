@@ -262,6 +262,23 @@ export function buildGround(x, z) {
 }
 
 /**
+ * The far land's haze, for the ground and whatever stands on it a long way off (the tree cards).
+ * Near you such things fade into the haze like everything else, but never all the way, and beyond
+ * that it thickens only slowly, so hills, woods and mountains kilometres off still stand as pale
+ * shapes against the sky (uHazeCap is 1 in fog, when they are lost). Call from onBeforeCompile.
+ */
+export function farHaze(sh) {
+  sh.uniforms.uHazeCap = groundU.haze;
+  sh.fragmentShader = 'uniform float uHazeCap;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `
+    #ifdef USE_FOG
+      float gFar = 1.0 - exp(-length(vFogPos) / 3500.0);
+      float gFog = smoothstep(fogNear, fogFar, fogDepth) * uHazeCap + (1.0 - uHazeCap) * gFar;
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, meadowHaze(fogColor, fogGlow, vFogPos, fogSunView), gFog);
+    #endif
+    gl_FragColor.rgb = meadowGrade(gl_FragColor.rgb);`);
+}
+
+/**
  * Per-pixel variation on top of the vertex colours: broad patches of lighter and darker grass,
  * metre-scale mottling, and a fine grain that fades out with distance (so it doesn't shimmer).
  */
@@ -347,17 +364,7 @@ function groundDetail(mat, textured) {
         float capLine = 118.0 + (broad - 0.5) * 36.0 + (mid - 0.5) * 8.0;
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.93, 0.98), smoothstep(capLine, capLine + 14.0, vGround.y));
       }`);
-    // Haze: near you the ground fades into it like everything else, but never all the way, and
-    // beyond that it thickens only slowly, so hills and mountains kilometres off still stand
-    // as pale shapes against the sky (uHazeCap is 1 in fog, when they are lost).
-    sh.uniforms.uHazeCap = groundU.haze;
-    sh.fragmentShader = 'uniform float uHazeCap;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `
-      #ifdef USE_FOG
-        float gFar = 1.0 - exp(-length(vFogPos) / 3500.0);
-        float gFog = smoothstep(fogNear, fogFar, fogDepth) * uHazeCap + (1.0 - uHazeCap) * gFar;
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, meadowHaze(fogColor, fogGlow, vFogPos, fogSunView), gFog);
-      #endif
-      gl_FragColor.rgb = meadowGrade(gl_FragColor.rgb);`);
+    farHaze(sh);
   };
   mat.customProgramCacheKey = () => 'ground' + (textured ? '-tex' : '');
   return mat;

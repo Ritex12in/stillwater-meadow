@@ -16,6 +16,36 @@ export const treeSpots = [];
 
 // how far from the camera things keep their full detail (metres)
 export const TREE_NEAR = 55;          // trees switch to a thinned-out copy and stop casting shadows
+export const MODEL_FAR = 118;         // beyond this a tree is drawn as a flat card instead (world/farforest.js)
+const TREE_SLOTS = 512;               // how many trees of one shape can be drawn at once
+/** Summer leaf colours by kind of tree (the valley's trees and the wild ones share them). */
+export const TREE_COLOURS = {
+  pine: ['#2f5a3a', '#3b6a40', '#2a4e37', '#456f43'].map(col),
+  round: ['#5b8f3e', '#6fa04a', '#4d7f3a', '#86a948', '#7a9c3c'].map(col),
+  blossom: ['#f2b8c6', '#eaa3b8', '#f7cdd8'].map(col),
+};
+let valley = null, wildBlocks = [];
+/** The valley's own trees (the first entries of treeSpots; wild trees near you follow them). */
+export const valleyTrees = () => (valley ? treeSpots.slice(0, valley.n) : treeSpots);
+/**
+ * Swap in the wild trees standing near you (see world/wilds.js): they are drawn by the same tree
+ * sets as the valley's, and the camera, walkers and animals treat them as trees like any other.
+ */
+export function setWildTrees(wild) {
+  if (!valley) return;
+  treeSpots.length = valley.n;
+  wildBlocks.forEach((b) => { const i = obstacles.indexOf(b); if (i >= 0) obstacles.splice(i, 1); });
+  wildBlocks = [];
+  const wp = [], wr = [];
+  for (const t of wild) {
+    treeSpots.push(t);
+    (t.type === 'pine' ? wp : wr).push(t);
+    const b = t.block || (t.block = { x: t.x, z: t.z, r: 0.32 * t.s });
+    obstacles.push(b); wildBlocks.push(b);
+  }
+  world.roundItems = valley.roundItems.concat(wr);
+  world.roundTop.setItems({ pines: valley.pines.concat(wp), pineItems: valley.pineItems.concat(wp), rounds: valley.rounds.concat(wr), roundItems: world.roundItems });
+}
 export const GRASS_FADE = [18, 66];   // grass thins out gradually between these distances
 export const FLOWER_FADE = [30, 70];
 const SHADOW_RANGE = 60;              // other objects cast shadows only this close to you
@@ -47,9 +77,7 @@ export function buildTrees() {
 
   const bark = std('#6b4f3a');
   const leaf = weatherize(std('#ffffff', { vertexColors: true }), 'std');
-  const pineCols = ['#2f5a3a', '#3b6a40', '#2a4e37', '#456f43'].map(col);
-  const roundCols = ['#5b8f3e', '#6fa04a', '#4d7f3a', '#86a948', '#7a9c3c'].map(col);
-  const blossomCols = ['#f2b8c6', '#eaa3b8', '#f7cdd8'].map(col);
+  const pineCols = TREE_COLOURS.pine, roundCols = TREE_COLOURS.round, blossomCols = TREE_COLOURS.blossom;
 
   // colours are drawn in the original order (all pines, then all the others) so nothing shifts
   const pineItems = pines.map((t) => Object.assign({}, t, { color: pick(pineCols) }));
@@ -57,13 +85,29 @@ export function buildTrees() {
   const pg = pineGeos(), cg = crownGeos();
   const pineKind = (t) => variantAt(t.x, t.z, pg.length, 3), crownKind = (t) => variantAt(t.x, t.z, cg.length, 8);
   // detailed (and shadow-casting) near the camera, a cheaper version further out
-  const lod = { cast: true, near: TREE_NEAR, lift: 2.8, radius: 3.6 };
-  if (kit) world.roundTop = kitTrees(pines, pineItems, rounds, world.roundItems, lod);
+  // (slots, not exact counts: wild trees join these sets as you walk; past MODEL_FAR a card stands in)
+  const lod = { cast: true, near: TREE_NEAR, lift: 2.8, radius: 3.6, capacity: TREE_SLOTS, maxDist: MODEL_FAR };
+  valley = { n: treeSpots.length, pines, pineItems, rounds, roundItems: world.roundItems };
+  world.valleyRoundItems = world.roundItems;
+  if (kit) world.roundTop = kitTrees({ pines, pineItems, rounds, roundItems: world.roundItems }, lod);
   else {
-    lodSet(pg.map((g) => g.trunk), pineTrunkFarGeos(), bark, pines, pineKind, lod);
-    lodSet(pg.map((g) => g.top), pineFarGeos(), leaf, pineItems, pineKind, lod);
-    lodSet(cg.map((g) => g.trunk), crownTrunkFarGeos(), bark, rounds, crownKind, lod);
-    world.roundTop = lodSet(cg.map((g) => g.top), crownFarGeos(), leaf, world.roundItems, crownKind, lod);
+    const plain = Object.assign({ colored: false }, lod), tinted = Object.assign({ colored: true }, lod);
+    const sets = [
+      ['pines', lodSet(pg.map((g) => g.trunk), pineTrunkFarGeos(), bark, pines, pineKind, plain)],
+      ['pineItems', lodSet(pg.map((g) => g.top), pineFarGeos(), leaf, pineItems, pineKind, tinted)],
+      ['rounds', lodSet(cg.map((g) => g.trunk), crownTrunkFarGeos(), bark, rounds, crownKind, plain)],
+      ['roundItems', lodSet(cg.map((g) => g.top), crownFarGeos(), leaf, world.roundItems, crownKind, tinted)],
+    ];
+    const crown = sets[3][1];
+    world.roundTop = {
+      get count() { return world.roundItems.length; },
+      material: leaf,
+      setColorAt(i, c) { crown.setColorAt(i, c); },
+      commit() {},
+      set visible(v) { crown.visible = v; },
+      setItems(lists) { sets.forEach(([role, set]) => set.setItems(lists[role])); },
+      get dropped() { return sets.reduce((a, [, set]) => a + set.dropped, 0); },
+    };
   }
   treeSpots.forEach((t) => { t.top = (kit ? 6.2 : 5.2) * t.s; obstacles.push({ x: t.x, z: t.z, r: 0.32 * t.s }); });
 }

@@ -28,6 +28,9 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
   but not in milestone 4; the owner also asked to plan for an **ocean** and a **backpack**. The
   backpack is planned into 4d (things you place come out of it); the ocean, rivers, islands and
   trails are milestone 8.
+- **Worlds and carrying (2026-11-22):** seeds as in Minecraft: any text is a seed, the same text
+  the same world, a new player gets a random one. The backpack is a real inventory of slots
+  (flowers, later tools and other things); bouquets are tied from flowers in it.
 - **Testing:** run only new or affected tests after a change; full runs when asked, at 4c, and
   before merging to `main`.
 - **Planning round (2026-11-21, second):**
@@ -241,9 +244,21 @@ or dropped once a pack is chosen.
   `tools/fingerprint.mjs` too). `tools/seeds.mjs random 30` checks thirty worlds a new player
   could get; 42 worlds so far (1 to 12 and 30 at random) all start well. If none of the home
   lake's sixteen ways fits a jetty, `kitOf` tries 64 ways between them (never needed so far).
-- **Backpack** (`ui/backpack.js`, I, or the menu): each feature that gives you something says
-  so with `carry(id, view, order)`; today the rod, the creel (and the fish in it), the bouquet
-  and pine cones. Lanterns and the tent are to be added the same way. Nothing is used from it yet.
+- **Backpack** is an inventory (`systems/pack.js`, owner's decision 2026-11-22): 24 slots, the
+  one record of what you carry (`store.pack`, goes with you from world to world). An item is
+  `{ uid, type, key, n, list }`; things of one type and key stack (flowers by kind up to 32, each
+  keeping its colour; fish by species, each keeping its length, still 8 fish at most; pine cones
+  up to 16); the rod and bouquets take a slot each. Features add their kinds with `itemKind()`
+  (name, stack size, picture from `ui/icons.js`, whether it can be held). The grid (`ui/backpack.js`,
+  I or the menu) shows each slot; choosing one says what it is and offers what can be done with it
+  (`packActions`); slots can be dragged to swap. Save version 3 moved the rod, the creel's fish and
+  the cones in; a bouquet held in the hand in an older save becomes a held bouquet.
+- **Flowers and bouquets** (owner's decision): picked flowers go into the backpack. A bouquet is
+  tied there: put flowers aside one at a time, or "Tie a mixed bouquet" (up to 12, one of each kind
+  in turn); the new bouquet is held, and drawn in the figure's hand. G by the skipper, your friend
+  or the bench gives the held bouquet (or the first one in the backpack). With flowers but no
+  bouquet there, a prompt says to tie one first. A full backpack shows "Backpack is full" and
+  picks nothing.
 - **Compass** (`ui/compass.js`): north is -z, as the sky has it (the sun rises at azimuth 65°,
   +x a little toward -z, and is due south, +z, at noon). The strip shows the half of the horizon
   you face, from the camera. Up to four named places are marked, chosen twice a second: the home

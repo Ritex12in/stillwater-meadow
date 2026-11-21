@@ -36,6 +36,7 @@
     <p id="clock">&nbsp;</p>
   </header>
   <div class="hint glass auto-hide" id="hint"></div>
+  <div class="compass auto-hide" id="compass" aria-hidden="true"><div class="track" id="compassTrack"></div></div>
 
   <nav class="toolbar auto-hide" aria-label="Meadow controls">
     <button class="tool glass" id="sound" type="button" aria-pressed="false">
@@ -56,7 +57,7 @@
     <button class="tool glass icon-only" type="button" data-panel="settingsPanel" aria-expanded="false" title="Settings" aria-label="Settings">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
     </button>
-    <button class="tool glass icon-only" type="button" data-panel="menuPanel" aria-expanded="false" title="Journal, photo mode and controls" aria-label="Menu">
+    <button class="tool glass icon-only" type="button" data-panel="menuPanel" aria-expanded="false" title="Backpack, journal, photo mode and controls" aria-label="Menu">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
     </button>
   </nav>
@@ -142,6 +143,7 @@
   </section>
 
   <section class="popover menu" id="menuPanel" data-exclusive="1" hidden aria-label="Menu">
+    <button type="button" class="tool glass" data-panel="backpack"><span>Backpack</span><kbd>I</kbd></button>
     <button type="button" class="tool glass" data-panel="journal"><span>Catch journal</span><kbd>J</kbd></button>
     <button type="button" class="tool glass" id="menuPhoto"><span>Photo mode</span><kbd>P</kbd></button>
     <button type="button" class="tool glass" data-panel="controls"><span>All controls</span><kbd>H</kbd></button>
@@ -156,6 +158,7 @@
       <dt><kbd>F</kbd></dt><dd>Pet a cat or dog once it's tame</dd>
       <dt><kbd>T</kbd></dt><dd>Feed or throw a fish to a cat or dog to win its trust</dd>
       <dt><kbd>R</kbd></dt><dd>Fish: cast, hook a bite, reel in</dd>
+      <dt><kbd>I</kbd></dt><dd>Backpack: what you are carrying</dd>
       <dt><kbd>J</kbd></dt><dd>Catch journal</dd>
       <dt><kbd>B</kbd></dt><dd>Toss bread to the ducks</dd>
       <dt><kbd>G</kbd></dt><dd>Pick flowers, give or leave the bouquet</dd>
@@ -171,6 +174,11 @@
       <dt><kbd>M</kbd> <kbd>H</kbd></dt><dd>Music on or off · this panel</dd>
       <dt><kbd>Esc</kbd></dt><dd>Close any open panel</dd>
     </dl>
+  </section>
+
+  <section class="panel" id="backpack" data-exclusive="1" hidden aria-label="Backpack">
+    <header><h2>Backpack</h2><span class="sum" id="packSummary"></span><button type="button" class="close" data-close="backpack" aria-label="Close">×</button></header>
+    <ul class="catches pack" id="packList"></ul>
   </section>
 
   <section class="panel" id="journal" data-exclusive="1" hidden aria-label="Catch journal">

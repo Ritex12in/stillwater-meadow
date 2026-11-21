@@ -390,6 +390,7 @@ export function clearingAt(x, z) {
  */
 const SHRINE_CELL = 640, PAD_FLAT = 25, PAD_OUT = 46, SHRINE_R = 17, SHRINE_TRIES = 14, SHRINE_GROVE = 0.6, SHRINE_RELIEF = 5, SHRINE_APART = 320;
 const shrineCells = new Map();
+const SHRINE_NAMES = ['Petalfall', 'Mistbloom', 'Quietbough', 'Rosecloud', 'Lanternhill', 'Softrain', 'Paleblossom', 'Windchime', 'Moonpetal', 'Hollowcherry', 'Dawnbloom', 'Silkpetal', 'Stillbranch', 'Cloudcherry', 'Duskpetal', 'Fernbloom'];
 let homeShrine = null, lastShrine = null, lastSX = NaN, lastSZ = NaN;
 /** How much the land rises or falls round a spot (the worst of twelve looks, 18 and 34 m out). */
 function reliefAt(x, z, h) {
@@ -426,7 +427,7 @@ export function homeShrineSite() {
   }
   if (!best) best = { x: L.x - L.rmax * 3.4, z: L.z };
   const d = Math.hypot(L.x - best.x, L.z - best.z);
-  return (homeShrine = { id: 'home', x: best.x, z: best.z, y: rawHeight(best.x, best.z), fx: (L.x - best.x) / d, fz: (L.z - best.z) / d, r: SHRINE_R });
+  return (homeShrine = { id: 'home', name: HOME.name + ' Shrine', x: best.x, z: best.z, y: rawHeight(best.x, best.z), fx: (L.x - best.x) / d, fz: (L.z - best.z) / d, r: SHRINE_R });
 }
 /** The shrine site of one square of the land, or null: most squares have none. Worked out once, then kept. */
 function shrineOfCell(cx, cz) {
@@ -448,7 +449,7 @@ function shrineOfCell(cx, cz) {
     // it looks down the gentlest way out: its path climbs to it from the lowest ground about
     let low = Infinity, fx = 0, fz = 1;
     for (let k = 0; k < 16; k++) { const a = (k / 16) * TAU, y = rawHeight(best.x + Math.cos(a) * 34, best.z + Math.sin(a) * 34); if (y < low) { low = y; fx = Math.cos(a); fz = Math.sin(a); } }
-    site = { id: key, x: best.x, z: best.z, y: best.h, fx, fz, r: SHRINE_R };
+    site = { id: key, name: SHRINE_NAMES[Math.floor(hash(cx * 3 - 41, cz * 7 + 19) * SHRINE_NAMES.length) % SHRINE_NAMES.length] + ' Shrine', x: best.x, z: best.z, y: best.h, fx, fz, r: SHRINE_R };
   }
   shrineCells.set(key, site);
   return site;

@@ -24,6 +24,7 @@ import { timeCtl } from '../systems/time.js';
 import { wx } from '../systems/weather.js';
 import { spawnRipple, spawnHeart } from '../world/effects.js';
 import { toast, togglePanel, onPanel } from '../ui/hud.js';
+import { carry } from '../ui/backpack.js';
 import { plop, meow } from './voices.js';
 import { hasRod } from './rod.js';
 
@@ -136,6 +137,13 @@ export function initFishing() {
   const journal = store.journal;
   store.creel = Array.isArray(store.creel) ? store.creel.slice(0, CREEL_MAX) : [];
   onSave((s) => { s.creel = store.creel.slice(); });
+  carry('creel', () => {
+    if (!hasRod() && !store.creel.length) return null;
+    const by = new Map();
+    for (const f of store.creel) by.set(f.id, (by.get(f.id) || 0) + 1);
+    const inside = [...by].map(([id, n]) => `${n} ${speciesName(id)}`).join(', ');
+    return { name: 'Creel', detail: `${store.creel.length} of ${CREEL_MAX}` + (inside ? ` · ${inside}` : ' · empty'), color: '#b08d57' };
+  }, 20);
 
   // ── on-screen pieces: the creel count, and the cast/fight gauge ──
   creelEl = document.createElement('p');

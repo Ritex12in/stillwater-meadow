@@ -17,6 +17,7 @@ import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
 import { store, saveSoon, onSave } from '../systems/save.js';
 import { toast } from '../ui/hud.js';
+import { carry } from '../ui/backpack.js';
 
 const MAX = 12, REGROW = 240;
 let debugView = () => [];
@@ -74,6 +75,11 @@ export function initFlowers() {
   redraw();
 
   let bouquet = Array.isArray(store.bouquet) ? store.bouquet.slice(0, MAX) : [];
+  carry('bouquet', () => {
+    if (!bouquet.length) return null;
+    const kinds = new Set(bouquet.map((b) => String(b).split(':')[1])).size;
+    return { name: 'Bouquet', detail: `${bouquet.length} ${bouquet.length === 1 ? 'flower' : 'flowers'}, ${kinds} ${kinds === 1 ? 'kind' : 'kinds'}`, color: String(bouquet[0]).split(':')[0] };
+  }, 30);
   let inHand = null;
   const rebuildHand = () => {
     if (inHand) hero.arms[1].remove(inHand);

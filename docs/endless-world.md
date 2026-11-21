@@ -58,7 +58,7 @@ Each one leaves the game playable and tested.
 | 4b-1 | **Landmarks that follow you.** Settled lakes (each outranking its eight neighbours, so at least half a kilometre apart) have a kit worked out from the seed and checked against the land: a jetty with the boat and skipper where the shore allows, a campfire with logs, a bench with lawn chairs and path lamps; each turned its own way. One of each object, moved to the nearest settled lake when the old one is well behind. Each place keeps its own state (bench bouquet, boat bouquet, fire). | Home is bit-for-bit unchanged; there and back leaves seats, obstacles and scene objects as they were; a bouquet stays at its own bench across a reload (`tests/places.spec.js`). | done |
 | 4b-2 | **Lake life at every lake.** Reeds and lily pads per lake, worked out from the lake and its country and drawn from fixed slots for the three nearest; the ducks, the heron, the frogs and the mist are at the lake you are at (not ducks on ice). | Each lake's are the same every visit; none undrawn; a tour of lakes leaves the scene as it was (`tests/lakes.spec.js`). | done |
 | 4c | **The valley goes.** Start beside a lake generated from the seed, with the full set of landmarks. The hand-placed valley, its plants, fences and pebbles are removed. Flowers to pick grow everywhere. Shrine sites are fixed by the seed (one back from the home lake, others in blossom groves); the ground under each is levelled, and the one shrine stands at the site nearest you. Tests go by places found by query. | One full run of the suite. | done (full run 2026-11-22: 42 of 43 passed; the one failure, the untamed cat, was the test assuming the old valley's shore, fixed) |
-| 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed; (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
+| 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed (done); (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | |
@@ -220,6 +220,31 @@ or dropped once a pack is chosen.
 - A lake's bowl is wider, in radii, for small lakes (`lake.bowl`), or they lie in a pit.
 - Still at the home lake only: the pine cones and the deer. The animals' homes, the girl's and
   the snowman's spot are given from the jetty, so they turn with the lake's arrangement.
+
+## How worlds, the backpack and the compass work (milestone 4d, step 1)
+
+- **Which world.** `systems/save.js` picks the seed as the save loads: the address's `?seed=`,
+  else the world last played (`store.seed`), else world 1 for a save from before worlds had
+  numbers, else (someone new) one at random from 2 to 99999. `core/shape.js` reads it from there.
+  A shared link switches your world: nothing is lost, because what belongs to a place is kept per
+  world: `where`, `places`, `anchor`, `benchBouquet` and `boatBouquet` are put away in
+  `store.worlds[seed]` when you leave a world and brought out when you come back. What you carry,
+  your pets, bonds and journal go with you. "Start over" forgets everything and begins in a new
+  world. The World panel shows the world's number, copies a link to it, goes to a world by
+  number, or to a new one at random.
+- **Tests and tools** play world 1 unless they ask for another (`tests/helpers.js` adds `seed=1`;
+  `tools/fingerprint.mjs` too). `tools/seeds.mjs random 30` checks thirty worlds a new player
+  could get; 42 worlds so far (1 to 12 and 30 at random) all start well. If none of the home
+  lake's sixteen ways fits a jetty, `kitOf` tries 64 ways between them (never needed so far).
+- **Backpack** (`ui/backpack.js`, I, or the menu): each feature that gives you something says
+  so with `carry(id, view, order)`; today the rod, the creel (and the fish in it), the bouquet
+  and pine cones. Lanterns and the tent are to be added the same way. Nothing is used from it yet.
+- **Compass** (`ui/compass.js`): north is -z, as the sky has it (the sun rises at azimuth 65°,
+  +x a little toward -z, and is due south, +z, at noon). The strip shows the half of the horizon
+  you face, from the camera. Up to four named places are marked, chosen twice a second: the home
+  lake, the nearest shrine, the nearest settled lakes; where two lie the same way the farther
+  shows only its dot. Shrine sites have names by rule from where they are (the home one is named
+  after the home lake). Coming to a lake, or within 40 m of a shrine, shows its name.
 
 ## How the shrine works (milestone 4c)
 

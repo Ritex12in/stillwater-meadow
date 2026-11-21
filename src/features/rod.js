@@ -16,6 +16,7 @@ import { registerAction } from '../systems/actions.js';
 import { store, saveSoon } from '../systems/save.js';
 import { growSquare } from '../world/wilds.js';
 import { toast } from '../ui/hud.js';
+import { carry } from '../ui/backpack.js';
 
 export const BOUQUET_FULL = 12, BOUQUET_KINDS = 3, CONES_NEEDED = 5;
 
@@ -86,6 +87,8 @@ export function initRod() {
     cones.push({ m, x, z, taken: false });
   }
   store.cones = store.cones || 0;
+  carry('rod', () => (store.rod ? { name: 'Fishing rod', detail: 'the skipper\'s old rod · R to cast', color: '#8a5a34' } : null), 10);
+  carry('cones', () => (store.cones > 0 ? { name: 'Pine cones', detail: store.rod ? String(store.cones) : `${store.cones} of ${CONES_NEEDED} for the skipper`, color: '#7a4f2c' } : null), 40);
   coneView = () => cones.filter((c) => !c.taken).map((c) => ({ x: c.x, z: c.z, shown: c.m.visible }));
   let nearCone = null;
   registerAction({

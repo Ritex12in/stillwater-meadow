@@ -42,6 +42,8 @@ import { initPost, resizePost, renderFrame, post } from './systems/post.js';
 import { store, onSave, flush } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
 import { initWorldPanel, initPlaces } from './ui/world-panel.js';
+import { initBackpack, backpackView } from './ui/backpack.js';
+import { initCompass, compassView } from './ui/compass.js';
 import { updateAnchor, moveAnchor, anchorId, settledAbout } from './systems/anchor.js';
 import { initSettings } from './ui/settings.js';
 import { initPetVoices } from './features/voices.js';
@@ -133,6 +135,8 @@ hooks.anchor.push(() => { resetGrassMap(); renderer.shadowMap.needsUpdate = true
 
 // ── Interface and systems ──
 initHud();
+initBackpack();
+initCompass();
 initPointer();
 initSettings();
 initWorldPanel();
@@ -353,6 +357,8 @@ window.__meadow = {
   fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, pets: petsView, fetch: fetchView, friend: friendView, get friendSt() { return friend && friend.st; }, dance: danceView, snowman: snowmanView, wardrobe: wardrobeNow, emote: playEmote, emoteState, toast,
   geo: { get lakePoint() { return lakePoint; }, lakeT, walkable, dockAt, dockDir, onDock, FIRE_SPOT, BENCH_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') }, // (lakePoint: whichever lake the landmarks stand at)
   seed: WORLD.seed,
+  backpack: backpackView,
+  compass: compassView,
   /** The home lake's middle, and where you first arrive beside it. */
   home: { x: HOME.x, z: HOME.z, r: HOME.R0, rmax: HOME.rmax }, spawn: { x: SPAWN.x, z: SPAWN.z },
   /** Lakes: those about you, the ones with water drawn just now, and a way to go to one or to any spot. */

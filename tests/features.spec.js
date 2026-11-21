@@ -65,12 +65,13 @@ test('the skipper trades his rod for a full bouquet of three kinds, not before',
   await teleport(page, p.x, p.z, s.x, s.z);
   await step(page, 0.4);
   expect((await actions(page)).map((a) => a.id)).not.toContain('fish-cast');
+  // (three kinds, chosen once: the three with the most flowers about)
+  const kinds = await page.evaluate(() => { const by = {}; for (const f of window.__meadow.flowers()) if (f.shown) by[f.kind] = (by[f.kind] || 0) + 1; return Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => +k); });
   for (let k = 0; k < 12; k++) {
-    const f = await page.evaluate((k) => {
+    const f = await page.evaluate((want) => {
       const m = window.__meadow, all = m.flowers().filter((it) => it.shown);
-      const kinds = [...new Set(all.map((it) => it.kind))].slice(0, 3), want = kinds[Math.floor(k / 4)];
       return all.filter((it) => it.kind === want).sort((a, b) => Math.hypot(a.x - m.player.x, a.z - m.player.z) - Math.hypot(b.x - m.player.x, b.z - m.player.z))[0];
-    }, k);
+    }, kinds[Math.floor(k / 4)]);
     await teleport(page, f.x + 0.4, f.z);
     await press(page, 'KeyG', 0.7);
   }

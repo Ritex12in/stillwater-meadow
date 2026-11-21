@@ -263,11 +263,41 @@ export function height(x, z) {
 //   wet   -> lush dark-green country, thick mixed woods, ferns and mushrooms
 // and here and there a blossom grove. Round the home lake the country is always mild.
 const mild = (x, z) => smooth(140, 330, Math.hypot(x - HOME.x, z - HOME.z)); // (0 by the home lake, 1 beyond it)
-/** How cold a spot is, 0 mild .. 1 frozen. `h` is the ground's height there. */
-export function coldAt(x, z, h) {
+/** How cold the country is at a spot, before its height: 0 mild .. 1 frozen. */
+export function coldBase(x, z) {
   const n = fbm((x + SX * 17) * 0.0011 - 63.4, (z + SZ * 17) * 0.0011 + 28.9);
-  return clamp(smooth(0.575, 0.7, n) * mild(x, z) + smooth(78, 132, h), 0, 1);
+  return smooth(0.575, 0.7, n) * mild(x, z);
 }
+/** How cold a spot is, 0 mild .. 1 frozen: the country's cold and the height (`h`, the ground's height there). */
+export function coldAt(x, z, h) {
+  return clamp(coldBase(x, z) + smooth(78, 132, h), 0, 1);
+}
+
+// ── Treeline, rock and the way a slope faces ─────────────────
+// Air is colder the higher you go, so trees give out at a certain height, then grass, then bare
+// rock, then snow. Here they all follow one quantity, the height a spot "feels": its height, raised
+// in cold country (the treeline is lower there) and on slopes that face north, away from the sun
+// (north is -z: systems/time.js), which are colder and hold their snow longer; slopes facing south
+// are warmer. Snow follows the same through coldAt(x, z, h + ASPECT * north).
+/** Felt height (m) where trees give out, in mild country on level ground. */
+export const TREELINE = 64;
+/** How much lower (m) the treeline lies in the coldest country. */
+export const TREE_COLD = 25;
+/** How much higher (m) a slope facing north feels, per unit of its rise (and lower for one facing south). */
+export const ASPECT = 14;
+/**
+ * How much the land at a spot faces north (+) or south (-): its rise toward +z per metre, taken over
+ * 16 m so it is the same whatever scale the ground is drawn at. 0 on low, mild ground, where it
+ * would change nothing.
+ */
+export function northness(x, z, h) {
+  if (h < 18 && coldBase(x, z) < 0.25) return 0;
+  return clamp((height(x, z + 8) - height(x, z - 8)) / 16, -1.2, 1.2);
+}
+/** The height (m) a spot feels like: see above. `north` from northness(). */
+export const feltHeight = (x, z, h, north) => h + TREE_COLD * coldBase(x, z) + ASPECT * north;
+/** How far into the treeline band a spot is: 0 below it, 1 at the line and above (no trees). */
+export const aboveTrees = (felt) => smooth(TREELINE - 16, TREELINE, felt);
 /** How much rain a spot gets, 0 parched .. 1 soaked (0.5 in between, and in the valley). */
 export function rainAt(x, z) {
   const n = fbm((x + SX * 17) * 0.0013 + 19.2, (z + SZ * 17) * 0.0013 - 51.7);

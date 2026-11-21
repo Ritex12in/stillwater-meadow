@@ -18,7 +18,7 @@
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
 // walk.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
-import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
+import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, aboveTrees, TREELINE, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -41,6 +41,8 @@ world.refreshFarTrees = () => { stale = true; };
 
 const seedOf = (ix, iz, salt) => mulberry32((Math.floor(hash(ix * 7 + 3, iz * 13 - 5) * 4294967296) ^ Math.imul(WORLD.seed, 0x9E3779B1) ^ salt) | 0);
 const slopeOf = (x, z) => Math.hypot(height(x + 1.5, z) - height(x - 1.5, z), height(x, z + 1.5) - height(x, z - 1.5)) / 3;
+/** The height a spot feels (for the treeline and rock: core/shape.js). */
+const feltAt = (x, z, h) => feltHeight(x, z, h, northness(x, z, h));
 /** Where the woods are (0 open country .. 1 deep wood): broad patches. */
 const woodAt = (x, z) => smooth(0.4, 0.62, fbm(x * 0.0063 + 31.7, z * 0.0063 - 12.2));
 
@@ -52,19 +54,24 @@ export function growSquare(ix, iz) {
     // (every try takes the same draws, so turning one spot down never moves the trees after it)
     const x = x0 + R() * S, z = z0 + R() * S, roll = R(), size = R(), turn = R(), tint = R(), keep = R();
     if (lakeT(x, z) < 1.22 || clearingAt(x, z)) continue; // (not in the water, nor where a lake's path, jetty, fire and bench are, nor on the shrine's ground)
-    const h = height(x, z), cold = coldAt(x, z, h), rain = rainAt(x, z), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(cold), grove = groveAt(x, z) * (1 - snow);
+    const h = height(x, z), felt = feltAt(x, z, h), line = aboveTrees(felt);
+    if (line >= 1) continue; // (above the treeline)
+    const cold = coldAt(x, z, h), rain = rainAt(x, z), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(cold), grove = groveAt(x, z) * (1 - snow);
     // woods in broad patches with open country between, and clumps and clearings inside a wood;
     // lush country is wooded nearly everywhere, the heath and the snowfields hardly at all
-    const wooded = Math.min(1, (0.06 + woodAt(x, z) * 0.9) * (1 - dry * 0.8) * (1 - snow * 0.65) + lush * 0.45 * (1 - snow * 0.5) + grove * 0.6);
+    // (and thinning out toward the treeline)
+    const wooded = Math.min(1, (0.06 + woodAt(x, z) * 0.9) * (1 - dry * 0.8) * (1 - snow * 0.65) + lush * 0.45 * (1 - snow * 0.5) + grove * 0.6) * (1 - line);
     if (keep > wooded * (0.35 + fbm(x * 0.03 + 9, z * 0.03))) continue;
     // not on rock, cliffs or the high peaks (the same test the grass and the ground's texture use)
     const slope = slopeOf(x, z);
-    if (slope > 0.62 || rockAmt(h, slope) > 0.3) continue;
+    if (slope > 0.62 || rockAmt(h, slope, felt) > 0.3) continue;
     if (trees.some((t) => (t.x - x) ** 2 + (t.z - z) ** 2 < 11)) continue;
     // pines in the cold and up the mountains, few on the heath; blossom trees in their groves
-    const pines = clamp(0.36 + cold * 0.7 + smooth(22, 60, h) * 0.3 - dry * 0.22 - grove, 0, 0.97);
+    // (near the treeline only pines, and stunted ones)
+    const nearLine = smooth(TREELINE - 34, TREELINE - 8, felt);
+    const pines = clamp(0.36 + cold * 0.7 + smooth(22, 60, h) * 0.3 - dry * 0.22 - grove + nearLine * 0.8, 0, 0.97);
     const type = roll < pines ? 'pine' : roll > 0.975 - grove * 0.8 ? 'blossom' : 'round';
-    const s = (0.8 + size * 0.7) * (1 + lush * 0.14 - snow * 0.12), cols = TREE_COLOURS[type];
+    const s = (0.8 + size * 0.7) * (1 + lush * 0.14 - snow * 0.12) * (1 - 0.4 * smooth(TREELINE - 28, TREELINE, felt)), cols = TREE_COLOURS[type];
     const t = { x, z, y: h - 0.15, type, s, ry: turn * TAU, color: cols[Math.floor(tint * cols.length)], top: (kit ? 6.2 : 5.2) * s, wild: true };
     if (kit) {
       // on the heath the broadleaf trees are the light, airy ones: birches and the open-crowned "normal" trees
@@ -82,7 +89,7 @@ export function growRocks(ix, iz) {
   for (let k = 0; k < 16; k++) {
     const x = x0 + R() * S, z = z0 + R() * S, size = R(), a = R(), b = R(), c = R(), turn = R(), tilt = R(), tint = R(), keep = R();
     if (lakeT(x, z) < 1.15 || clearingAt(x, z)) continue;
-    const h = height(x, z), rocky = rockAmt(h, slopeOf(x, z));
+    const h = height(x, z), rocky = rockAmt(h, slopeOf(x, z), feltAt(x, z, h));
     // (more of them on the dry heath and in the cold, where little else stands)
     if (keep > 0.07 + rocky * 0.8 + smooth(30, 70, h) * 0.15 + dryOf(rainAt(x, z)) * 0.16 + snowOf(coldAt(x, z, h)) * 0.08) continue;
     const s = 0.4 + size * size * (1.1 + rocky * 1.3);
@@ -97,7 +104,7 @@ export function growSmall(ix, iz, trees) {
   const R = seedOf(ix, iz, 0x2C1B3F), r = (a, b) => a + (b - a) * R(), x0 = ix * S, z0 = iz * S;
   const out = { bushes: [], ferns: [], shrooms: [], clover: [], flowers: [] };
   // (the land's own formula, not the drawn tiles: a square must come out the same whether or not its ground is loaded)
-  const fits = (x, z) => lakeT(x, z) > 1.16 && !clearingAt(x, z) && rockAmt(height(x, z), slopeOf(x, z)) < 0.2;
+  const fits = (x, z) => { if (lakeT(x, z) <= 1.16 || clearingAt(x, z)) return false; const h = height(x, z); return rockAmt(h, slopeOf(x, z), feltAt(x, z, h)) < 0.2; };
   // the climate, taken once at the square's middle (it changes over hundreds of metres)
   const mx = x0 + S / 2, mz = z0 + S / 2, mh = height(mx, mz), rain = rainAt(mx, mz), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(coldAt(mx, mz, mh));
   for (const t of trees) {
@@ -175,7 +182,7 @@ export function growPicks(ix, iz) {
     if (stay > (meadow ? (L.settled ? 1 : 0.6) : 1 - woodAt(x, z) * 0.6) * thin) continue;
     if (lt < sandEnd(L) || L.path(x, z) > 0.2 || clearingAt(x, z)) continue;
     const h = height(x, z);
-    if (rockAmt(h, slopeOf(x, z)) > 0.2) continue;
+    if (rockAmt(h, slopeOf(x, z), feltAt(x, z, h)) > 0.2) continue;
     out.push(dressFlower({ id: ix + ':' + iz + ':' + k, x, z, y: h - 0.02, s, ry, keep }, undefined, a, b, c));
   }
   // the drifts of the lakes here whose middle lies in this square

@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { smooth, fbm } from '../core/math.js';
-import { height, lakeAt, setGroundSampler, coldAt, rainAt, dryOf, lushOf, snowOf } from '../core/shape.js';
+import { height, lakeAt, setGroundSampler, northness, feltHeight, ASPECT, TREELINE, coldAt, rainAt, dryOf, lushOf, snowOf } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -50,8 +50,12 @@ const g1 = col('#5c9040'), g2 = col('#86b44e'), g3 = col('#3d7034'), sand = col(
 const dirt = col('#c4ab7c'), moss = col('#5c7444'), rock = col('#8d8b7d'), heath = col('#b9a35c'), snowy = col('#eef2f8');
 const MOSS_TINT = new THREE.Color(0.8, 0.85, 0.7), c = new THREE.Color();
 
-/** How rocky the ground is (0 grass .. 1 bare rock): steep slopes and the high mountains. */
-export const rockAmt = (h, slope) => Math.max(smooth(0.7, 1.15, slope), smooth(52, 84, h));
+/**
+ * How rocky the ground is (0 grass .. 1 bare rock): slopes too steep to hold soil (from about 35
+ * degrees; loose rock rests at 33 to 37), and high ground, from a little above the treeline (an
+ * alpine meadow between), by the height it feels (`felt`: core/shape.js feltHeight).
+ */
+export const rockAmt = (h, slope, felt) => Math.max(smooth(0.7, 1.15, slope), smooth(TREELINE + 6, TREELINE + 34, felt));
 
 // ── tiles ──
 const tiles = new Map(), pool = [], queue = [], fine = new Map();
@@ -150,9 +154,10 @@ function* fill(t) {
       // sand round the nearest lake, as broad as that lake's beach; soil on its path, if it has one
       const lake = lakeAt(x, z), lt = lake.t(x, z);
       const wSand = (1 - smooth(1.02, 1.02 + 0.14 * lake.beach, lt)) * Math.min(1, lake.beach * 2), wBed = smooth(0.05, -0.8, h), wDirt = lt < 2.2 ? lake.path(x, z) * 0.9 : 0;
-      const wRock = rockAmt(h, slope) * 0.85, wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6;
-      // the climate here: snow does not lie on cliffs; lush country is a deeper green
-      const rain = rainAt(x, z), dry = dryOf(rain), cold = coldAt(x, z, h) * (1 - smooth(0.9, 1.5, slope) * 0.55);
+      const north = northness(x, z, h), felt = feltHeight(x, z, h, north);
+      const wRock = rockAmt(h, slope, felt) * 0.85, wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6;
+      // the climate here: snow lies longer on slopes facing north, and not on cliffs; lush country is a deeper green
+      const rain = rainAt(x, z), dry = dryOf(rain), cold = coldAt(x, z, h + ASPECT * north) * (1 - smooth(0.9, 1.5, slope) * 0.55);
       // (clime: cold, dry, and whether this is a lake seen from too far off to have its own sheet of water)
       const pond = t.lv > 0 && h < 0.02 ? 1 : 0;
       if (pond) { pos[k * 3 + 1] = 0.02; nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }

@@ -19,6 +19,15 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
   (free, CC0). The animals (cats, dogs, ducks) and the skipper are redesigned too.
 - **Saves:** existing players keep their journal, pets and rod. (Today's save holds no position,
   so nothing is lost there.)
+- **Milestone 4 choices (2026-11-21):** all four groups of extra places (glowing and ancient,
+  high places, hot springs, places you make) and all four activities (frozen-lake play, fish by
+  country, a flower journal, compass and named places). **Each place remembers its own state**:
+  not one bench or skipper shared by all. Trails, rivers and waterfalls, and islands are wanted
+  but not in milestone 4; the owner also asked to plan for an **ocean** and a **backpack**. The
+  backpack is planned into 4d (things you place come out of it); the ocean, rivers, islands and
+  trails are milestone 8.
+- **Testing:** run only new or affected tests after a change; full runs when asked, at 4c, and
+  before merging to `main`.
 
 ## Milestones
 
@@ -31,10 +40,34 @@ Each one leaves the game playable and tested.
 | 2b | **Trees everywhere.** Each 57.6 m square beyond the valley grows its own trees from the seed; real models near the player, cards further off; the camera, walkers, animals and seasons treat them like the valley's. | A square regrows identically; no tree is dropped for want of a slot; repeated 2 km trips leave the scene's object count unchanged (`tests/world.spec.js`). | done |
 | 2c | **Small plants and rocks beyond the valley.** Boulders (with the tree models), and in the squares closest to the player bushes, ferns, mushrooms and drifts of daisies, lupins and tulips. The valley's own build-once plants stay until milestone 4 retires the valley. Picking flowers out there waits for milestone 4 too. | A square regrows identically; nothing dropped (`tests/world.spec.js`). | done |
 | 3 | **Kinds of country.** A climate (cold, rain) read from the seed: snowfields and pines in the cold, golden heath with a few birches where it is dry, thick dark-green woods where it is wet, mild meadow between, and rare blossom groves. The ground, grass, trees, boulders and flowers all follow it, and far tiles show it from a distance. | Each kind exists within 2.6 km and grows its own trees; the valley stays mild (`tests/world.spec.js`). | done |
-| 4 | **Lakes and landmarks everywhere.** The fixed home goes. | | next |
-| 5 | **Travelling.** Companions keep up; the save holds seed and position; a way to find places again. | |
-| 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. | |
+| 4a | **Places from the seed, lakes first.** A grid of places, each chosen from the land and climate round it. Lakes of varied size and shape, each in its own valley: water, reeds, lilies, ducks, jumping fish, fishing; frozen all year in snow country; seen from afar. The save holds seed and position; a list to jump to places. The home valley still stands. | Height is continuous between neighbouring lakes; a lake is the same every visit; water is drawn from a fixed pool. | next |
+| 4b | **Landmarks that follow you.** Jetty with boat and skipper, campfire with logs, bench and lamp path at some lakes; the shrine in blossom groves. One of each object, moved to the nearest place of its kind while out of sight. Each place remembers its own state (its own bouquet, fire, trade). | Moving between two lakes re-anchors everything with nothing left behind; each place's state survives leaving and returning. | |
+| 4c | **The valley goes.** Start beside a generated lake with the full set. The fixed valley and its hand-placed plants are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
+| 4d | **More to discover, and a backpack.** Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
+| 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | |
+| 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | |
+| 8 | **Water and ways** (planned, not started; each needs new terrain work): an ocean with coasts and beaches; rivers running between lakes and to the sea, with waterfalls; islands in big lakes reached by boat; worn trails between places with signposts. | |
+
+## Rules for milestone 4
+
+- **A site grid, not just lakes.** One pure query (`sitesNear`, `nearestSite(kind)`) over a
+  jittered grid; a site's kind is chosen from the terrain and climate at its spot. New kinds of
+  place are then data, not new machinery.
+- **Height stays continuous.** "Nearest lake" switches abruptly and a lake's basin reaches 7.5
+  radii: space lakes so the switch falls outside both basins, or blend the basins of all nearby
+  lakes. Check by sampling height along lines between neighbouring lakes.
+- **`lakeAt` stays cheap.** It runs for every tile vertex and tree candidate: cache lakes per
+  grid cell and exit early.
+- **Plants keep off sites.** `growSquare` and `growSmall` ask for nearby sites, so nothing grows
+  through a jetty or a fire.
+- **Anchors move only when safe**: out of sight, nothing in progress. After a move, rebuild what
+  caches positions (the grass map knows where the jetty and bench are; obstacles; shadows).
+- **Water from a small fixed pool** of meshes, one material each with shared uniform objects.
+  Ground below the water line is tinted on far tiles so distant lakes are not brown holes.
+- **Per-place state** lives in the save under the place's id (grid cell and kind); the single
+  bench, fire, boat and skipper load the state of the place they are standing at.
+- **One water level** (0) everywhere, so an ocean (milestone 8) can share it.
 
 ## Rules for the generator
 

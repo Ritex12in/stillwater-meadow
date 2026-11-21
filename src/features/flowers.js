@@ -91,7 +91,15 @@ export function initFlowers() {
     layOnBench();
     scene.add(onBench);
   };
-  hooks.anchor.push(layOnBench); // (the bench has moved to another lake)
+  // The landmarks have moved to another lake. A bouquet left on a bench or in a boat belongs to
+  // that place: the ones here are taken up, and this place's own (systems/anchor.js has put them
+  // in the save's bench and boat slots) are laid out.
+  hooks.anchor.push(() => {
+    if (onBench) { scene.remove(onBench); onBench = null; }
+    if (onBoat) { boat.remove(onBoat); onBoat = null; }
+    if (store.benchBouquet) placeOnBench(store.benchBouquet);
+    if (store.boatBouquet) placeOnBoat(store.boatBouquet);
+  });
   const placeOnBoat = (colors) => {
     if (onBoat) boat.remove(onBoat);
     onBoat = buildBouquet(colors);

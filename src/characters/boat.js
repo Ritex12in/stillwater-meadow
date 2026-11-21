@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, clamp, lerp, damp, smooth, angDiff, rnd } from '../core/math.js';
-import { lakeT, lakePoint, dockAt, DOCK_A, DOCK_LEN, DOCK_Y } from '../core/shape.js';
+import { lakeT, lakePoint, dockAt, DOCK_A, DOCK_LEN, DOCK_Y, KIT } from '../core/shape.js';
 import { std, weatherize, glowTex } from '../core/materials.js';
 import { seasonState, hooks } from '../core/state.js';
 import { makePerson } from './rigs.js';
@@ -42,11 +42,13 @@ function layTour() {
   boatSeat.slideMinY = DOCK_Y + 0.05;
   const T_MOOR = lakeT(MOOR.x, MOOR.z), pts = [], N = 28;
   for (let i = 0; i < N; i++) {
-    const p = i === 0 ? MOOR : lakePoint(DOCK_A + (i / N) * TAU, T_MOOR);
+    // (a lake with no jetty has no boat: it waits, unseen, where the jetty is put away)
+    const p = i === 0 ? MOOR : KIT.dock ? lakePoint(DOCK_A + (i / N) * TAU, T_MOOR) : { x: MOOR.x + Math.cos((i / N) * TAU) * 3, z: MOOR.z + Math.sin((i / N) * TAU) * 3 };
     pts.push(new THREE.Vector3(p.x, 0, p.z));
   }
   boatPath = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
   BOAT_PATH_LEN = boatPath.getLength();
+  boat.visible = KIT.dock;
 }
 
 export function buildBoat() {

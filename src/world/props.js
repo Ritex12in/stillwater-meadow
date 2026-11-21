@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { TAU, rand, pick, angDiff } from '../core/math.js';
-import { height, LAKE, lakePoint, PATH_T, dockStart, dockDir, DOCK_A, DOCK_BACK, DOCK_LEN, DOCK_HALF, DOCK_Y, chairSpots, BENCH_SPOT } from '../core/shape.js';
+import { height, LAKE, lakePoint, PATH_T, dockStart, dockDir, DOCK_A, DOCK_BACK, DOCK_LEN, DOCK_HALF, DOCK_Y, chairSpots, BENCH_SPOT, KIT, PARK } from '../core/shape.js';
 import { std, weatherize, glowTex } from '../core/materials.js';
 import { world, obstacles, seats, hooks } from '../core/state.js';
 import { kitBench } from './kitprops.js';
@@ -68,6 +68,7 @@ export function buildDockAndBench() {
 function placeDockAndBench() {
   dock.position.set(dockStart.x, DOCK_Y, dockStart.z);
   dock.rotation.y = Math.atan2(dockDir.x, dockDir.z);
+  dock.visible = KIT.dock; bench.visible = KIT.bench;
   const bp = BENCH_SPOT;
   bench.position.set(bp.x, height(bp.x, bp.z), bp.z);
   bench.rotation.y = Math.atan2(LAKE.x - bp.x, LAKE.z - bp.z);
@@ -172,7 +173,8 @@ export function buildLamps() {
 }
 function placeLamps(first) {
   for (const l of lamps) {
-    const a = first ? l.a : DOCK_A + l.off, p = lakePoint(a, PATH_T + 0.085), y = height(p.x, p.z);
+    // (the lamps light the path of a lake that has a bench to walk to; otherwise they are put away)
+    const a = first ? l.a : DOCK_A + l.off, p = KIT.bench ? lakePoint(a, PATH_T + 0.085) : PARK, y = KIT.bench ? height(p.x, p.z) : 0;
     l.post.position.set(p.x, y, p.z); l.post.rotation.y = a;
     l.lamp.position.copy(l.post.position); l.lamp.rotation.y = a;
     l.glow.position.set(p.x, y + 2.44, p.z);

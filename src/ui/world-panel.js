@@ -5,7 +5,7 @@ import { wx, setWeather, goAutoWeather, onWeatherChange } from '../systems/weath
 const $ = (id) => document.getElementById(id);
 
 /**
- * The list of places near you: `list()` gives them nearest first ({ id, name, far, frozen }),
+ * The list of places near you: `list()` gives them nearest first ({ id, name, far, frozen, kit }),
  * `go(id)` takes you to one. Redrawn whenever the popover is opened, and now and then while it is.
  */
 export function initPlaces({ list, go }) {
@@ -22,7 +22,8 @@ export function initPlaces({ list, go }) {
         b.addEventListener('click', () => { go(b.dataset.place); draw(); });
         box.appendChild(b);
       }
-      const text = `${p.name} · ${p.far < 10 ? 'here' : p.far < 1000 ? p.far + ' m' : (p.far / 1000).toFixed(1) + ' km'}${p.frozen ? ' · frozen' : ''}`;
+      const built = p.kit ? [p.kit.dock && 'jetty', p.kit.fire && 'fire', p.kit.bench && 'bench'].filter(Boolean).join(', ') : '';
+      const text = `${p.name} · ${p.far < 10 ? 'here' : p.far < 1000 ? p.far + ' m' : (p.far / 1000).toFixed(1) + ' km'}${p.frozen ? ' · frozen' : ''}${built ? ' · ' + built : ''}`;
       if (b.textContent !== text) b.textContent = text;
       b.dataset.place = p.id;
       b.title = 'Go to ' + p.name;

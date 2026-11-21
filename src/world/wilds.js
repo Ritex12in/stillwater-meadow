@@ -16,7 +16,7 @@
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
 // walk. The valley's own plants are not grown here: they keep the places they have always had.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
-import { height, lakeT, WORLD, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt } from '../core/shape.js';
+import { height, lakeT, WORLD, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -50,7 +50,7 @@ export function growSquare(ix, iz) {
   for (let k = 0; k < WILD.tries; k++) {
     // (every try takes the same draws, so turning one spot down never moves the trees after it)
     const x = x0 + R() * S, z = z0 + R() * S, roll = R(), size = R(), turn = R(), tint = R(), keep = R();
-    if (Math.hypot(x, z) < WILD.valley || lakeT(x, z) < 1.3) continue;
+    if (Math.hypot(x, z) < WILD.valley || lakeT(x, z) < 1.3 || clearingAt(x, z)) continue; // (not in the water, nor where a lake's jetty, fire and bench stand)
     const h = height(x, z), cold = coldAt(x, z, h), rain = rainAt(x, z), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(cold), grove = groveAt(x, z) * (1 - snow);
     // woods in broad patches with open country between, and clumps and clearings inside a wood;
     // lush country is wooded nearly everywhere, the heath and the snowfields hardly at all
@@ -80,7 +80,7 @@ export function growRocks(ix, iz) {
   const R = seedOf(ix, iz, 0x51ED27), x0 = ix * S, z0 = iz * S, rocks = [];
   for (let k = 0; k < 16; k++) {
     const x = x0 + R() * S, z = z0 + R() * S, size = R(), a = R(), b = R(), c = R(), turn = R(), tilt = R(), tint = R(), keep = R();
-    if (Math.hypot(x, z) < WILD.home || lakeT(x, z) < 1.15) continue;
+    if (Math.hypot(x, z) < WILD.home || lakeT(x, z) < 1.15 || clearingAt(x, z)) continue;
     const h = height(x, z), rocky = rockAmt(h, slopeOf(x, z));
     // (more of them on the dry heath and in the cold, where little else stands)
     if (keep > 0.07 + rocky * 0.8 + smooth(30, 70, h) * 0.15 + dryOf(rainAt(x, z)) * 0.16 + snowOf(coldAt(x, z, h)) * 0.08) continue;

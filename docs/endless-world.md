@@ -43,8 +43,9 @@ Each one leaves the game playable and tested.
 | 2c | **Small plants and rocks beyond the valley.** Boulders (with the tree models), and in the squares closest to the player bushes, ferns, mushrooms and drifts of daisies, lupins and tulips. The valley's own build-once plants stay until milestone 4 retires the valley. Picking flowers out there waits for milestone 4 too. | A square regrows identically; nothing dropped (`tests/world.spec.js`). | done |
 | 3 | **Kinds of country.** A climate (cold, rain) read from the seed: snowfields and pines in the cold, golden heath with a few birches where it is dry, thick dark-green woods where it is wet, mild meadow between, and rare blossom groves. The ground, grass, trees, boulders and flowers all follow it, and far tiles show it from a distance. | Each kind exists within 2.6 km and grows its own trees; the valley stays mild (`tests/world.spec.js`). | done |
 | 4a | **Places from the seed, lakes first.** A grid of places, each chosen from the land and climate round it. Lakes of varied size and shape, each in its own valley: water, reeds, lilies, ducks, jumping fish, fishing; frozen all year in snow country; seen from afar. The save holds seed and position; a list to jump to places. The home valley still stands. | Height is continuous between neighbouring lakes; a lake is the same every visit; water is drawn from a fixed pool (`tests/lakes.spec.js`). | done |
-| 4b | **Landmarks that follow you.** Jetty with boat and skipper, campfire with logs, bench and lamp path at some lakes; the shrine in blossom groves. One of each object, moved to the nearest place of its kind while out of sight. Each place remembers its own state (its own bouquet, fire, trade). | Moving between two lakes re-anchors everything with nothing left behind; each place's state survives leaving and returning. | |
-| 4c | **The valley goes.** Start beside a generated lake with the full set. The fixed valley and its hand-placed plants are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
+| 4b-1 | **Landmarks that follow you.** Settled lakes (each outranking its eight neighbours, so at least half a kilometre apart) have a kit worked out from the seed and checked against the land: a jetty with the boat and skipper where the shore allows, a campfire with logs, a bench with lawn chairs and path lamps; each turned its own way. One of each object, moved to the nearest settled lake when the old one is well behind. Each place keeps its own state (bench bouquet, boat bouquet, fire). | Home is bit-for-bit unchanged; there and back leaves seats, obstacles and scene objects as they were; a bouquet stays at its own bench across a reload (`tests/places.spec.js`). | done |
+| 4b-2 | **Lake life at every lake.** Reeds and lilies per lake from fixed slots; ducks, the heron and the mist follow the lake you are at. | Same checks. | next |
+| 4c | **The valley goes.** Start beside a generated lake with the full set. The shrine is rebuilt in blossom groves (its geometry is baked to the ground it stands on, so it is rebuilt, not moved). The fixed valley and its hand-placed plants, fences and pebbles are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
 | 4d | **More to discover, and a backpack.** Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | |
@@ -154,6 +155,35 @@ or dropped once a pack is chosen.
   show as pale shapes; fog, rain and snow push it back to full.
 - `world/grassfield.js` keeps a 144 x 144 map of height and "grass grows here" round the camera
   and shifts it as the camera moves.
+
+## How the landmarks work (milestone 4b-1)
+
+- **Made once, then placed.** `world/props.js` (jetty, bench, chairs, lamps), `features/campfire.js`,
+  `characters/boat.js` and the bench bouquet in `features/flowers.js` build their objects once and
+  put them where the landmark spots are; each registers a function in `hooks.anchor`
+  (`core/state.js`) to place them again. Seats and obstacles are objects kept by their owner and
+  updated in place, never re-pushed.
+- **The spots move.** `anchorTo(lake)` in `core/shape.js` re-points the single-lake names (`LAKE`,
+  `lakeR`, `lakePoint`, `DOCK_A`, `DOCK_Y` are `export let`) and writes new numbers into the same
+  `{x, z}` objects (`SPAWN`, `dockStart`, `dockDir`, `FIRE_SPOT`, `BENCH_SPOT`, `chairSpots`).
+  `landmarksOf(lake)` works them out, turned by the lake's `turn`.
+- **Settled lakes.** `settledCell`: a lake is settled if its rank (a hash) beats every lake in the
+  eight squares round it; the home lake outranks all. `kitOf(lake)` (lazy, kept on the lake)
+  decides `{ dock, fire, bench }` and tries ten turns for one where `jettyFits`: root on dry land,
+  deck over water, the boat's whole tour afloat. No jetty on frozen lakes.
+- **What a lake lacks is parked.** Its spots are put at `PARK` (400 km off), so `onDock`, seats,
+  obstacles, actions and lamp light all answer "not here" with no special cases. `KIT` says what
+  the anchor lake has; the boat is hidden and circles its parked mooring.
+- **Plants keep clear by a pure rule.** `clearingAt`: no wild tree or boulder within 1.95 radii of
+  a settled lake, whether or not the landmarks are there, so a square always regrows the same.
+- **The chooser** (`systems/anchor.js`, called from `tick`): moves the landmarks when you are
+  idle, the old lake is 280 m behind and another settled lake is 60 m nearer; at once on arriving
+  by the Places list and at load. It swaps per-place state: `store.places[id]` holds a place's
+  bouquets and fire while the landmarks are elsewhere; `store.benchBouquet`/`boatBouquet` are
+  always the current place's, named by `store.anchor` (so old saves and features work unchanged).
+- A lake's bowl is wider, in radii, for small lakes (`lake.bowl`), or they lie in a pit.
+- Still home-only until 4b-2 and 4c: reeds, lilies and frogs, ducks, the heron, mist, the fences,
+  pebbles, the snowman, the animals' homes, the shrine, pickable flowers, pine cones, deer.
 
 ## How the lakes work (milestone 4a)
 

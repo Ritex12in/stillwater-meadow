@@ -6,8 +6,8 @@ import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug, query } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU, updateDetail, neonU } from './core/materials.js';
-import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, heightAt, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt } from './core/shape.js';
-import { hooks, seasonState, seats, world } from './core/state.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, heightAt, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT } from './core/shape.js';
+import { hooks, seasonState, seats, world, obstacles } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU } from './world/sky.js';
 import { buildLights, hemi, ambient, sun, placeSun } from './world/lights.js';
@@ -42,6 +42,7 @@ import { initPost, resizePost, renderFrame, post } from './systems/post.js';
 import { store, onSave, flush } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
 import { initWorldPanel, initPlaces } from './ui/world-panel.js';
+import { updateAnchor, moveAnchor, anchorId, settledAbout } from './systems/anchor.js';
 import { initSettings } from './ui/settings.js';
 import { initPetVoices } from './features/voices.js';
 import { initDucks, duckState } from './features/ducks.js';
@@ -63,7 +64,7 @@ import { initIceDance, danceView, snowmanView } from './features/icedance.js';
 import { initDanceCam } from './features/dancecam.js';
 import { initDanceMusic } from './features/dancemusic.js';
 import { initFoley } from './features/foley.js';
-import { ferry, boatSeat, BOARD_POINT } from './characters/boat.js';
+import { ferry, boatSeat, BOARD_POINT, boat } from './characters/boat.js';
 import { seasonNow } from './features/seasons.js';
 
 let renderer;
@@ -139,11 +140,12 @@ initWorldPanel();
 function travelTo(x, z, faceX, faceZ) {
   player.x = x; player.z = z; player.slide = null; player.y = groundAt(x, z);
   if (faceX !== undefined) { player.rot = Math.atan2(faceX - x, faceZ - z); camState.yaw = Math.atan2(x - faceX, z - faceZ); }
+  updateAnchor(0, true); // (if this is another settled lake, its jetty, fire and bench are here when you arrive)
   settleGround(x, z); settleWilds(x, z); updateWater(x, z);
   flush();
 }
 /** The lakes within reach, for the Places list and the tests. */
-const lakesAbout = (r = 1500) => lakesNear(player.x, player.z, r).map((L) => ({ id: L.id, name: L.name, x: L.x, z: L.z, r: L.R0, rmax: L.rmax, long: L.E, beach: L.beach, ring: L.ring, frozen: L.frozen, far: Math.round(Math.max(0, Math.hypot(L.x - player.x, L.z - player.z) - L.R0)) }));
+const lakesAbout = (r = 1500) => lakesNear(player.x, player.z, r).map((L) => ({ id: L.id, name: L.name, x: L.x, z: L.z, r: L.R0, rmax: L.rmax, long: L.E, beach: L.beach, ring: L.ring, frozen: L.frozen, settled: !!L.settled, kit: L.settled ? Object.assign({}, kitOf(L)) : null, far: Math.round(Math.max(0, Math.hypot(L.x - player.x, L.z - player.z) - L.R0)) }));
 /** Stand on a lake's shore, on the side you came from, facing the water. */
 function visitLake(id) {
   const L = lakesNear(player.x, player.z, 6000).find((q) => q.id === id);
@@ -186,6 +188,8 @@ for (const [name, init] of Object.entries(features)) {
   } catch (e) { reportProblem(name.replace(/^init/, ''), e); }
 }
 resize();
+// the landmarks stand where you are: at the settled lake you last left them by, or the one nearest you now
+updateAnchor(0, true);
 
 // ── Hotkeys ──
 bindKey('KeyH', () => togglePanel('controls'));
@@ -282,6 +286,7 @@ export function tick(dt) {
   safe('time', () => { advanceTime(dt); applySky(); });
   safe('boat', () => updateBoat(dt, clock.elapsed, cur.eve, cur.day));
   safe('player', () => updatePlayer(dt, updatePetting));
+  safe('places', () => updateAnchor(dt));
   safe('camera', () => updateCamera(dt, player));
   audio.listener.x = camera.position.x; audio.listener.z = camera.position.z; audio.listener.yaw = camState.yaw;
   safe('animals', () => { for (const a of animals) updateAnimal(a, dt, clock.elapsed); separateAnimals(); });
@@ -341,10 +346,15 @@ window.__meadow = {
   get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, get shrine() { return world.shrine; }, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
   fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, pets: petsView, fetch: fetchView, friend: friendView, get friendSt() { return friend && friend.st; }, dance: danceView, snowman: snowmanView, wardrobe: wardrobeNow, emote: playEmote, emoteState, toast,
-  geo: { get lakePoint() { return lakePoint; }, walkable, dockAt, dockDir, onDock, FIRE_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') }, // (lakePoint: whichever lake the landmarks stand at)
+  geo: { get lakePoint() { return lakePoint; }, lakeT, walkable, dockAt, dockDir, onDock, FIRE_SPOT, BENCH_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') }, // (lakePoint: whichever lake the landmarks stand at)
   seed: WORLD.seed,
   /** Lakes: those about you, the ones with water drawn just now, and a way to go to one or to any spot. */
   lakes: lakesAbout, waterLakes, visitLake, travelTo,
+  /** The landmarks: which lake they stand at, what it has, the settled lakes about, and a way to send them to one. */
+  anchor: anchorId, get kit() { return Object.assign({}, KIT); }, settled: settledAbout, boatShown: () => boat.visible,
+  moveAnchor: (id) => { const L = lakesNear(player.x, player.z, 6000).find((q) => q.id === id); return !!L && moveAnchor(L); },
+  /** What the scene holds besides the ground's own pooled tiles (which fill up once and are then reused), and the lists things are registered in. */
+  counts: () => { let n = 0; scene.traverse(() => { n++; }); return { objects: n - groundStats().parts, obstacles: obstacles.length, seats: seats.length }; },
   /** The climate at a spot: how much snow lies, how parched, how lush, how much of a blossom grove (each 0..1). */
   climate: (x, z) => { const rain = rainAt(x, z); return { snow: snowOf(coldAt(x, z, height(x, z))), dry: dryOf(rain), lush: lushOf(rain), grove: groveAt(x, z) }; },
   // the ground's tiles: what is loaded, and ways to bring it up to date without waiting for frames

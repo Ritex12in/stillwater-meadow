@@ -37,7 +37,9 @@ const SX = WORLD.seed === DEFAULT_SEED ? 0 : Math.floor(shift() * 9000) + 0.37, 
  */
 export function makeLake({ x, z, R0 = 30, A3 = 4, P3 = 0, A5 = 2.5, P5 = 1.3, A7 = 1.5, P7 = 0.4, E = 0, TH = 0, beach = 1, ring = true, tint = [1, 1, 1] }) {
   const rmax = (R0 + Math.abs(A3) + Math.abs(A5) + Math.abs(A7)) * (1 + E);
-  const L = { x, z, R0, A3, P3, A5, P5, A7, P7, E, TH, beach, ring, tint, rmax, id: 'home', name: 'Stillwater', frozen: false, reach2: (rmax * 7.5) ** 2 }; // (reach2: beyond this the lake has no say in the land)
+  // how far out its bowl runs before the land is its own again, in lake-radii: 1.6 at home, more for a small lake (or it would lie in a pit), but never past 80 m
+  const bowl = Math.max(1.6, Math.min(44 / R0, 80 / rmax));
+  const L = { x, z, R0, A3, P3, A5, P5, A7, P7, E, TH, beach, ring, tint, rmax, bowl, id: 'home', name: 'Stillwater', frozen: false, reach2: (rmax * 7.5) ** 2 }; // (reach2: beyond this the lake has no say in the land)
   /** Shore radius at angle `a`. */
   L.r = (a) => (R0 + A3 * Math.sin(3 * a + P3) + A5 * Math.cos(5 * a + P5) + A7 * Math.sin(7 * a + P7)) * (1 + E * Math.cos(2 * (a - TH)));
   /** How far out a spot is, in lake-radii: 0 at the centre, 1 on the shore. */
@@ -55,6 +57,7 @@ export function makeLake({ x, z, R0 = 30, A3 = 4, P3 = 0, A5 = 2.5, P5 = 1.3, A7
 }
 /** The valley's lake. */
 export const HOME = makeLake({ x: 6, z: -30 });
+HOME.settled = true;
 
 // ── Lakes from the seed ────────────────────────────────────────
 // The land is ruled into squares LAKE_CELL metres wide, and each square has one lake or none,
@@ -70,6 +73,26 @@ const lakeCells = new Map(), aroundCells = new Map();
 const HOME_CX = Math.floor(HOME.x / LAKE_CELL), HOME_CZ = Math.floor(HOME.z / LAKE_CELL);
 const NAME_A = ['Mirror', 'Heron', 'Willow', 'Amber', 'Silver', 'Moss', 'Lark', 'Fern', 'Otter', 'Birch', 'Glass', 'Hollow', 'Mist', 'Reed', 'Thistle', 'Ember', 'Swan', 'Dawn', 'Quiet', 'Lantern'];
 const NAME_COLD = ['Frost', 'Snow', 'White', 'Winter', 'Crystal', 'Pale'], NAME_B = ['water', 'mere', 'pool', 'tarn', 'deep', 'rest', 'glass', 'hollow'];
+/** The first of a square's draws: whether it has a lake and where (and the random stream, for the rest of the lake). */
+function cellSpot(cx, cz) {
+  const R = mulberry32((Math.floor(hash(cx * 11 + 7, cz * 17 - 3) * 4294967296) ^ Math.imul(WORLD.seed, 0x85EBCA6B)) | 0);
+  const there = R() < 0.62, x = (cx + 0.2 + R() * 0.6) * LAKE_CELL, z = (cz + 0.2 + R() * 0.6) * LAKE_CELL;
+  return { R, x, z, there: there && rangeAt(x, z) < 0.3 };
+}
+// Settled lakes are the ones with things built beside them: a jetty, a fire, a bench (see kitOf).
+// A lake is settled if it outranks every lake in the eight squares round its own, by a rank fixed
+// by the seed. So no two settled lakes are neighbours: they lie half a kilometre apart at the
+// least, each out of sight of the next. The home lake outranks all.
+const cellRank = (cx, cz) => (cx === HOME_CX && cz === HOME_CZ ? 2 : hash(cx * 5 + 1 + WORLD.seed * 3, cz * 9 - 4));
+function settledCell(cx, cz) {
+  const mine = cellRank(cx, cz);
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+    if (!dx && !dz) continue;
+    const nx = cx + dx, nz = cz + dz;
+    if (cellRank(nx, nz) > mine && ((nx === HOME_CX && nz === HOME_CZ) || cellSpot(nx, nz).there)) return false;
+  }
+  return true;
+}
 function lakeOfCell(cx, cz) {
   const key = cx + ':' + cz;
   let L = lakeCells.get(key);
@@ -77,9 +100,9 @@ function lakeOfCell(cx, cz) {
   L = null;
   if (cx === HOME_CX && cz === HOME_CZ) L = HOME;
   else {
-    const R = mulberry32((Math.floor(hash(cx * 11 + 7, cz * 17 - 3) * 4294967296) ^ Math.imul(WORLD.seed, 0x85EBCA6B)) | 0);
-    const there = R() < 0.62, x = (cx + 0.2 + R() * 0.6) * LAKE_CELL, z = (cz + 0.2 + R() * 0.6) * LAKE_CELL, size = R(), p3 = R() * TAU, p5 = R() * TAU, p7 = R() * TAU, wob = 0.35 + R() * 1.25, n1 = R(), n2 = R(), long = R(), th = R() * Math.PI, worn = R();
-    if (there && rangeAt(x, z) < 0.3) {
+    const { R, there, x, z } = cellSpot(cx, cz), settled = there && settledCell(cx, cz);
+    const size = R(), p3 = R() * TAU, p5 = R() * TAU, p7 = R() * TAU, wob = 0.35 + R() * 1.25, n1 = R(), n2 = R(), long = R(), th = R() * Math.PI, worn = R();
+    if (there) {
       // size, how deeply the shore is scalloped, and how long and narrow it is (one in three is nearly round);
       // then scaled down, if need be, so the longest reach of the shore stays inside the lake's own square
       let R0 = 12 + size * size * 30;
@@ -89,8 +112,9 @@ function lakeOfCell(cx, cz) {
       const rain = rainAt(x, z), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(coldAt(x, z, 1));
       const beach = clamp(1 + dry * 0.5 - lush * 0.8 - snow * 0.9, 0.1, 1.5);
       const tint = [1 - lush * 0.3 - dry * 0.12 - snow * 0.12, 1 + lush * 0.04 + dry * 0.16 - snow * 0.04, 1 - lush * 0.2 + dry * 0.12 + snow * 0.12];
-      L = makeLake({ x, z, R0, A3: R0 * 0.13 * wob, P3: p3, A5: R0 * 0.085 * wob, P5: p5, A7: R0 * 0.05 * wob, P7: p7, E, TH: th, beach, ring: worn < 0.4, tint });
+      L = makeLake({ x, z, R0, A3: R0 * 0.13 * wob, P3: p3, A5: R0 * 0.085 * wob, P5: p5, A7: R0 * 0.05 * wob, P7: p7, E, TH: th, beach, ring: settled || worn < 0.25, tint }); // (a settled lake always has its path)
       L.id = key;
+      L.settled = settled;
       L.frozen = snow > 0.6;
       const first = L.frozen ? NAME_COLD : NAME_A;
       L.name = first[Math.floor(n1 * first.length)] + NAME_B[Math.floor(n2 * NAME_B.length)];
@@ -177,9 +201,9 @@ export function height(x, z) {
     if (lt < t) { t = lt; lake = L; }
   }
   const base = land(x, z, open);
-  if (!lake || t >= 1.7) return base; // (beyond the bowl and the path)
+  if (!lake || t >= lake.bowl + 0.1) return base; // (beyond the bowl and the path)
   const floor = t < 1 ? -3.2 * (1 - t * t) : (t - 1) * 2.0;
-  const k = smooth(0.8, 1.6, t);
+  const k = smooth(0.8, lake.bowl, t);
   return floor * (1 - k) + base * k - lake.path(x, z) * 0.08;
 }
 
@@ -243,19 +267,56 @@ export const DOCK_BACK = 1.6, DOCK_LEN = 9, DOCK_HALF = 1.05;
  * lakes are laid out facing the same way.
  */
 export function landmarksOf(lake) {
-  const turn = lake.turn || 0, dockA = Math.PI / 2 + 0.55 + turn, chairA = Math.PI / 2 - 0.95 + turn;
-  const start = lake.point(dockA, 1.03);
+  const kit = kitOf(lake), turn = lake.turn || 0, dockA = Math.PI / 2 + 0.55 + turn, chairA = Math.PI / 2 - 0.95 + turn;
+  const start = kit.dock ? lake.point(dockA, 1.03) : { x: PARK.x, z: PARK.z };
+  const away = () => ({ x: PARK.x, z: PARK.z });
   return {
-    dockA, chairA,
+    dockA, chairA, kit,
     spawn: lake.point(Math.PI / 2 + turn, PATH_T + 0.04),
     dockStart: start,
     dockDir: { x: -Math.cos(dockA), z: -Math.sin(dockA) },
-    dockY: Math.max(0.5, height(start.x, start.z) + 0.1),
-    chairs: [lake.point(chairA, 1.17), lake.point(chairA + 0.05, 1.17)],
-    fire: lake.point(Math.PI / 2 + 0.34 + turn, 1.68),
-    bench: lake.point(Math.PI / 2 - 0.5 + turn, 1.5),
+    dockY: kit.dock ? Math.max(0.5, height(start.x, start.z) + 0.1) : 0.5,
+    chairs: kit.bench ? [lake.point(chairA, 1.17), lake.point(chairA + 0.05, 1.17)] : [away(), away()],
+    fire: kit.fire ? lake.point(Math.PI / 2 + 0.34 + turn, 1.68) : away(),
+    bench: kit.bench ? lake.point(Math.PI / 2 - 0.5 + turn, 1.5) : away(),
   };
 }
+/**
+ * Where the spots of things a lake does not have are put: far beyond anywhere you will walk. A
+ * lake with no jetty has its "jetty spot" out there, so nothing can stand on a jetty that isn't
+ * to be seen, sit on its chair or board its boat.
+ */
+export const PARK = { x: 4.0e5, z: 4.0e5 };
+/** Would a jetty at this lake, with the arrangement turned this way, stand in deep water with room for the boat's tour? */
+function jettyFits(lake, turn) {
+  const a = Math.PI / 2 + 0.55 + turn, s0 = lake.point(a, 1.03), dx = -Math.cos(a), dz = -Math.sin(a);
+  if (height(s0.x, s0.z) < 0.25) return false;                                                       // it leaves dry land
+  for (const s of [3.5, 6, DOCK_LEN]) if (height(s0.x + dx * s, s0.z + dz * s) > -0.35) return false; // and runs out over water
+  const mx = s0.x + dx * (DOCK_LEN + 0.85), mz = s0.z + dz * (DOCK_LEN + 0.85), tm = lake.t(mx, mz);
+  if (tm > 0.82 || tm < 0.25) return false;                                                           // the mooring is well inside the lake, not across it
+  for (let i = 1; i < 28; i++) { const p = lake.point(a + (i / 28) * TAU, tm); if (height(p.x, p.z) > -0.5) return false; } // and the tour floats all the way round
+  return true;
+}
+/**
+ * What is built beside a lake: `{ dock, fire, bench }`. Nothing at a lake that isn't settled; at
+ * a settled one, most of them: a jetty with the boat and its skipper if the shore allows (not on
+ * a frozen lake), a campfire with its logs, a bench with the lawn chairs and the path lamps. Also
+ * settles the lake's `turn`: which way the whole arrangement faces. Worked out when first asked
+ * for (it needs the shape of the land), then kept on the lake.
+ */
+export function kitOf(lake) {
+  if (lake.kit) return lake.kit;
+  if (lake === HOME) return (lake.kit = { dock: true, fire: true, bench: true });
+  if (!lake.settled) return (lake.kit = { dock: false, fire: false, bench: false });
+  const R = mulberry32((Math.floor(hash(Math.round(lake.x), Math.round(lake.z)) * 4294967296) ^ 0x3C6EF372) | 0);
+  const first = R() * TAU, wantDock = R() < 0.85, wantFire = R() < 0.8, wantBench = R() < 0.72;
+  let dock = false;
+  lake.turn = first;
+  if (wantDock && !lake.frozen) for (let k = 0; k < 10 && !dock; k++) { const t = first + (k / 10) * TAU; if (jettyFits(lake, t)) { lake.turn = t; dock = true; } }
+  return (lake.kit = { dock, fire: wantFire || (!dock && !wantBench), bench: wantBench });
+}
+/** Is a spot in the clearing kept round a settled lake's landmarks? (Trees and boulders keep out of it, whether or not the landmarks are there just now.) */
+export function clearingAt(x, z) { const L = lakeAt(x, z); return !!L.settled && L.t(x, z) < 1.95; }
 const HOME_PLACES = landmarksOf(HOME);
 export const SPAWN = HOME_PLACES.spawn;
 
@@ -323,8 +384,9 @@ export const FIRE_SPOT = HOME_PLACES.fire;
 export const BENCH_SPOT = HOME_PLACES.bench;
 
 // ── Moving the landmarks to another lake ───────────────────────
-/** The lake the jetty, the fire and the bench stand at just now. */
+/** The lake the jetty, the fire and the bench stand at just now, and which of them it has. */
 export let ANCHOR = HOME;
+export const KIT = { dock: true, fire: true, bench: true };
 /**
  * Point the single-lake names at another lake: LAKE, lakeR and lakePoint become that lake, and
  * the landmark spots (SPAWN, dockStart, dockDir, DOCK_Y, chairSpots, FIRE_SPOT, BENCH_SPOT) are
@@ -335,6 +397,7 @@ export let ANCHOR = HOME;
 export function anchorTo(lake) {
   const m = landmarksOf(lake);
   ANCHOR = LAKE = lake; lakeR = lake.r; lakePoint = lake.point;
+  Object.assign(KIT, m.kit);
   DOCK_A = m.dockA; CHAIR_A = m.chairA; DOCK_Y = m.dockY;
   Object.assign(SPAWN, m.spawn); Object.assign(dockStart, m.dockStart); Object.assign(dockDir, m.dockDir);
   Object.assign(FIRE_SPOT, m.fire); Object.assign(BENCH_SPOT, m.bench);

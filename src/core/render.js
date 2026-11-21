@@ -15,5 +15,5 @@ export function createRenderer() {
 
 export const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xcfe5f2, 50, 220);
-export const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1500);
+export const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 3200); // (far enough for mountains two kilometres off)
 camera.layers.enable(1); // layer 1: small plants (kept apart so a second view of the scene can leave them out)

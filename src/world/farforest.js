@@ -5,11 +5,10 @@
 // drawn in three draw calls (the hills, and one per mountain range).
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
-import { TAU, mulberry32, fbm, smooth } from '../core/math.js';
-import { heightAt, lakeT, TERRAIN, WORLD_LIMIT } from '../core/shape.js';
+import { mulberry32, fbm, smooth } from '../core/math.js';
+import { heightAt, lakeT, WORLD_LIMIT } from '../core/shape.js';
 import { weatherize, camU, softEdges } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
-import { RANGES, rangeHeight, mountainU } from './mountains.js';
 import { groundU } from './terrain.js';
 
 /** The card meshes, so the distant-forest setting can hide them. */
@@ -79,7 +78,6 @@ function cardMaterial(atlas, cells, distant) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uCamF = camU;
     sh.uniforms.uAutumn = groundU.autumn;
-    if (distant) Object.assign(sh.uniforms, mountainU);
     sh.vertexShader = `uniform vec3 uCamF; uniform float uAutumn;
       attribute vec3 aPos; attribute vec2 aSize; attribute float aCell; attribute float aRand; attribute float aLeafy;
       ${distant ? 'varying vec3 vMW;' : ''}
@@ -144,7 +142,7 @@ export function buildFarForest(renderer) {
   };
 
   // 1. the hills round the meadow, past where you can walk: woods in clumps, clearings between
-  const hills = [], half = TERRAIN.size / 2 - 3;
+  const hills = [], half = 177;
   for (let i = 0; i < 30000 && hills.length < 4600; i++) {
     const x = (r() * 2 - 1) * half, z = (r() * 2 - 1) * half, d = Math.hypot(x, z);
     if (d < WORLD_LIMIT + 3 || lakeT(x, z) < 1.3) continue;
@@ -158,19 +156,5 @@ export function buildFarForest(renderer) {
   }
   farForest.push(cards(hills, texture, fams.length, false));
 
-  // 2. the mountains' lower slopes, below the rock and snow: denser, bigger, hazier
-  RANGES.forEach((R, k) => {
-    const list = [];
-    const count = R.forest ? 9000 : k === 0 ? 3500 : 6000;
-    for (let i = 0; i < count * 3 && list.length < count; i++) {
-      const a = r() * TAU, t = 0.04 + r() * (R.forest ? 0.42 : 0.3), y = rangeHeight(R, a, t);
-      if (y > R.height * (R.forest ? 1.2 : 0.3) || y < -2) continue;
-      if (fbm(Math.cos(a) * 14 + k, Math.sin(a) * 14 + t * 6) < (R.forest ? 0.3 : 0.38)) continue;
-      const rr = R.radius + t * R.depth, h = (R.forest ? 11 : k === 0 ? 22 : 15) * (0.75 + r() * 0.5);
-      const fade = R.forest ? 1 : 1 - smooth(R.height * 0.12, R.height * 0.28, y); // fewer, and more pines, up the slope
-      if (r() > 0.35 + 0.65 * fade) continue;
-      list.push(tree(Math.cos(a) * rr, y - 1.5, Math.sin(a) * rr, h, fade < 0.5 ? [['slimpine', 0.55], ['pine', 0.35], ['birch', 0.1]] : [['slimpine', 0.3], ['pine', 0.25], ['common', 0.15], ['normal', 0.1], ['maple', 0.12], ['birch', 0.08]]));
-    }
-    farForest.push(cards(list, texture, fams.length, R.haze * 0.9)); // hazed like the slope it stands on
-  });
+
 }

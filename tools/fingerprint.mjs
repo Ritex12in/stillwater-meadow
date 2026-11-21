@@ -2,7 +2,7 @@
 // places beside the lake, and the position of every instanced plant. Two runs of the same code
 // and seed must give the same fingerprint; a refactor that should move nothing must too.
 //
-//   node tools/fingerprint.mjs out.json            write one (needs `npm run dev` running)
+//   node tools/fingerprint.mjs out.json            write one (needs `npm run dev` running; MEADOW_SEED=7 picks a seed)
 //   node tools/fingerprint.mjs a.json b.json --compare   say whether two are identical
 import { readFileSync } from 'node:fs';
 if (process.argv[4] === '--compare') {
@@ -16,7 +16,7 @@ import { writeFileSync } from 'node:fs';
 const b = await chromium.launch({ channel: 'chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ viewport: { width: 640, height: 400 } })).newPage();
 const errs = []; p.on('pageerror', (e) => errs.push(e.message));
-await p.goto('http://127.0.0.1:8080/?weather=clear&season=summer#14');
+await p.goto('http://127.0.0.1:8080/?weather=clear&season=summer' + (process.env.MEADOW_SEED ? '&seed=' + process.env.MEADOW_SEED : '') + '#14');
 await p.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 300000 });
 const fp = await p.evaluate(async () => {
   const m = window.__meadow;
@@ -29,7 +29,7 @@ const fp = await p.evaluate(async () => {
     visit(h); return out; };
   const scene = (await import(url('/src/core/render.js'))).scene;
   return {
-    height: grid(S.height), heightAt: grid(S.heightAt), lakeT: grid(S.lakeT), pathAmt: grid(S.pathAmt),
+    seed: m.seed, height: grid(S.height), farLand: Array.from({ length: 400 }, (_, i) => S.height(Math.cos(i * 2.4) * i * 55, Math.sin(i * 2.4) * i * 55)), heightAt: grid(S.heightAt), lakeT: grid(S.lakeT), pathAmt: grid(S.pathAmt),
     walk: grid((x, z) => +S.walkable(x, z)), animalWalk: grid((x, z) => +S.animalWalkable(x, z)), ground: grid(S.groundAt), dock: grid((x, z) => +S.onDock(x, z)), reserved: grid((x, z) => +S.nearReserved(x, z, 1.4)),
     consts: [S.LAKE.x, S.LAKE.z, S.SPAWN, S.dockStart, S.dockDir, S.DOCK_Y, S.DOCK_A, S.FIRE_SPOT, S.BENCH_SPOT, S.chairSpots, S.CHAIR_A, S.PATH_T, S.WORLD_LIMIT, S.ICE_Y],
     lakeR: Array.from({ length: 200 }, (_, i) => S.lakeR(i * 0.0317)), lakePoint: Array.from({ length: 60 }, (_, i) => S.lakePoint(i * 0.11, 0.2 + i * 0.03)),

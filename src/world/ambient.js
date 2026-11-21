@@ -59,10 +59,10 @@ export function buildBirds() {
   scene.add(birds);
 }
 const bv = new THREE.Vector3();
-function updateBirds(t) {
+function updateBirds(t, center) {
   // the leader's path: a wide, slowly wandering loop over the valley
   const a = t * 0.045, R = 85 + 25 * Math.sin(t * 0.017);
-  const cx = Math.cos(a) * R + 6, cz = Math.sin(a) * R * 0.75 - 20, cy = 48 + 6 * Math.sin(t * 0.05);
+  const cx = center.x + Math.cos(a) * R + 6, cz = center.z + Math.sin(a) * R * 0.75 - 20, cy = Math.max(center.y, 0) + 46 + 6 * Math.sin(t * 0.05);
   const hx = -Math.sin(a), hz = Math.cos(a) * 0.75, hl = Math.hypot(hx, hz), fx = hx / hl, fz = hz / hl; // heading
   const arr = birdGeo.attributes.position.array;
   let o = 0;
@@ -111,6 +111,7 @@ export function buildClouds() {
     const a = R() * TAU, r = cr(200, 320);
     g.position.set(Math.cos(a) * r, cr(70, 115), Math.sin(a) * r);
     g.userData.mat = mat;
+    g.userData.at = { x: g.position.x, y: g.position.y, z: g.position.z }; // where it is in the sky's own drifting frame
     scene.add(g);
     clouds.push(g);
   }
@@ -151,7 +152,7 @@ export function buildButterflies() {
 
 /** Fireflies and butterflies wrap around `center` so there are always some nearby. */
 export function updateAmbientLife(dt, t, center, dayLevel, wind) {
-  if (birds.visible) updateBirds(t);
+  if (birds.visible) updateBirds(t, center);
   if (pollen.visible) {
     pnDrift += dt * (0.25 + wind * 1.6);
     const arr = pnGeo.attributes.position.array;
@@ -190,8 +191,10 @@ export function updateAmbientLife(dt, t, center, dayLevel, wind) {
       b.L.rotation.z = flap; b.R.rotation.z = -flap;
     }
   }
+  // the clouds drift on the wind, and the whole sky of them wraps round you so it is never empty
   for (const c of clouds) {
-    c.position.x += dt * (1.6 + wind * 7);
-    if (c.position.x > 320) c.position.x = -320;
+    const at = c.userData.at;
+    at.x += dt * (1.6 + wind * 7);
+    c.position.set(wrap(at.x - center.x, -320, 320) + center.x, at.y + Math.max(center.y, 0), wrap(at.z - center.z, -320, 320) + center.z);
   }
 }

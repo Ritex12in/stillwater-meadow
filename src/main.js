@@ -6,13 +6,12 @@ import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU, updateDetail, neonU } from './core/materials.js';
-import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT } from './core/shape.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, heightAt } from './core/shape.js';
 import { hooks, seasonState, seats, world } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU } from './world/sky.js';
-import { buildMountains, tintMountains } from './world/mountains.js';
 import { buildLights, hemi, ambient, sun, placeSun } from './world/lights.js';
-import { buildTerrain, groundU } from './world/terrain.js';
+import { buildGround, updateGround, pumpGround, settleGround, groundStats, groundU } from './world/terrain.js';
 import { buildWater, waterU } from './world/water.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
@@ -36,7 +35,7 @@ import { updateCamera, camTarget } from './systems/camera.js';
 import { cur, sunDir, moonDir, lightDir, solar, timeCtl, advanceTime, periodName, formatHour, goLive, setManual, wrap24 } from './systems/time.js';
 import { wx, WX_LABEL, buildWeather, updateWeather, updatePrecip, weatherModify, cycleWeather, onRainStopped, restoreWeather, resizeWeather } from './systems/weather.js';
 import { quality, initQuality, tickQuality, onQualityChange, loadingStarted, loadingFinished } from './systems/quality.js';
-import { grassU } from './world/grassfield.js';
+import { grassU, updateGrassMap } from './world/grassfield.js';
 import { farForest } from './world/farforest.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
 import { store, onSave, flush } from './systems/save.js';
@@ -86,9 +85,8 @@ loadingStarted(); // (cleared once the first frame is drawn: still set next time
 await loadKit((f) => loadingStep(0.05 + f * 0.5, 'Gathering trees and flowers…')); // nature models; the meadow falls back to hand-built shapes without them
 loadingStep(0.58, 'Raising the hills…'); await paint();
 buildSky();
-buildMountains();
 buildLights();
-buildTerrain();
+buildGround(SPAWN.x, SPAWN.z);
 buildWater();
 loadingStep(0.68, 'Planting the forest…'); await paint();
 buildTrees();
@@ -185,7 +183,7 @@ function applySky() {
   skyU.sunColor.value.copy(cur.glow);
   skyU.stars.value = cur.stars;
   neonU.value = (1 - smooth(-10, -2, solar.sunElev)) * (1 - wx.fog * 0.4) * (1 - wx.snow * 0.85); // the flowers glow neon once the sun is well down (dimmed under snow)
-  tintMountains(cur, sunDir, seasonState.coverFloor || 0);
+  groundU.haze.value = 0.62 + 0.38 * clamp(Math.max(wx.fog, wx.rain * 0.5, wx.snow * 0.5), 0, 1); // far hills show through the haze, unless the weather hides them
   groundU.bloom.value = seasonState.flowerFrac ?? 1;
   const wildOn = seasonState.name !== 'Winter' && world.wildAllowed !== false; // the wildflowers die back under the snow (or are switched off)
   if (world.wild && world.wildOn !== wildOn) { world.wildOn = wildOn; world.wild.forEach((h) => { h.visible = wildOn; }); }
@@ -261,6 +259,7 @@ export function tick(dt) {
   sunAim.set(camTarget.x, camTarget.y - 1.55, camTarget.z);
   placeSun(sunAim, lightDir);
   safe('detail', () => updateDetail(camera, camTarget));
+  safe('grass', () => updateGrassMap(camera.position.x, camera.position.z));
   updateAtmosphere(camera, sunDir, cur.glow, 1, lampSpots, cur.eve);
   actionTimer -= dt;
   if (actionTimer <= 0) { actionTimer = 0.1; safe('prompts', () => renderPrompts(evaluateActions())); }
@@ -279,6 +278,9 @@ function frame(now) {
   // (before drawing: a resolution change resizes the canvas, which clears it, so it must be redrawn at once
   // in the same frame; done after drawing, the cleared canvas would be shown for a frame as a black flicker)
   tickQuality(clamp(real, 0, 0.5));
+  // the ground: choose the tiles round the camera, and spend a few milliseconds making new ones
+  updateGround(camera.position.x, camera.position.z);
+  pumpGround(3);
   renderNow();
   requestAnimationFrame(frame);
 }
@@ -288,6 +290,8 @@ updateBoat(0, 0, cur.eve, cur.day);
 updatePlayer(0, updatePetting);
 updateCamera(0, player);
 updateDetail(camera, camTarget);
+settleGround(camera.position.x, camera.position.z);
+updateGrassMap(camera.position.x, camera.position.z);
 renderer.shadowMap.needsUpdate = true;
 renderNow();
 loadingFinished();
@@ -300,7 +304,10 @@ window.__meadow = {
   get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, get shrine() { return world.shrine; }, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
   fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, pets: petsView, fetch: fetchView, friend: friendView, get friendSt() { return friend && friend.st; }, dance: danceView, snowman: snowmanView, wardrobe: wardrobeNow, emote: playEmote, emoteState, toast,
-  geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, bench: () => seats.find((s) => s.name === 'bench') },
+  geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') },
+  seed: WORLD.seed,
+  // the ground's tiles: what is loaded, and ways to bring it up to date without waiting for frames
+  ground: { stats: groundStats, update: updateGround, pump: pumpGround, settle: settleGround },
   hour: () => wrap24(timeCtl.hour),
 };
 if (debug) import('./debug.js').then((m) => m.initDebug(window.__meadow)).catch((e) => console.error(e));

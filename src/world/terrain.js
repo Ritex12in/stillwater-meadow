@@ -1,56 +1,264 @@
-// The ground: one smooth-shaded mesh. With the assets loaded it is textured: hand-painted grass,
-// soil, sand and rock blended by per-vertex weights (sand by the lake, soil on the path, rock up
-// high), sampled in world space at two scales so the tiling doesn't show. Without them it falls
-// back to painted vertex colours. Either way broad patches of colour vary across the meadow.
+// The ground, without an edge. It is drawn as square tiles in a quadtree round the camera: fine
+// tiles (a vertex every 1.2 m) where you are, and tiles twice as wide at each step outward, so the
+// same number of triangles covers the meadow at your feet and a mountain range two kilometres
+// off. Every tile is the same grid of vertices, filled in from the land's formula (core/shape.js),
+// so any tile can be made at any time and always comes out the same.
+//
+// Tiles are made a little at a time (a few milliseconds a frame), nearest first; a coarse tile
+// stays on show until the finer ones that replace it are all ready, and the other way round, so
+// there is never a hole. Finished tiles go back into a pool to be refilled, so walking for hours
+// uses no more memory than standing still. Each tile hangs a skirt down from its edges to hide the
+// hairline gaps where a fine tile meets a coarse one.
+//
+// With the assets loaded the ground is textured: hand-painted grass, soil, sand and rock blended
+// by per-vertex weights (sand by a lake, soil on the path, rock on steep and high ground), sampled
+// in world space at two scales so the tiling doesn't show. Without them it falls back to painted
+// vertex colours. Either way broad patches of colour vary across the land.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { smooth, fbm } from '../core/math.js';
-import { height, lakeT, pathAmt, TERRAIN, bakeHeights } from '../core/shape.js';
+import { height, lakeT, pathAmt, setGroundSampler } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
 
-/** Shared with the seasons: how much of the meadow is in flower, and how far into autumn (0..1). */
-export const groundU = { bloom: { value: 1 }, autumn: { value: 0 } };
+/**
+ * Shared with the seasons and the sky: how much of the meadow is in flower, how far into autumn
+ * (0..1), and how much of the ordinary haze the far ground takes (below 1 the distant hills and
+ * mountains show through as pale shapes; 1 in fog, when they are lost).
+ */
+export const groundU = { bloom: { value: 1 }, autumn: { value: 0 }, haze: { value: 0.62 } };
 
-export function buildTerrain() {
-  const geo = new THREE.PlaneGeometry(TERRAIN.size, TERRAIN.size, TERRAIN.seg, TERRAIN.seg);
-  geo.rotateX(-Math.PI / 2);
-  const p = geo.attributes.position;
-  const colors = new Float32Array(p.count * 3);
-  const g1 = col('#5c9040'), g2 = col('#86b44e'), g3 = col('#3d7034'), sand = col('#dcc895'), bed = col('#7a7856');
-  const dirt = col('#c4ab7c'), moss = col('#5c7444'), rock = col('#8d8b7d');
-  const c = new THREE.Color();
-  const textured = !!(kit && kit.tex.grass_lush), splat = textured ? new Float32Array(p.count * 4) : null;
-  const MOSS_TINT = new THREE.Color(0.8, 0.85, 0.7);
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), z = p.getZ(i);
-    const h = height(x, z);
-    p.setY(i, h);
-    c.copy(g1).lerp(g2, smooth(0.35, 0.7, fbm(x * 0.05 + 11, z * 0.05 - 3)));
-    c.lerp(g3, smooth(0.5, 0.75, fbm(x * 0.11 - 5, z * 0.11 + 8)) * 0.6);
-    const wSand = 1 - smooth(1.02, 1.16, lakeT(x, z)), wBed = smooth(0.05, -0.8, h), wDirt = pathAmt(x, z) * 0.9;
-    const wMoss = smooth(6, 12, h) * 0.6, wRock = smooth(13, 24, h) * 0.85;
-    if (textured) {
-      // the grass patches become a tint around 1 (the texture brings the colour); weights go apart
-      // keep only a little of the patch hue, and its brightness relative to the average green
-      const L = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
-      c.setRGB(1 + (c.r / L - 1) * 0.25, 1 + (c.g / L - 1) * 0.25, 1 + (c.b / L - 1) * 0.25).multiplyScalar(L / 0.32 * 0.88).lerp(MOSS_TINT, wMoss);
-      splat[i * 4] = wSand; splat[i * 4 + 1] = wBed; splat[i * 4 + 2] = wDirt; splat[i * 4 + 3] = wRock;
-    } else {
-      c.lerp(sand, wSand).lerp(bed, wBed).lerp(dirt, wDirt).lerp(moss, wMoss).lerp(rock, wRock);
-    }
-    colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+// ── the grid every tile shares ──
+export const TILE_N = 48, CELL = 1.2;                 // 48 cells a side; the finest are 1.2 m
+const LEVELS = 5;                                      // tile sizes 57.6 m, 115.2, 230.4, 460.8 and 921.6 m
+const SPLIT = 1.0;                                     // a tile gives way to four finer ones within this many of its own widths
+const V = TILE_N + 1, GRID = V * V, VERTS = GRID + 4 * V, W = TILE_N + 3;
+export const tileSize = (lv) => TILE_N * CELL * (1 << lv);
+const tileIndex = (() => {
+  const idx = [];
+  for (let j = 0; j < TILE_N; j++) for (let i = 0; i < TILE_N; i++) { const a = j * V + i, b = a + 1, c = a + V, d = c + 1; idx.push(a, c, b, c, d, b); }
+  // skirts: a strip hanging from each edge (both windings, so it shows from either side)
+  const edge = [(k) => k, (k) => TILE_N * V + k, (k) => k * V, (k) => k * V + TILE_N];
+  edge.forEach((at, e) => { for (let k = 0; k < TILE_N; k++) { const a = at(k), b = at(k + 1), sa = GRID + e * V + k, sb = sa + 1; idx.push(a, b, sa, b, sb, sa, a, sa, b, b, sa, sb); } });
+  return new THREE.BufferAttribute(new Uint16Array(idx), 1);
+})();
+const EDGE_OF = [(k) => k, (k) => TILE_N * V + k, (k) => k * V, (k) => k * V + TILE_N];
+
+let groundMat = null, textured = false;
+const g1 = col('#5c9040'), g2 = col('#86b44e'), g3 = col('#3d7034'), sand = col('#dcc895'), bed = col('#7a7856');
+const dirt = col('#c4ab7c'), moss = col('#5c7444'), rock = col('#8d8b7d');
+const MOSS_TINT = new THREE.Color(0.8, 0.85, 0.7), c = new THREE.Color();
+
+/** How rocky the ground is (0 grass .. 1 bare rock): steep slopes and the high mountains. */
+export const rockAmt = (h, slope) => Math.max(smooth(0.7, 1.15, slope), smooth(52, 84, h));
+
+// ── tiles ──
+const tiles = new Map(), pool = [], queue = [], fine = new Map();
+const hs = new Float32Array(W * W);                    // scratch: a tile's heights, one cell wider all round
+const keyOf = (lv, ix, iz) => lv + ':' + ix + ':' + iz;
+const fineKey = (ix, iz) => (ix + 32768) * 65536 + (iz + 32768);
+let frameNo = 0, camX = 0, camZ = 0, job = null, shown = new Set(), madeTotal = 0, partsMade = 0;
+
+function tileAt(lv, ix, iz) {
+  const k = keyOf(lv, ix, iz);
+  let t = tiles.get(k);
+  if (!t) { t = { lv, ix, iz, key: k, part: null, built: false, queued: false, used: frameNo }; tiles.set(k, t); }
+  return t;
+}
+const kidsOf = (t) => [tileAt(t.lv - 1, t.ix * 2, t.iz * 2), tileAt(t.lv - 1, t.ix * 2 + 1, t.iz * 2), tileAt(t.lv - 1, t.ix * 2, t.iz * 2 + 1), tileAt(t.lv - 1, t.ix * 2 + 1, t.iz * 2 + 1)];
+const kidsMade = (t) => (t.lv === 0 ? [] : [[0, 0], [1, 0], [0, 1], [1, 1]].map(([a, b]) => tiles.get(keyOf(t.lv - 1, t.ix * 2 + a, t.iz * 2 + b))).filter(Boolean));
+/** Distance from the camera to a tile's square (0 inside it). */
+function away(t) {
+  const s = tileSize(t.lv), x0 = t.ix * s, z0 = t.iz * s;
+  return Math.hypot(Math.max(x0 - camX, 0, camX - x0 - s), Math.max(z0 - camZ, 0, camZ - z0 - s));
+}
+const wantsSplit = (t) => t.lv > 0 && away(t) < SPLIT * tileSize(t.lv);
+/** Is this tile's square fully drawable, by itself or by finer tiles? */
+function covered(t) {
+  if (t.built) return true;
+  const ks = kidsMade(t);
+  return ks.length === 4 && ks.every(covered);
+}
+function request(t) { if (!t.built && !t.queued) { t.queued = true; queue.push(t); } }
+/** Ask for the tiles that should end up on show under this one. */
+function requestLeaves(t) {
+  t.used = frameNo;
+  if (wantsSplit(t)) kidsOf(t).forEach(requestLeaves); else request(t);
+}
+/** Show whatever is ready under a tile that isn't itself. */
+function showReady(t) {
+  t.used = frameNo;
+  if (t.built) { shown.add(t); return; }
+  kidsMade(t).forEach(showReady);
+}
+function select(t) {
+  t.used = frameNo;
+  if (wantsSplit(t)) {
+    const ks = kidsOf(t);
+    if (ks.every(covered)) { ks.forEach(select); return; }
+    ks.forEach(requestLeaves);
+  } else request(t);
+  showReady(t);
+}
+
+/** A set of buffers and a mesh for one tile, new or from the pool. */
+function takePart() {
+  const p = pool.pop();
+  if (p) return p;
+  partsMade++;
+  const geo = new THREE.BufferGeometry();
+  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, h: new Float32Array(GRID) };
+  geo.setAttribute('position', new THREE.BufferAttribute(part.pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(part.nrm, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(part.col, 3));
+  if (textured) geo.setAttribute('splat', new THREE.BufferAttribute(part.spl, 4));
+  geo.setIndex(tileIndex);
+  geo.boundingSphere = new THREE.Sphere();
+  part.mesh = new THREE.Mesh(geo, groundMat);
+  part.mesh.receiveShadow = true;
+  part.mesh.visible = false;
+  part.mesh.matrixAutoUpdate = false;
+  scene.add(part.mesh);
+  return part;
+}
+
+/** Fill a tile's buffers from the land's formula. A generator: it yields every few rows so the work can be spread over frames. */
+function* fill(t) {
+  const part = takePart(), s = tileSize(t.lv), cs = s / TILE_N, x0 = t.ix * s, z0 = t.iz * s;
+  const { pos, nrm, col: cols, spl, h: hOut } = part;
+  // heights, one cell beyond the tile on every side: normals then come from the land itself, not
+  // from this tile's triangles, so light runs unbroken across the joins
+  for (let j = 0; j < W; j++) {
+    for (let i = 0; i < W; i++) hs[j * W + i] = height(x0 + (i - 1) * cs, z0 + (j - 1) * cs);
+    if (j % 5 === 4) yield;
   }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  if (textured) geo.setAttribute('splat', new THREE.BufferAttribute(splat, 4));
-  geo.computeVertexNormals();
-  bakeHeights(p);
-  const terrain = new THREE.Mesh(geo, weatherize(groundDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }), textured), 'std'));
-  terrain.receiveShadow = true;
-  terrain.castShadow = true;
-  scene.add(terrain);
-  world.terrain = terrain;
+  let lo = Infinity, hi = -Infinity;
+  for (let j = 0; j < V; j++) {
+    for (let i = 0; i < V; i++) {
+      const k = j * V + i, o = (j + 1) * W + i + 1, h = hs[o], x = x0 + i * cs, z = z0 + j * cs;
+      const dx = hs[o + 1] - hs[o - 1], dz = hs[o + W] - hs[o - W], slope = Math.hypot(dx, dz) / (2 * cs);
+      const nl = 1 / Math.hypot(dx, 2 * cs, dz);
+      pos[k * 3] = i * cs; pos[k * 3 + 1] = h; pos[k * 3 + 2] = j * cs;
+      nrm[k * 3] = -dx * nl; nrm[k * 3 + 1] = 2 * cs * nl; nrm[k * 3 + 2] = -dz * nl;
+      hOut[k] = h;
+      if (h < lo) lo = h;
+      if (h > hi) hi = h;
+      c.copy(g1).lerp(g2, smooth(0.35, 0.7, fbm(x * 0.05 + 11, z * 0.05 - 3)));
+      c.lerp(g3, smooth(0.5, 0.75, fbm(x * 0.11 - 5, z * 0.11 + 8)) * 0.6);
+      const lt = lakeT(x, z);
+      const wSand = 1 - smooth(1.02, 1.16, lt), wBed = smooth(0.05, -0.8, h), wDirt = lt < 2.2 ? pathAmt(x, z) * 0.9 : 0;
+      const wRock = rockAmt(h, slope) * 0.85, wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6;
+      if (textured) {
+        // the grass patches become a tint around 1 (the texture brings the colour); weights go apart
+        // keep only a little of the patch hue, and its brightness relative to the average green
+        const L = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+        c.setRGB(1 + (c.r / L - 1) * 0.25, 1 + (c.g / L - 1) * 0.25, 1 + (c.b / L - 1) * 0.25).multiplyScalar(L / 0.32 * 0.88).lerp(MOSS_TINT, wMoss);
+        spl[k * 4] = wSand; spl[k * 4 + 1] = wBed; spl[k * 4 + 2] = wDirt; spl[k * 4 + 3] = wRock;
+      } else {
+        c.lerp(sand, wSand).lerp(bed, wBed).lerp(dirt, wDirt).lerp(moss, wMoss).lerp(rock, wRock);
+      }
+      cols[k * 3] = c.r; cols[k * 3 + 1] = c.g; cols[k * 3 + 2] = c.b;
+    }
+    if (j % 4 === 3) yield;
+  }
+  // the skirt: each edge vertex again, lower down
+  const drop = cs * 2.5;
+  for (let e = 0; e < 4; e++) {
+    for (let k = 0; k < V; k++) {
+      const from = EDGE_OF[e](k), to = GRID + e * V + k;
+      for (let q = 0; q < 3; q++) { pos[to * 3 + q] = pos[from * 3 + q]; nrm[to * 3 + q] = nrm[from * 3 + q]; cols[to * 3 + q] = cols[from * 3 + q]; }
+      pos[to * 3 + 1] -= drop;
+      if (spl) for (let q = 0; q < 4; q++) spl[to * 4 + q] = spl[from * 4 + q];
+    }
+  }
+  const { geo, mesh } = part;
+  for (const name in geo.attributes) geo.attributes[name].needsUpdate = true;
+  geo.boundingSphere.center.set(s / 2, (lo - drop + hi) / 2, s / 2);
+  geo.boundingSphere.radius = Math.hypot(s / 2, s / 2, (hi - lo + drop) / 2);
+  mesh.position.set(x0, 0, z0);
+  mesh.updateMatrix();
+  mesh.castShadow = t.lv === 0;   // only the ground near you is inside the shadow square
+  t.part = part; t.built = true; t.queued = false;
+  if (t.lv === 0) fine.set(fineKey(t.ix, t.iz), t);
+  madeTotal++;
+}
+
+function release(t) {
+  if (t.part) { t.part.mesh.visible = false; pool.push(t.part); t.part = null; }
+  if (t.lv === 0) fine.delete(fineKey(t.ix, t.iz));
+  t.built = false;
+  tiles.delete(t.key);
+}
+
+/** Once a frame: choose which tiles are on show round (x, z), and queue the ones still to be made. */
+export function updateGround(x, z) {
+  frameNo++; camX = x; camZ = z;
+  const next = new Set(), was = shown;
+  shown = next;
+  const top = LEVELS - 1, s = tileSize(top), rx = Math.floor(x / s), rz = Math.floor(z / s);
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) select(tileAt(top, rx + dx, rz + dz));
+  was.forEach((t) => { if (!next.has(t) && t.part) t.part.mesh.visible = false; });
+  next.forEach((t) => { t.part.mesh.visible = true; });
+  // tiles nobody has asked about for a while go back to the pool (not the one being made)
+  if (frameNo % 30 === 0) tiles.forEach((t) => { if (t.used < frameNo - 90 && !t.queued) release(t); });
+}
+
+/** Spend up to `ms` milliseconds making queued tiles, nearest first. Returns how many are still to do. */
+export function pumpGround(ms) {
+  const until = performance.now() + ms;
+  for (;;) {
+    if (!job) {
+      // drop requests nobody wants any more, then take the nearest
+      for (let i = queue.length - 1; i >= 0; i--) if (queue[i].used < frameNo - 2 || !tiles.has(queue[i].key)) { queue[i].queued = false; queue.splice(i, 1); }
+      if (!queue.length) return 0;
+      let best = 0, bd = Infinity;
+      queue.forEach((t, i) => { const d = away(t) + t.lv * 0.01; if (d < bd) { bd = d; best = i; } });
+      job = fill(queue.splice(best, 1)[0]);
+    }
+    for (;;) {
+      if (job.next().done) { job = null; break; }
+      if (performance.now() >= until) return queue.length + 1;
+    }
+    if (performance.now() >= until) return queue.length + (job ? 1 : 0);
+  }
+}
+
+/** Make everything wanted round (x, z) right now (at load, and after being moved a long way). */
+export function settleGround(x, z) {
+  for (let i = 0; i < 12; i++) {
+    updateGround(x, z);
+    if (!pumpGround(Infinity) && i) break;
+  }
+  updateGround(x, z);
+}
+
+/** Height from the fine tile under a spot, read with the tile's own triangle split; NaN where none is loaded. */
+let lastFine = null;
+function sample(x, z) {
+  const s = TILE_N * CELL, ix = Math.floor(x / s), iz = Math.floor(z / s);
+  let t = lastFine;
+  if (!t || t.ix !== ix || t.iz !== iz || !t.built) { t = fine.get(fineKey(ix, iz)); if (!t) return NaN; lastFine = t; }
+  const fx = Math.min((x - ix * s) / CELL, TILE_N - 1e-6), fz = Math.min((z - iz * s) / CELL, TILE_N - 1e-6);
+  const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, h = t.part.h, a = j * V + i;
+  const ha = h[a], hb = h[a + 1], hc = h[a + V], hd = h[a + V + 1];
+  // each cell is split along the b–c diagonal
+  return u + v <= 1 ? ha + u * (hb - ha) + v * (hc - ha) : hd + (1 - u) * (hc - hd) + (1 - v) * (hb - hd);
+}
+
+/**
+ * For tests and the debug panel: what the ground is holding. `parts` is how many sets of tile
+ * buffers exist in all (on show, kept ready, or pooled): the number that must stop growing.
+ */
+export const groundStats = () => ({ tiles: tiles.size, shown: shown.size, pooled: pool.length, parts: partsMade, queued: queue.length + (job ? 1 : 0), fine: fine.size, made: madeTotal });
+
+/** Lay the first ground, round the starting spot. */
+export function buildGround(x, z) {
+  textured = !!(kit && kit.tex.grass_lush);
+  groundMat = weatherize(groundDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }), textured), 'std');
+  world.terrain = { material: groundMat };   // (the seasons tint the ground through this)
+  setGroundSampler(sample);
+  settleGround(x, z);
 }
 
 /**
@@ -72,7 +280,8 @@ function groundDetail(mat, textured) {
       vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;
       ${textured ? 'vSplat = splat;' : ''}`);
     sh.fragmentShader = 'varying vec3 vGround;\nuniform vec3 uCam;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
-      float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      // (wrapped first: far from the middle of the world the numbers get too big for sin() to scatter)
+      float gHash(vec2 p) { return fract(sin(dot(mod(p, 1024.0), vec2(127.1, 311.7))) * 43758.5453); }
       float gNoise(vec2 p) {
         vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), f.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), f.x), f.y);
@@ -134,7 +343,21 @@ function groundDetail(mat, textured) {
         diffuseColor.rgb *= 1.0 + shade;
         // sunlit patches lean yellow-green, shaded ones blue-green
         diffuseColor.rgb += vec3(0.025, 0.02, -0.02) * (broad - 0.5) * 2.0 * diffuseColor.g;
+        // snow lies on the high peaks all year, with a ragged lower edge
+        float capLine = 118.0 + (broad - 0.5) * 36.0 + (mid - 0.5) * 8.0;
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.93, 0.98), smoothstep(capLine, capLine + 14.0, vGround.y));
       }`);
+    // Haze: near you the ground fades into it like everything else, but never all the way, and
+    // beyond that it thickens only slowly, so hills and mountains kilometres off still stand
+    // as pale shapes against the sky (uHazeCap is 1 in fog, when they are lost).
+    sh.uniforms.uHazeCap = groundU.haze;
+    sh.fragmentShader = 'uniform float uHazeCap;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `
+      #ifdef USE_FOG
+        float gFar = 1.0 - exp(-length(vFogPos) / 3500.0);
+        float gFog = smoothstep(fogNear, fogFar, fogDepth) * uHazeCap + (1.0 - uHazeCap) * gFar;
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, meadowHaze(fogColor, fogGlow, vFogPos, fogSunView), gFog);
+      #endif
+      gl_FragColor.rgb = meadowGrade(gl_FragColor.rgb);`);
   };
   mat.customProgramCacheKey = () => 'ground' + (textured ? '-tex' : '');
   return mat;

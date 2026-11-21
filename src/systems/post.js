@@ -41,6 +41,8 @@ export function initPost(r, s, c) {
   const target = renderer.capabilities.isWebGL2
     ? new THREE.WebGLMultisampleRenderTarget(size.x, size.y, { format: THREE.RGBAFormat })
     : undefined;
+  // (a 24-bit depth buffer: the default for such a target is 16-bit, far too coarse for ground kilometres away)
+  if (target) target.depthTexture = new THREE.DepthTexture(size.x, size.y, THREE.UnsignedIntType);
   composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
   bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.6, 0.5, 0.82);

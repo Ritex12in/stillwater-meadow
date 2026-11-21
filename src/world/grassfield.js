@@ -2,36 +2,58 @@
 // near you and a coarser one further out. Each is one tuft shape drawn many times; the vertex
 // shader puts every copy on a grid that moves with the camera, at a spot jittered by a hash of
 // its *world* grid cell (so blades stay put as you walk), reads the ground height and whether
-// grass grows there from a small baked map, and sways it in the wind. Nothing per blade lives on
+// grass grows there from a small map of the ground round the camera, and sways it in the wind. Nothing per blade lives on
 // the CPU, and the blades are plain solid shapes (no cut-out textures), so they are cheap to draw.
 import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { smooth } from '../core/math.js';
-import { heightAt, lakeT, pathAmt, nearReserved, onDock, TERRAIN, BENCH_SPOT } from '../core/shape.js';
+import { heightAt, slopeAt, lakeT, pathAmt, nearReserved, onDock, BENCH_SPOT, SPAWN } from '../core/shape.js';
 import { weatherize, bothSides, timeU, windU, camU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { onShrineGround } from './shrine.js';
+import { rockAmt } from './terrain.js';
 
 /** Share of the tufts drawn (the grass-density setting). */
 export const grassU = { density: { value: 1 } };
 
-// ── the ground map: height and how grassy each spot is, on the terrain's own grid ──
-function groundMap() {
-  const n = TERRAIN.seg + 1, half = TERRAIN.size / 2, step = TERRAIN.size / TERRAIN.seg;
-  const data = new Float32Array(n * n * 4);
-  for (let iz = 0; iz < n; iz++) {
-    for (let ix = 0; ix < n; ix++) {
-      const x = -half + ix * step, z = -half + iz * step, h = heightAt(x, z), i = (iz * n + ix) * 4;
-      let g = smooth(1.12, 1.22, lakeT(x, z)) * (1 - smooth(0.15, 0.5, pathAmt(x, z))) * (1 - smooth(11, 16, h));
-      if (onDock(x, z) || nearReserved(x, z, 1.2) || Math.hypot(x - BENCH_SPOT.x, z - BENCH_SPOT.z) < 1.3 || onShrineGround(x, z)) g = 0;
-      data[i] = h; data[i + 1] = g;
+// ── the ground map: height and how grassy each spot is, on the ground's own 1.2 m grid ──
+// A window onto the endless ground, MAP_N texels square, that keeps itself round the camera: once
+// the camera has moved a few texels the window shifts, keeping what it already knows and working
+// out only the strip that has come into it.
+const MAP_N = 144, MAP_STEP = 1.2, MAP_SHIFT = 6;
+const mapU = { origin: { value: new THREE.Vector2() } };
+let mapTex = null, mapData = new Float32Array(MAP_N * MAP_N * 4), mapNext = new Float32Array(MAP_N * MAP_N * 4), mapIx = null, mapIz = 0;
+/** How well grass grows at a spot (0..1): not in the water, on the path, on rock, or where something stands. */
+function grassy(x, z, h) {
+  if (onDock(x, z) || nearReserved(x, z, 1.2) || Math.hypot(x - BENCH_SPOT.x, z - BENCH_SPOT.z) < 1.3 || onShrineGround(x, z)) return 0;
+  return smooth(1.12, 1.22, lakeT(x, z)) * (1 - smooth(0.15, 0.5, pathAmt(x, z))) * (1 - rockAmt(h, slopeAt(x, z)));
+}
+/** Keep the map round (cx, cz). Call once a frame; it only does work when the camera has moved on. */
+export function updateGrassMap(cx, cz) {
+  if (!mapTex) return;
+  const ix = Math.round(cx / MAP_STEP) - MAP_N / 2, iz = Math.round(cz / MAP_STEP) - MAP_N / 2;
+  const first = mapIx === null;
+  if (!first && Math.abs(ix - mapIx) < MAP_SHIFT && Math.abs(iz - mapIz) < MAP_SHIFT) return;
+  const dx = first ? MAP_N : ix - mapIx, dz = first ? MAP_N : iz - mapIz;
+  for (let j = 0; j < MAP_N; j++) {
+    for (let i = 0; i < MAP_N; i++) {
+      const o = (j * MAP_N + i) * 4, oi = i + dx, oj = j + dz;
+      if (oi >= 0 && oi < MAP_N && oj >= 0 && oj < MAP_N) { const q = (oj * MAP_N + oi) * 4; mapNext[o] = mapData[q]; mapNext[o + 1] = mapData[q + 1]; }
+      else { const x = (ix + i) * MAP_STEP, z = (iz + j) * MAP_STEP, h = heightAt(x, z); mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h); }
     }
   }
-  const t = new THREE.DataTexture(data, n, n, THREE.RGBAFormat, THREE.FloatType);
-  t.magFilter = t.minFilter = THREE.NearestFilter; // filtered by hand in the shader (float filtering isn't everywhere)
-  t.needsUpdate = true;
-  return t;
+  [mapData, mapNext] = [mapNext, mapData];
+  mapIx = ix; mapIz = iz;
+  mapU.origin.value.set(ix * MAP_STEP, iz * MAP_STEP);
+  mapTex.image.data = mapData;
+  mapTex.needsUpdate = true;
+}
+function groundMap() {
+  mapTex = new THREE.DataTexture(mapData, MAP_N, MAP_N, THREE.RGBAFormat, THREE.FloatType);
+  mapTex.magFilter = mapTex.minFilter = THREE.NearestFilter; // filtered by hand in the shader (float filtering isn't everywhere)
+  updateGrassMap(SPAWN.x, SPAWN.z);
+  return mapTex;
 }
 
 /** One tuft: three tapered, slightly curved blades fanned round the centre. y runs 0..1. */
@@ -61,19 +83,19 @@ function tuftGeo(blades, segs) {
 /** The material both fields share: a Lambert material whose vertex shader places the tufts. */
 function grassMaterial(map, tex) {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, map: tex || null });
-  const n = TERRAIN.seg + 1;
   mat.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, { tGround: { value: map }, uTime: timeU, uWind: windU, uCamG: camU });
+    Object.assign(sh.uniforms, { tGround: { value: map }, uMapOrigin: mapU.origin, uTime: timeU, uWind: windU, uCamG: camU });
     sh.vertexShader = `
-      uniform sampler2D tGround; uniform float uTime; uniform float uWind; uniform vec3 uCamG;
+      uniform sampler2D tGround; uniform vec2 uMapOrigin; uniform float uTime; uniform float uWind; uniform vec3 uCamG;
       uniform float uSpacing; uniform float uInner; uniform vec2 uFade; uniform float uScale; uniform float uDensity;
       attribute vec2 aCell;
       varying float vGust;
-      float gh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      // (the cell is wrapped first: far from the middle of the world the numbers get too big for sin() to scatter)
+      float gh(vec2 p) { return fract(sin(dot(mod(p, 512.0), vec2(127.1, 311.7))) * 43758.5453); }
       vec4 groundAt(vec2 p) {
-        vec2 f = (p + ${(TERRAIN.size / 2).toFixed(1)}) / ${(TERRAIN.size / TERRAIN.seg).toFixed(4)};
+        vec2 f = (p - uMapOrigin) / ${MAP_STEP.toFixed(4)};
         vec2 i = floor(f), u = f - i;
-        float px = 1.0 / ${n.toFixed(1)};
+        float px = 1.0 / ${MAP_N.toFixed(1)};
         vec4 a = texture2D(tGround, (i + vec2(0.5, 0.5)) * px), b = texture2D(tGround, (i + vec2(1.5, 0.5)) * px);
         vec4 c = texture2D(tGround, (i + vec2(0.5, 1.5)) * px), d = texture2D(tGround, (i + vec2(1.5, 1.5)) * px);
         return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);

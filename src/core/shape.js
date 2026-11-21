@@ -1,5 +1,7 @@
 // The shape of the world: terrain height, lakes, the path round a lake, the jetty, and where you
-// can walk.
+// can walk. The land has no edge: its height is a formula of the world's seed and a position,
+// so it can be worked out anywhere, in any order (the ground is drawn from it in tiles: see
+// world/terrain.js).
 //
 // Lakes and the places beside them are data, not constants: a lake is an object (makeLake) that
 // knows its own outline, and the jetty, campfire, bench, chairs and starting spot are worked out
@@ -7,11 +9,21 @@
 // lake nearest that spot (lakeAt), so the same code holds for one lake or many. For now there is
 // one: HOME, the valley's own. The older single-lake names (LAKE, lakeR, lakePoint, SPAWN,
 // dockStart, ...) still stand for that lake and its places.
-import { smooth, fbm } from './math.js';
+import { smooth, fbm, mulberry32 } from './math.js';
 import { seasonState } from './state.js';
+import { query } from './env.js';
 
 export const PATH_T = 1.32;       // the path runs round a lake at this many lake-radii
-export const WORLD_LIMIT = 118;
+export const WORLD_LIMIT = 118;   // how far from the middle the valley's own trees and flowers are planted (you can walk on past it)
+
+// ── The world's seed ───────────────────────────────────────────
+// One number decides the whole landscape (`?seed=7` in the address picks another). It shifts where
+// in the endless noise the land is read from. The first world, seed 1, reads from the start, which
+// leaves the meadow round the home lake as it was first made.
+const DEFAULT_SEED = 1;
+export const WORLD = { seed: Math.max(1, Math.floor(Math.abs(Number(query.get('seed')) || DEFAULT_SEED))) };
+const shift = mulberry32(WORLD.seed * 7919 + 101);
+const SX = WORLD.seed === DEFAULT_SEED ? 0 : Math.floor(shift() * 9000) + 0.37, SZ = WORLD.seed === DEFAULT_SEED ? 0 : Math.floor(shift() * 9000) + 0.61;
 
 // ── Lakes ──────────────────────────────────────────────────────
 /**
@@ -53,44 +65,52 @@ export const LAKE = HOME;
 export const lakeR = HOME.r;
 
 // ── Terrain ────────────────────────────────────────────────────
-/** The lie of the land before any lake is cut into it: rolling meadow, rising to hills round the valley. */
-function land(x, z) {
-  const d = Math.hypot(x, z);
-  let base = 0.6 + fbm(x * 0.018 + 3.1, z * 0.018 - 7.4) * 7.5;
-  base += smooth(85, 150, d) * (16 + fbm(x * 0.045, z * 0.045) * 24);
-  return base;
+/**
+ * The lie of the land before any lake is cut into it. Three layers: the gentle meadow underfoot;
+ * broad rolling hills; and, in some regions, mountains with long sharp ridges. The hills and
+ * mountains are held back round a lake (`t` is how far out the spot is, in lake-radii), so every
+ * lake lies in its own valley. Never below 0.6 m: the only water is the lakes.
+ */
+function land(x, z, t) {
+  const u = x + SX * 31, v = z + SZ * 31;
+  const meadow = 0.6 + fbm(u * 0.018 + 3.1, v * 0.018 - 7.4) * 7.5;
+  const open = smooth(2.4, 7.5, t);
+  if (open <= 0) return meadow;
+  const hills = fbm(u * 0.0055 - 9.2, v * 0.0055 + 23.6);
+  let rise = hills * hills * 46;
+  const range = smooth(0.5, 0.72, fbm(u * 0.0014 + 41.3, v * 0.0014 - 17.9)); // where the mountains stand
+  if (range > 0) {
+    const crest = 1 - Math.abs(2 * fbm(u * 0.0038 + 71.1, v * 0.0038 + 5.5) - 1); // ridged: sharp along the tops
+    rise += range * (28 + crest * crest * 205 + fbm(u * 0.021 - 3.3, v * 0.021 + 8.8) * 24 * range);
+  }
+  return meadow + open * rise;
 }
-/** Exact analytic terrain height: the land, with the nearest lake's bowl and path cut in. Used to build the terrain mesh. */
+/** Exact terrain height: the land, with the nearest lake's bowl and path cut in. The ground's tiles are built from it. */
 export function height(x, z) {
-  const base = land(x, z);
   const lake = lakeAt(x, z), t = lake.t(x, z);
+  const base = land(x, z, t);
   const floor = t < 1 ? -3.2 * (1 - t * t) : (t - 1) * 2.0;
   const k = smooth(0.8, 1.6, t);
   return floor * (1 - k) + base * k - lake.path(x, z) * 0.08;
 }
 
-// ── Baked height field ─────────────────────────────────────────
-// After the terrain mesh is built we keep its vertex heights and sample them with the same
-// triangle split the mesh uses. Feet and paws then sit exactly on the rendered surface, and a
-// lookup costs a few multiplies instead of eight noise evaluations.
-export const TERRAIN = { size: 360, seg: 300 };
-let baked = null;
-export function bakeHeights(positionAttr) {
-  const n = TERRAIN.seg + 1;
-  baked = new Float32Array(n * n);
-  // PlaneGeometry rotated -90° about X: vertex index = iz * n + ix, x and z both increase with index
-  for (let i = 0; i < positionAttr.count; i++) baked[i] = positionAttr.getY(i);
-}
-/** Height of the rendered ground. Falls back to the analytic height outside the mesh or before baking. */
+// ── The ground as drawn ────────────────────────────────────────
+// The ground is drawn in tiles; where a fine tile is loaded, heights are read from its own
+// vertices (with the same triangle split), so feet and paws sit exactly on the surface you see and
+// a lookup costs a few multiplies instead of several noise evaluations. Anywhere else the exact
+// formula answers, so every question about the land works whether or not that land is on screen.
+let sampler = null;
+/** The ground hands over its lookup: (x, z) -> height, or NaN where no fine tile is loaded. */
+export function setGroundSampler(fn) { sampler = fn; }
+/** Height of the ground at a spot. */
 export function heightAt(x, z) {
-  if (!baked) return height(x, z);
-  const half = TERRAIN.size / 2, step = TERRAIN.size / TERRAIN.seg, n = TERRAIN.seg + 1;
-  const fx = (x + half) / step, fz = (z + half) / step;
-  if (fx < 0 || fz < 0 || fx >= TERRAIN.seg || fz >= TERRAIN.seg) return height(x, z);
-  const ix = Math.floor(fx), iz = Math.floor(fz), u = fx - ix, v = fz - iz;
-  const ha = baked[iz * n + ix], hd = baked[iz * n + ix + 1], hb = baked[(iz + 1) * n + ix], hc = baked[(iz + 1) * n + ix + 1];
-  // the plane splits each cell along the b–d diagonal
-  return u + v <= 1 ? ha + u * (hd - ha) + v * (hb - ha) : hc + (1 - u) * (hb - hc) + (1 - v) * (hd - hc);
+  if (sampler) { const h = sampler(x, z); if (h === h) return h; }
+  return height(x, z);
+}
+/** How steep the ground is at a spot (rise over run: 1 is a 45 degree slope). */
+export function slopeAt(x, z) {
+  const e = 0.6;
+  return Math.hypot(heightAt(x + e, z) - heightAt(x - e, z), heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e);
 }
 
 export const lakePoint = HOME.point;
@@ -135,22 +155,35 @@ export const dockAt = (s, w) => ({ x: dockStart.x + dockDir.x * s + dockDir.z * 
 export const onIce = (x, z) => seasonState.ice > 0.85 && lakeT(x, z) < 1.0 && heightAt(x, z) < 0.3;
 export const ICE_Y = 0.09;
 export const groundAt = (x, z) => (onDock(x, z) ? Math.max(DOCK_Y + 0.05, heightAt(x, z)) : onIce(x, z) ? Math.max(heightAt(x, z), ICE_Y) : heightAt(x, z));
+export const MAX_SLOPE = 1.25;    // steeper than this (about 51 degrees) is a cliff, not a hillside
+/** Anywhere that is dry land and not too steep to climb (or the jetty, or solid ice). */
 export function walkable(x, z) {
   if (onDock(x, z) || onIce(x, z)) return true;
-  if (Math.hypot(x, z) > WORLD_LIMIT) return false;
-  const h = heightAt(x, z);
-  return h > 0.22 && h < 18;
+  return heightAt(x, z) > 0.22 && slopeAt(x, z) < MAX_SLOPE;
 }
 export const animalWalkable = (x, z) => onDock(x, z) || (walkable(x, z) && !onIce(x, z) && heightAt(x, z) > 0.35);
 
-/** Nearest walkable spot going outward from the centre of the lake you are on: used to rescue someone on thawing ice. */
+/**
+ * Somewhere to stand, for someone who is where they can't: out over water (the ice just thawed),
+ * the nearest shore going outward from the lake's centre; up on a cliff, the nearest gentler ground.
+ */
 export function nearestShore(x, z) {
-  const lake = lakeAt(x, z), a = Math.atan2(z - lake.z, x - lake.x);
-  for (let t = Math.max(lake.t(x, z), 0.5); t < 1.8; t += 0.02) {
-    const p = lake.point(a, t);
-    if (walkable(p.x, p.z) && !onIce(p.x, p.z)) return p;
+  const lake = lakeAt(x, z);
+  if (lake.t(x, z) < 1.4) {
+    const a = Math.atan2(z - lake.z, x - lake.x);
+    for (let t = Math.max(lake.t(x, z), 0.5); t < 1.8; t += 0.02) {
+      const p = lake.point(a, t);
+      if (walkable(p.x, p.z) && !onIce(p.x, p.z)) return p;
+    }
+    return lake.point(a, 1.3);
   }
-  return lake.point(a, 1.3);
+  for (let r = 1.5; r < 60; r += 1.5) {
+    for (let k = 0; k < 16; k++) {
+      const a = k / 16 * Math.PI * 2 + r, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+      if (walkable(px, pz)) return { x: px, z: pz };
+    }
+  }
+  return { x, z };
 }
 
 /** First point straight ahead (dir = {x, z}) that is open water, trying several distances. */

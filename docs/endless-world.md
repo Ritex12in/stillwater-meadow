@@ -27,7 +27,8 @@ Each one leaves the game playable and tested.
 | # | Milestone | Done when | State |
 |---|---|---|---|
 | 1 | **Prepare the code.** Lakes and the places beside them become data that code asks for by position, instead of constants. | The world is bit-for-bit the same (`tools/fingerprint.mjs`) and every test passes. | done |
-| 2 | **Endless ground.** Terrain in tiles around the player from a world seed; plants grown per tile; the mountain ring replaced by real far terrain; the walk limit removed. | Walking 2 km out and back causes no stutter and no growth in memory or draw calls. | next |
+| 2a | **Endless ground.** Land from a world seed (`?seed=`), drawn in tiles round the camera at five sizes; the painted mountain ring replaced by real far terrain; grass, clouds and birds follow the player; the walk limit removed (steep slopes block instead). The valley's own trees and flowers still stand where they did. | Tile buffers stop growing over repeated 2 km trips (`tests/world.spec.js`); same seed, same land. Smoothness still needs a look on a real GPU. | done |
+| 2b | **Plants per tile.** Trees, rocks, flowers and undergrowth grown on each tile from its own seed and removed behind the player; the valley's build-once plants retired. | Walking 2 km out and back leaves instanced-mesh and geometry counts where they were. | next |
 | 3 | **Biomes.** Meadow, forest, hills, mountains and snow, blending into each other. | |
 | 4 | **Lakes and landmarks everywhere.** The fixed home goes. | |
 | 5 | **Travelling.** Companions keep up; the save holds seed and position; a way to find places again. | |
@@ -59,19 +60,23 @@ Each one leaves the game playable and tested.
 
 Found while preparing milestone 1; each line is work for the milestone named.
 
-**Centred on the origin (milestone 2)**
-- `core/shape.js` `land()`: hills rise with distance from (0, 0).
-- `core/shape.js` `walkable()`: `WORLD_LIMIT` and the 18 m height cap.
+**Centred on the origin (milestone 2b)**
 - `world/vegetation.js`: tree density by distance from the origin; flower drifts inside the limit.
 - `world/kitplants.js`, `world/wildflowers.js`, `world/shrine.js`, `world/farforest.js`: placement
   loops bounded by distance from the origin.
 
-**One piece of ground (milestone 2)**
-- `world/terrain.js`: a single 360 m mesh.
-- `core/shape.js` `bakeHeights`/`heightAt`: one baked height grid.
-- `world/grassfield.js`: the grass reads height and "grass grows here" from one map on that grid.
-- Everything in `main.js` "Build the world" runs once, in an order that fixes every position.
-- `world/mountains.js` and the distant cards in `world/farforest.js`: a painted ring round the valley.
+**Built once (milestone 2b)**
+- Everything planted in `main.js` "Build the world" runs once, in an order that fixes every
+  position, from the shared layout stream.
+- `world/farforest.js`: tree cards on the hills just outside the old valley.
+- The helpers in `core/materials.js` (`instancedChunks`, `lodSet`) add meshes that are never
+  removed; streaming needs versions that hand back something disposable (or pooled).
+
+**Far from the origin (milestone 5)**
+- Shader hashes are wrapped (`mod`) in the ground and grass so they stay random far out; the wind
+  hash in `addWind` (`core/materials.js`) is not yet.
+- Ground textures are sampled by world position: about 20 km out their coordinates lose precision.
+  If that shows, re-centre the world on the player.
 
 **One lake (milestone 4)**
 - `world/water.js`: one disc of radius 48 at the home lake.
@@ -95,6 +100,21 @@ strike), pet an animal, throw bread and fish, carry a bouquet, hold hands and wa
 changing facial expressions, winter clothes, hair and a backpack that lag behind the body.
 An imported model only has the animations its pack ships, so some of these will be simplified
 or dropped once a pack is chosen.
+
+## How the ground works (milestone 2a)
+
+- `core/shape.js` `height(x, z)` is the land: meadow, rolling hills and mountain ranges from noise
+  shifted by the seed, held back in a basin round each lake, with the lake's bowl and path cut in.
+  `heightAt` reads the drawn tiles where they are loaded and falls back to the formula, so game
+  logic is right whether or not that ground is on screen (the tests tick without drawing frames).
+- `world/terrain.js` keeps a quadtree of tiles round the camera: 48 x 48 cells each, 57.6 m wide
+  at the finest (1.2 m cells) and doubling four times to 921.6 m. `updateGround` picks what shows;
+  `pumpGround(ms)` makes queued tiles nearest first within a time budget; `settleGround` makes
+  everything now (at load). Buffers are pooled. `window.__meadow.ground` exposes these to tests.
+- The ground has its own haze (`groundU.haze`): it never fades out completely, so far mountains
+  show as pale shapes; fog, rain and snow push it back to full.
+- `world/grassfield.js` keeps a 144 x 144 map of height and "grass grows here" round the camera
+  and shifts it as the camera moves.
 
 ## Tools
 

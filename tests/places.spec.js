@@ -113,6 +113,7 @@ test('each place keeps its own: a bouquet left on one bench is not on another, a
     await teleport(page, f.x + 0.4, f.z);
     await press(page, 'KeyG', 0.8);
   }
+  expect(await page.evaluate(() => window.__meadow.pack.tie()), 'tied into a bouquet in the backpack').toBe(true);
   const b = await page.evaluate(() => window.__meadow.geo.bench());
   await teleport(page, b.x + Math.sin(b.rot) * 1.3, b.z + Math.cos(b.rot) * 1.3);
   await press(page, 'KeyG', 0.3);

@@ -1,4 +1,5 @@
-// Pick flowers (G), carry a bouquet, give it to the skipper or leave it on the bench.
+// Pick flowers (G): they go into your backpack. Tie some into a bouquet there, hold it, and give
+// it to the skipper or your friend, or leave it on the bench.
 // Flowers grow wherever the land says (world/wilds.js, square by square); the ones near you are
 // kept here. Picked flowers grow back after a few minutes; there are fewer in autumn and none in winter.
 import * as THREE from 'three';
@@ -15,8 +16,12 @@ import { hasRod, judgeBouquet, nearSkipper, giveRod } from './rod.js';
 import { friendNear, giftFriend } from './friend.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
-import { store, saveSoon, onSave } from '../systems/save.js';
+import { store } from '../systems/save.js';
 import { toast } from '../ui/hud.js';
+import { itemKind, add, addItem, take, removeItem, held, hold, has, units, packSlots, onPack, roomFor } from '../systems/pack.js';
+import { packActions } from '../ui/backpack.js';
+import { ICONS } from '../ui/icons.js';
+import { flowerName } from '../world/vegetation.js';
 
 const MAX = 12, REGROW = 240;
 let debugView = () => [];
@@ -50,6 +55,17 @@ function buildBouquet(colors) {
   return g;
 }
 
+itemKind('flower', {
+  name: (it) => flowerName(it.key), max: 32,
+  icon: (it) => ICONS.flower(it.list && it.list.length ? it.list[it.list.length - 1] : undefined),
+  detail: (it) => `${it.n} picked. Put some aside and tie them into a bouquet.`,
+});
+itemKind('bouquet', {
+  name: 'Bouquet', holdable: true,
+  icon: (it) => ICONS.bouquet(it.list.map((f) => String(f).split(':')[0])),
+  detail: (it) => { const kinds = new Set(it.list.map((f) => String(f).split(':')[1])).size; return `${it.list.length} ${it.list.length === 1 ? 'flower' : 'flowers'} of ${kinds} ${kinds === 1 ? 'kind' : 'kinds'}. Hold it to give it: G by the skipper, your friend or the bench.`; },
+});
+
 export function initFlowers() {
   // `items`: the flowers of the squares near you (they change as you walk); `shown`: those of them
   // standing just now. A picked flower is remembered by its name until it has grown back, so it
@@ -73,16 +89,73 @@ export function initFlowers() {
   };
   redraw();
 
-  let bouquet = Array.isArray(store.bouquet) ? store.bouquet.slice(0, MAX) : [];
-  let inHand = null;
+  // a bouquet carried in the hand before the backpack (an older save) is a bouquet in the backpack, held
+  if (Array.isArray(store.bouquet)) { const old = store.bouquet.slice(0, MAX); delete store.bouquet; if (old.length) { const b = addItem({ type: 'bouquet', list: old }); if (b) hold(b.uid); } }
+  /** The bouquet you would give: the one in your hand, else the first in the backpack. */
+  const giving = () => { const h = held(); return h && h.type === 'bouquet' ? h : packSlots().find((it) => it && it.type === 'bouquet') || null; };
+  /** Give the bouquet away (out of the backpack): returns its flowers. */
+  const handOver = () => { const b = giving(); if (!b) return []; removeItem(b.uid); return b.list.slice(); };
+  // the held bouquet is in the figure's hand
+  let inHand = null, inHandUid = null;
   const rebuildHand = () => {
+    const h = held(), want = h && h.type === 'bouquet' ? h : null;
+    if ((want ? want.uid : null) === inHandUid) return;
     if (inHand) hero.arms[1].remove(inHand);
-    inHand = bouquet.length ? buildBouquet(bouquet) : null;
+    inHand = want ? buildBouquet(want.list) : null;
+    inHandUid = want ? want.uid : null;
     if (inHand) { inHand.position.set(0, -hero.dims.arm + 0.03, 0.03); inHand.scale.setScalar(0.8); inHand.rotation.order = 'ZYX'; hero.arms[1].add(inHand); }
-    store.bouquet = bouquet.slice();
-    saveSoon();
   };
+  onPack(rebuildHand);
   rebuildHand();
+
+  // ── tying a bouquet in the backpack ──
+  // Flowers are put on one side, one at a time or a mixed handful, then tied (up to MAX of them).
+  // Those put aside stay in the backpack until the bouquet is tied, so nothing is lost if you stop.
+  let aside = []; // [{ key, unit }]: which flowers, by kind and colour
+  const asideOf = (key) => aside.filter((a) => a.key === key).length;
+  const putAside = (key) => {
+    if (aside.length >= MAX) return;
+    const left = units('flower').filter((u) => u.key === key).map((u) => u.unit);
+    const used = aside.filter((a) => a.key === key).map((a) => a.unit);
+    for (const u of used) { const i = left.indexOf(u); if (i >= 0) left.splice(i, 1); }
+    if (left.length) aside.push({ key, unit: left[left.length - 1] });
+  };
+  /** A mixed handful: one of each kind in turn until the bouquet is full or the flowers run out. */
+  const mixAside = () => {
+    const keys = [...new Set(units('flower').map((u) => u.key))];
+    for (let round = 0; aside.length < MAX && round < MAX; round++) for (const k of keys) { if (aside.length >= MAX) break; const before = aside.length; putAside(k); if (aside.length === before) continue; }
+  };
+  /** Tie what is put aside into a bouquet, and hold it. False if there is nothing, or no room. */
+  const tie = () => {
+    if (!aside.length) return false;
+    // (there must be a slot for it once the flowers are out: an empty one, or a stack the flowers empty)
+    const empties = packSlots().some((it) => !it) || packSlots().some((it) => it && it.type === 'flower' && it.n === asideOf(it.key));
+    if (!empties) { toast('No room in your backpack for a bouquet.'); return false; }
+    const flowers = [];
+    for (const a of aside) { const t = take('flower', a.key, (list) => list.lastIndexOf(a.unit)); if (t) flowers.push(t.unit + ':' + t.key); }
+    aside = [];
+    const b = addItem({ type: 'bouquet', list: flowers });
+    if (!b) { for (const f of flowers) { const [c, k] = f.split(':'); add('flower', Number(k), c); } return false; }
+    hold(b.uid);
+    toast(`You tie ${flowers.length} ${flowers.length === 1 ? 'flower' : 'flowers'} into a bouquet. You hold it now: give it with G.`, 4);
+    return true;
+  };
+  /** Take a bouquet apart: its flowers go back in the backpack (if they fit). */
+  const untie = (b) => {
+    removeItem(b.uid);
+    for (const f of b.list) { const [c, k] = String(f).split(':'); if (!add('flower', Number(k), c)) { addItem({ type: 'bouquet', list: b.list.slice(b.list.indexOf(f)) }); break; } }
+  };
+  world.tieBouquet = (keys) => { aside = []; if (keys) keys.forEach(putAside); else mixAside(); return tie(); }; // (for tests)
+  packActions((it) => {
+    if (it.type === 'flower') {
+      const out = [{ label: `Put one aside (${aside.length}/${MAX})`, disabled: aside.length >= MAX || asideOf(it.key) >= it.n, run: () => putAside(it.key) }];
+      if (aside.length) out.push({ label: `Tie a bouquet of ${aside.length}`, primary: true, run: tie }, { label: 'Put them back', run: () => { aside = []; } });
+      else out.push({ label: 'Tie a mixed bouquet', primary: true, run: () => { mixAside(); tie(); } });
+      return out;
+    }
+    if (it.type === 'bouquet') return [{ label: 'Untie', run: () => untie(it) }];
+    return [];
+  });
 
   let onBench = null, onBoat = null;
   const benchSeat = seats.find((s) => s.name === 'bench');
@@ -116,7 +189,6 @@ export function initFlowers() {
   };
   if (store.benchBouquet) placeOnBench(store.benchBouquet);
   if (store.boatBouquet) placeOnBoat(store.boatBouquet);
-  onSave((s) => { s.bouquet = bouquet.slice(); });
 
   const nearBench = () => benchSeat && Math.hypot(benchSeat.x - player.x, benchSeat.z - player.z) < 2.3;
   const scan = () => {
@@ -131,57 +203,66 @@ export function initFlowers() {
 
   registerAction({
     id: 'give-friend', key: 'KeyG', keyLabel: 'G', score: () => 9,
-    available: () => activity.free && bouquet.length && friendNear(2.6),
+    available: () => activity.free && !!giving() && friendNear(2.6),
     label: () => 'Give her the bouquet',
-    run: () => { giftFriend(bouquet.slice()); bouquet = []; rebuildHand(); player.pickT = 0.6; },
+    run: () => { giftFriend(handOver()); player.pickT = 0.6; },
   });
   registerAction({
     id: 'give-skipper', key: 'KeyG', keyLabel: 'G', score: () => 10,
-    available: () => activity.free && bouquet.length && nearSkipper(),
+    available: () => activity.free && !!giving() && nearSkipper(),
     label: () => (hasRod() ? 'Give the bouquet to the skipper' : 'Offer the bouquet for the fishing rod'),
     run: () => {
       if (!hasRod()) {
         // without a rod, the bouquet is a trade: he only takes a proper one
-        const v = judgeBouquet(bouquet);
+        const v = judgeBouquet(giving().list);
         if (!v.ok) { sk.nod = 0.5; toast(`The skipper: ${v.why}`, 5); return; }
-        placeOnBoat(bouquet);
-        store.boatBouquet = bouquet.slice();
-        bouquet = []; rebuildHand();
+        const b = handOver(); // (paid before the rod goes in, so there is room for it)
+        placeOnBoat(b);
+        store.boatBouquet = b;
         giveRod('bouquet');
         return;
       }
-      placeOnBoat(bouquet);
-      store.boatBouquet = bouquet.slice();
+      const b = handOver();
+      placeOnBoat(b);
+      store.boatBouquet = b;
       sk.nod = 0.9; sk.waveT = 1.6;
       toast('The skipper smiles and tucks your bouquet into the bow of the boat.');
-      bouquet = []; rebuildHand();
     },
   });
   registerAction({
     id: 'leave-bench', key: 'KeyG', keyLabel: 'G', score: () => 9,
-    available: () => activity.free && bouquet.length && nearBench(),
+    available: () => activity.free && !!giving() && nearBench(),
     label: () => 'Leave the bouquet on the bench',
     run: () => {
-      placeOnBench(bouquet);
-      store.benchBouquet = bouquet.slice();
+      const b = handOver();
+      placeOnBench(b);
+      store.benchBouquet = b;
       toast('You leave the bouquet on the bench.');
-      bouquet = []; rebuildHand();
     },
+  });
+  // with flowers but no bouquet, where one could be given: say how to make one
+  registerAction({
+    id: 'tie-hint', key: 'KeyG', keyLabel: 'G', score: () => -4,
+    available: () => activity.free && !giving() && has('flower') && (nearSkipper() || friendNear(2.6) || nearBench()),
+    disabled: () => true,
+    label: () => 'Tie your flowers into a bouquet first (backpack, I)',
+    run: () => {},
   });
   registerAction({
     id: 'pick', key: 'KeyG', keyLabel: 'G', score: () => (nearDist < 0.7 ? 20 : 0), // standing on a flower picks it
-    available: () => activity.free && bouquet.length < MAX && !!nearFlower,
-    label: () => `Pick a flower${bouquet.length ? ` (${bouquet.length}/${MAX})` : ''}`,
+    available: () => activity.free && !!nearFlower,
+    disabled: () => !!nearFlower && !roomFor('flower', nearFlower.kind),
+    label: () => (nearFlower && !roomFor('flower', nearFlower.kind) ? 'Backpack is full' : 'Pick a flower'),
     run: () => {
       const f = nearFlower;
-      if (!f) return;
+      if (!f || !add('flower', f.kind, '#' + f.color.getHexString())) return;
       picked.set(f.id, clock.elapsed);
       redraw();
-      bouquet.push('#' + f.color.getHexString() + ':' + f.kind);
-      rebuildHand();
       player.pickT = 0.6;
-      if (bouquet.length === 1) toast(hasRod() ? 'Picked a flower. Gather more, then give the bouquet to the skipper or leave it on the bench.' : 'Picked a flower. A full bouquet of three kinds or more could win you the skipper\'s fishing rod.', 4.5);
-      if (bouquet.length === MAX) toast('Your hands are full of flowers.');
+      if (!store.pickedOnce) {
+        store.pickedOnce = true;
+        toast(hasRod() ? 'Picked a flower: it is in your backpack (I). Tie flowers into a bouquet there to give one away.' : 'Picked a flower: it is in your backpack (I). Tie a bouquet of 12, of three kinds or more, and the skipper may trade you his fishing rod.', 6);
+      }
       scan();
     },
   });

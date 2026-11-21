@@ -75,6 +75,7 @@ test('the skipper trades his rod for a full bouquet of three kinds, not before',
     await teleport(page, f.x + 0.4, f.z);
     await press(page, 'KeyG', 0.7);
   }
+  expect(await page.evaluate(() => window.__meadow.pack.tie()), 'tied into a bouquet in the backpack').toBe(true);
   const bp = await page.evaluate(() => window.__meadow.BOARD_POINT);
   await teleport(page, bp.x, bp.z);
   await press(page, 'KeyG', 0.5);
@@ -111,7 +112,8 @@ test('flowers: pick a few and leave the bouquet on the bench', async ({ page }) 
     await teleport(page, f.x + 0.4, f.z);
     await press(page, 'KeyG', 0.8);
   }
-  expect((await page.evaluate(() => window.__meadow.store.bouquet)).length, 'flowers in hand').toBe(3);
+  expect(await page.evaluate(() => window.__meadow.pack.count('flower')), 'flowers in the backpack').toBe(3);
+  expect(await page.evaluate(() => window.__meadow.pack.tie()), 'tied into a bouquet in the backpack').toBe(true);
   const b = await page.evaluate(() => window.__meadow.geo.bench());
   await teleport(page, b.x + Math.sin(b.rot) * 1.3, b.z + Math.cos(b.rot) * 1.3);
   await press(page, 'KeyG', 0.3);

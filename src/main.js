@@ -360,7 +360,7 @@ window.__meadow = {
   seed: WORLD.seed,
   backpack: backpackView,
   /** The backpack's contents and the ways to change them (systems/pack.js). */
-  pack: { view: pack.packView, add: pack.add, addItem: pack.addItem, take: pack.take, count: pack.count, hold: pack.hold, held: pack.held, fish: () => pack.units('fish').map((u) => ({ id: u.key, cm: u.unit })) },
+  pack: { view: pack.packView, add: pack.add, addItem: pack.addItem, take: pack.take, count: pack.count, hold: pack.hold, held: pack.held, fish: () => pack.units('fish').map((u) => ({ id: u.key, cm: u.unit })), tie: (kinds) => world.tieBouquet(kinds) },
   compass: compassView,
   /** The home lake's middle, and where you first arrive beside it. */
   home: { x: HOME.x, z: HOME.z, r: HOME.R0, rmax: HOME.rmax }, spawn: { x: SPAWN.x, z: SPAWN.z },

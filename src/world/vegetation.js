@@ -100,12 +100,18 @@ export function buildGrass() {
  * daisy, tulip, poppy, lavender, allium; `colour` is what a picked one adds to the bouquet.
  */
 const MEADOW_FLOWERS = [
-  { model: 'Flower_2_Clump', colour: col('#f3d36a') },  // yellow cosmos
-  { model: 'Flower_4_Clump', colour: col('#f3a6c4') },  // pink cosmos
-  { model: 'Flower_3_Clump', colour: col('#56c3d6') },  // cyan bloom
-  { model: 'Flower_5_Clump', colour: col('#b98ae6') },  // violet iris
-  { model: 'Flower_1_Clump', colour: col('#4aa9d0') },  // blue hydrangea
+  { model: 'Flower_2_Clump', colour: col('#f3d36a'), name: 'Yellow cosmos' },
+  { model: 'Flower_4_Clump', colour: col('#f3a6c4'), name: 'Pink cosmos' },
+  { model: 'Flower_3_Clump', colour: col('#56c3d6'), name: 'Cyan bloom' },
+  { model: 'Flower_5_Clump', colour: col('#b98ae6'), name: 'Violet iris' },
+  { model: 'Flower_1_Clump', colour: col('#4aa9d0'), name: 'Blue hydrangea' },
 ];
+const HAND_BUILT = ['Daisy', 'Tulip', 'Poppy', 'Lavender', 'Allium'], KIT_NAMES = { 5: 'Cup flower', 6: 'Yellow bells' };
+/** The name of a kind of flower you can pick (as it is drawn in this game: with or without the nature models). */
+export function flowerName(kind) {
+  if (KIT_NAMES[kind]) return KIT_NAMES[kind];
+  return (hasMeadow() && MEADOW_FLOWERS[kind] ? MEADOW_FLOWERS[kind].name : HAND_BUILT[kind]) || 'Flower';
+}
 const hasMeadow = () => !!(kit && kit.models.Flower_1_Clump);
 function meadowFlowerGeos() {
   return MEADOW_FLOWERS.map(({ model }) => {

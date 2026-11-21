@@ -120,7 +120,7 @@ test('name tags are drawn in the scene, so things in front can hide them', async
   noErrors(errors);
 });
 
-test('the save keeps time, weather and the bouquet in hand across a reload', async ({ page }) => {
+test('the save keeps time, weather and the flowers you picked across a reload', async ({ page }) => {
   const errors = await open(page, '', '');
   await step(page, 0.5);
   for (let k = 0; k < 2; k++) {
@@ -132,11 +132,11 @@ test('the save keeps time, weather and the bouquet in hand across a reload', asy
   await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   await page.reload();
   await page.waitForFunction(() => window.__meadow && window.__meadow.player);
-  const s = await page.evaluate(() => ({ live: window.__meadow.timeCtl.live, target: window.__meadow.timeCtl.target, wx: window.__meadow.wx.type, auto: window.__meadow.wx.auto, bouquet: window.__meadow.store.bouquet }));
+  const s = await page.evaluate(() => ({ live: window.__meadow.timeCtl.live, target: window.__meadow.timeCtl.target, wx: window.__meadow.wx.type, auto: window.__meadow.wx.auto, bouquet: window.__meadow.pack.count('flower') }));
   expect(s.live).toBe(false);
   expect(Math.round(s.target)).toBe(21);
   expect(s.wx).toBe('fog');
   expect(s.auto).toBe(false);
-  expect(s.bouquet.length).toBe(2);
+  expect(s.bouquet, 'the picked flowers are still in the backpack').toBe(2);
   noErrors(errors);
 });

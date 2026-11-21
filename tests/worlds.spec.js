@@ -1,6 +1,6 @@
 // Worlds: a new player gets a world of their own, kept in the save; each world keeps its own places.
 import { test, expect } from './harness.js';
-import { open, step, teleport, press, noErrors } from './helpers.js';
+import { open, step, teleport, press, actions, noErrors } from './helpers.js';
 
 /** Load the game at an address as it is (no world pinned), and wait for it. */
 async function visit(page, address) {
@@ -31,6 +31,7 @@ test('a new player gets a world of their own, kept in the save; any text is a se
     await teleport(page, f.x + 0.4, f.z);
     await press(page, 'KeyG', 0.8);
   }
+  expect(await page.evaluate(() => window.__meadow.pack.tie()), 'tied into a bouquet in the backpack').toBe(true);
   const b = await page.evaluate(() => window.__meadow.geo.bench());
   await teleport(page, b.x + Math.sin(b.rot) * 1.3, b.z + Math.cos(b.rot) * 1.3);
   await press(page, 'KeyG', 0.3);
@@ -138,5 +139,49 @@ test('an older save moves what you carried into the backpack: the rod, the fish 
   const got = await page.evaluate(() => window.__meadow.pack.view().filter(Boolean).map((it) => `${it.type}:${it.key || ''}:${it.n}:${(it.list || []).join('/')}`));
   expect(got).toEqual(['rod::1:', 'fish:perch:2:20/24', 'fish:carp:1:41', 'cone::3:']);
   expect(await page.evaluate(() => window.__meadow.rod())).toMatchObject({ rod: true, cones: 3 });
+  noErrors(errors);
+});
+
+test('flowers go into the backpack: tie them into a bouquet there with the mouse, hold it, give it; a full backpack takes no more', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#11');
+  await step(page, 1.5);
+  const nearest = () => page.evaluate(() => { const m = window.__meadow; return m.flowers().filter((it) => it.shown).sort((a, b) => Math.hypot(a.x - m.player.x, a.z - m.player.z) - Math.hypot(b.x - m.player.x, b.z - m.player.z))[0]; });
+  for (let k = 0; k < 4; k++) { const f = await nearest(); await teleport(page, f.x + 0.4, f.z); await press(page, 'KeyG', 0.8); }
+  expect(await page.evaluate(() => window.__meadow.pack.count('flower'))).toBe(4);
+  // open the backpack, choose the flowers, tie a mixed bouquet
+  await page.keyboard.press('KeyI');
+  await step(page, 0.2);
+  await page.locator('#packGrid .slot.full').first().click();
+  await page.locator('#packInfo button', { hasText: 'Tie a mixed bouquet' }).click();
+  const after = await page.evaluate(() => ({ flowers: window.__meadow.pack.count('flower'), held: window.__meadow.pack.held() }));
+  expect(after.flowers, 'all four went into it').toBe(0);
+  expect(after.held.type).toBe('bouquet');
+  expect(after.held.list.length).toBe(4);
+  await expect(page.locator('#packGrid .slot.held')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  // give it: it leaves the backpack and lies on the bench
+  const b = await page.evaluate(() => window.__meadow.geo.bench());
+  await teleport(page, b.x + Math.sin(b.rot) * 1.3, b.z + Math.cos(b.rot) * 1.3);
+  await press(page, 'KeyG', 0.3);
+  expect(await page.evaluate(() => ({ bench: (window.__meadow.store.benchBouquet || []).length, left: window.__meadow.pack.view().filter(Boolean).length }))).toEqual({ bench: 4, left: 0 });
+  // a stack holds 32 flowers of a kind; a full backpack takes no more, and says so
+  const full = await page.evaluate(() => {
+    const p = window.__meadow.pack;
+    for (let i = 0; i < 40; i++) p.add('flower', 0, '#ffffff');
+    const stacks = p.view().filter(Boolean).map((it) => it.n);
+    for (let k = 0; k < 30; k++) p.add('cone');
+    while (p.add('rod'));
+    while (p.add('flower', 0, '#ffffff')); // (and the last stack of flowers)
+    return { stacks, filled: p.view().every(Boolean), flowers: p.count('flower') };
+  });
+  expect(full.stacks).toEqual([32, 8]);
+  expect(full.filled).toBe(true);
+  const f = await nearest();
+  await teleport(page, f.x + 0.4, f.z);
+  await step(page, 0.4);
+  const pick = (await actions(page)).find((a) => a.id === 'pick');
+  expect(pick && pick.label).toBe('Backpack is full');
+  await press(page, 'KeyG', 0.5);
+  expect(await page.evaluate(() => window.__meadow.pack.count('flower')), 'nothing picked').toBe(full.flowers);
   noErrors(errors);
 });

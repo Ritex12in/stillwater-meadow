@@ -221,7 +221,7 @@ test('flowers to pick grow wherever the land allows: far from home too, each rem
   const seen = (id) => page.evaluate((id) => { const f = window.__meadow.flowers().find((q) => q.id === id); return f ? f.shown : null; }, id);
   expect(await seen(spot.id), 'it stands there').toBe(true);
   await press(page, 'KeyG', 0.8);
-  const got = await page.evaluate(() => { const m = window.__meadow, mine = m.flowers().filter((f) => !f.shown); return { bouquet: (m.store.bouquet || []).length, gone: mine.map((f) => f.id), dropped: m.wilds.stats().dropped }; });
+  const got = await page.evaluate(() => { const m = window.__meadow, mine = m.flowers().filter((f) => !f.shown); return { bouquet: m.pack.count('flower'), gone: mine.map((f) => f.id), dropped: m.wilds.stats().dropped }; });
   expect(got.bouquet, 'picked').toBe(1);
   expect(got.gone.length).toBe(1);
   expect(got.dropped).toBe(0);

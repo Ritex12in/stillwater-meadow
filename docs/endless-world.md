@@ -28,6 +28,13 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
   but not in milestone 4; the owner also asked to plan for an **ocean** and a **backpack**. The
   backpack is planned into 4d (things you place come out of it); the ocean, rivers, islands and
   trails are milestone 8.
+- **Seasons, weather and the wild (2026-11-22):** seasons and weather must differ place by place
+  and change. The owner chose: a faster game year (8 real days, so each season lasts 2 real days;
+  day and night still follow the real clock); regions warmer than home (green in winter); weather
+  shared by everyone in the same world at the same moment; and, for now, no manmade things away
+  from home ("it's weird to see a lamp post out of nowhere near lakes in a snow desert"): the home
+  lake keeps its jetty, boat and skipper, fire, bench, chairs, lamps and path; every other lake is
+  wild; the shrines in blossom groves stay.
 - **Worlds and carrying (2026-11-22):** seeds as in Minecraft: any text is a seed, the same text
   the same world, a new player gets a random one. The backpack is a real inventory of slots
   (flowers, later tools and other things); bouquets are tied from flowers in it.
@@ -62,6 +69,7 @@ Each one leaves the game playable and tested.
 | 4b-2 | **Lake life at every lake.** Reeds and lily pads per lake, worked out from the lake and its country and drawn from fixed slots for the three nearest; the ducks, the heron, the frogs and the mist are at the lake you are at (not ducks on ice). | Each lake's are the same every visit; none undrawn; a tour of lakes leaves the scene as it was (`tests/lakes.spec.js`). | done |
 | 4c | **The valley goes.** Start beside a lake generated from the seed, with the full set of landmarks. The hand-placed valley, its plants, fences and pebbles are removed. Flowers to pick grow everywhere. Shrine sites are fixed by the seed (one back from the home lake, others in blossom groves); the ground under each is levelled, and the one shrine stands at the site nearest you. Tests go by places found by query. | One full run of the suite. | done (full run 2026-11-22: 42 of 43 passed; the one failure, the untamed cat, was the test assuming the old valley's shore, fixed) |
 | 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed (done); (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
+| N | **Seasons and weather by place** (planned 2026-11-22, before 4d step 2; see "Plan: seasons and weather by place"). (1) Away from home, lakes are wild. (2) A game year of 8 real days, and each place's temperature through it; warmer regions. (3) Snow, ice, leaves, blossom and flowers from that local temperature. (4) Weather as a pattern moving across the land with the wind, the same for everyone in a world. (5) The World panel says what it is like where you stand; distant storms later. | Pure in seed, position and time; nothing rebuilt as the days pass. | |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | |
@@ -265,6 +273,53 @@ or dropped once a pack is chosen.
   lake, the nearest shrine, the nearest settled lakes; where two lie the same way the farther
   shows only its dot. Shrine sites have names by rule from where they are (the home one is named
   after the home lake). Coming to a lake, or within 40 m of a shrine, shows its name.
+
+## Plan: seasons and weather by place (decided 2026-11-22, not started)
+
+**What is wrong today.** One season for the whole world, from the calendar or picked: in winter every
+lake freezes, snow covers everything and flowers go everywhere; walking never changes the season.
+One weather state follows you everywhere, changing on a timer by a table of what follows what, the
+same on the heath as in lush woods; it snows only because the season says winter.
+
+**1. Wild lakes away from home.** Only the home lake is settled: its jetty, boat and skipper, fire,
+bench, chairs, lamps and worn path stay (the rod trade, the boat tour and the campfire need them).
+Every other lake has no path, clearing or landmarks. The code that moves the landmarks from lake to
+lake and keeps each place's own things is switched off, not deleted (settlements may come back
+with a story). The Places list and the compass still name lakes. Tests about landmarks at other
+lakes are retired or rewritten.
+
+**2. The year and local temperature.** The time of year is a smooth phase, the same for every player
+at the same real moment: the real time (UTC) divided by 8 days. Picking a season in the World
+panel sets the phase (for photos and tests). Each place has a yearly mean temperature (from its
+climate and height: the felt height already in use) and a seasonal swing (larger inland and in
+cold country, smaller near water). Its temperature on a day is the mean plus the swing times a
+yearly curve. **Warmer regions**: the climate's cold field gains a warm side, far from home: warm
+and wet is evergreen lush country, green all year; warm and dry is Mediterranean, golden in
+summer drought and green in winter rain (the opposite of the cold country's rhythm).
+
+**3. Season effects from local temperature.** Snow cover where it is below freezing and moist; lake
+ice only after some weeks of cold (the temperature a while back), so ice lags the first frost and
+lingers into spring, each lake its own; leaves turn as it falls through about 10 degrees and drop
+below about 3, earlier up high and in the cold; blossom as spring warms through about 8 degrees,
+later up high (about 4 days per 100 ft is the rule of thumb); flowers where it is warm enough and
+not in summer drought; grass browns in the cold and golds in drought. The ground and grass carry
+each spot's mean and swing, and the shader works out the day's look from a phase uniform, so
+nothing is rebuilt as the days pass; trees are recoloured now and then from their own local
+phase; each nearby lake's water sheet gets its own ice. Skating, ice fishing and the ice dance go
+by the lake's own ice. The home lake must still freeze in midwinter (the skipper's pine cones,
+the skating dance).
+
+**4. Weather moving over the land.** A field, a function of position and real time (UTC) and the
+seed, so all players in a world share it: broad cloud noise drifting with a prevailing wind from
+the west and slowly changing as it goes; rain where it is cloudy enough, more readily in wet
+country and on slopes facing the wind (less in their rain shadow); snow instead of rain where the
+local temperature is near freezing (so summer peaks get snow showers); storms mostly on warm wet
+afternoons; fog of a morning in low ground and over lakes, where cold air pools. You feel the field
+where you stand, blended as you move: you can walk out of the rain, or watch a storm come in.
+Picking weather in the World panel overrides it where you stand; Auto is the land's own.
+
+**5. Then.** The World panel says what it is like where you stand ("Here: early spring, light
+rain"); dark skies and rain curtains in the direction of a far storm come after.
 
 ## How nature shapes the land (after milestone 4d, step 1)
 

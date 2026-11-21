@@ -67,7 +67,7 @@ test('the landmarks follow you from lake to lake: everything works there, and no
     const m = window.__meadow, settle = () => { for (let i = 0; i < 200; i++) m.ground.update(m.player.x, m.player.z); for (let i = 0; i < 5; i++) m.tick(1 / 30); };
     m.visitLake(id); settle();
     const away = { anchor: m.anchor(), counts: m.counts() };
-    m.visitLake('home'); m.travelTo(8, 14); settle();
+    m.visitLake('home'); m.travelTo(m.spawn.x, m.spawn.z); settle();
     return { away, home: { anchor: m.anchor(), counts: m.counts() } };
   }, there.id);
   await round();
@@ -85,7 +85,8 @@ test('walking, the landmarks move only when the old lake is well behind you, and
   const there = (await settled(page)).find((L) => L.id !== 'home' && L.kit.bench);
   const dry = (x, z) => page.evaluate(([x, z]) => { const g = window.__meadow.geo; for (let r = 0; r < 60; r += 3) for (let a = 0; a < 6.28; a += 0.7) { const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r; if (g.walkable(px, pz)) return { x: px, z: pz }; } return { x, z }; }, [x, z]);
   // a little way from home: they stay
-  const near = await dry(120, 60);
+  const home = await page.evaluate(() => window.__meadow.home);
+  const near = await dry(home.x + 120, home.z + 60);
   await teleport(page, near.x, near.z);
   await step(page, 1.2);
   expect(await page.evaluate(() => window.__meadow.anchor())).toBe('home');

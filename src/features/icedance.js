@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { clamp, lerp } from '../core/math.js';
-import { SPAWN, lakePoint, onIce, onDock, groundAt, heightAt, walkable, nearReserved, ICE_Y } from '../core/shape.js';
+import { SPAWN, DOCK_A, lakePoint, onIce, onDock, groundAt, heightAt, walkable, nearReserved, ICE_Y } from '../core/shape.js';
 import { hooks, seasonState, obstacles, seats } from '../core/state.js';
 import { timeU, windU } from '../core/materials.js';
 import { player, hero } from '../characters/player.js';
@@ -131,7 +131,7 @@ function buildSnowman() {
 /** A clear spot on the shore near where you arrive (fixed, so no world randomness is used). */
 function snowmanSpot() {
   for (let i = 0; i < 24; i++) {
-    const a = Math.PI / 2 - 0.16 - i * 0.03, p = lakePoint(a, 1.13);
+    const a = DOCK_A - 0.71 - i * 0.03, p = lakePoint(a, 1.13);
     // (by the water, where no tree or boulder grows: the spot depends on the lake alone, not on what is loaded round you)
     const clear = walkable(p.x, p.z) && heightAt(p.x, p.z) > 0.35 && !onDock(p.x, p.z) && !nearReserved(p.x, p.z, 1.5)
       && !seats.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < 2);

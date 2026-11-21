@@ -8,8 +8,8 @@
 // from a lake (landmarksOf). Questions about a spot ("how far from the water is this?") go to the
 // lake nearest that spot (lakeAt), so the same code holds for one lake or many. Lakes are
 // scattered over the whole land by its seed (see "Lakes from the seed"); one of them is HOME, the
-// valley's own, and the older single-lake names (LAKE, lakeR, lakePoint, SPAWN, dockStart, ...)
-// still stand for that lake and its places.
+// lake you start beside, and the single-lake names (LAKE, lakeR, lakePoint, SPAWN, dockStart, ...)
+// stand for whichever lake the landmarks are at (HOME, until they move).
 import { TAU, smooth, clamp, fbm, hash, mulberry32 } from './math.js';
 import { seasonState } from './state.js';
 import { query } from './env.js';
@@ -54,9 +54,28 @@ export function makeLake({ x, z, R0 = 30, A3 = 4, P3 = 0, A5 = 2.5, P5 = 1.3, A7
   };
   return L;
 }
-/** The valley's lake. */
-export const HOME = makeLake({ x: 6, z: -30 });
+/** The side of the squares the land is ruled into, one lake (or none) to a square. */
+export const LAKE_CELL = 420;
+/**
+ * The home lake: the one you start beside. Like every lake it comes from the world's seed; unlike
+ * the others it is always there (in the square at the world's middle), is always settled, has
+ * every landmark, and lies in mild country. It is put at the flattest of a dozen spots in its
+ * square, well clear of the mountains, and kept near enough round, and big enough, that a jetty
+ * always fits and the boat has room for its tour.
+ */
+function makeHome() {
+  const R = mulberry32((Math.imul(WORLD.seed, 0x2545F491) ^ 0x1B873593) | 0);
+  let spot = null;
+  for (let k = 0; k < 14; k++) {
+    const x = (0.2 + R() * 0.6) * LAKE_CELL, z = (0.2 + R() * 0.6) * LAKE_CELL, rough = rangeAt(x, z) + fbm((x + SX * 31) * 0.0055 - 9.2, (z + SZ * 31) * 0.0055 + 23.6) * 0.3;
+    if (!spot || rough < spot.rough) spot = { x, z, rough };
+  }
+  const R0 = 27 + R() * 6, wob = 0.55 + R() * 0.45;
+  return makeLake({ x: spot.x, z: spot.z, R0, A3: R0 * 0.13 * wob, P3: R() * TAU, A5: R0 * 0.085 * wob, P5: R() * TAU, A7: R0 * 0.05 * wob, P7: R() * TAU, E: R() * 0.1, TH: R() * Math.PI });
+}
+export const HOME = makeHome();
 HOME.settled = true;
+HOME.clime = { dry: 0, lush: 0, snow: 0 };
 
 // ── Lakes from the seed ────────────────────────────────────────
 // The land is ruled into squares LAKE_CELL metres wide, and each square has one lake or none,
@@ -66,8 +85,7 @@ HOME.settled = true;
 // none lies among the mountains. The country it lies in gives it its character: a broad beach in
 // the meadows and broader still on the heath, where the water is clear turquoise; grass to the
 // water's edge and dark green water in lush country; ice the year round in the snow. Some have a
-// path worn round them. The square the valley stands in holds HOME instead.
-export const LAKE_CELL = 420;
+// path worn round them. One square holds HOME instead.
 const lakeCells = new Map(), aroundCells = new Map();
 const HOME_CX = Math.floor(HOME.x / LAKE_CELL), HOME_CZ = Math.floor(HOME.z / LAKE_CELL);
 const NAME_A = ['Mirror', 'Heron', 'Willow', 'Amber', 'Silver', 'Moss', 'Lark', 'Fern', 'Otter', 'Birch', 'Glass', 'Hollow', 'Mist', 'Reed', 'Thistle', 'Ember', 'Swan', 'Dawn', 'Quiet', 'Lantern'];
@@ -215,8 +233,8 @@ export function height(x, z) {
 //   cold  -> snow in drifts, then snowfields; pines; no flowers      (also: the higher, the colder)
 //   dry   -> golden heath, tall pale grass, a few airy trees, more boulders
 //   wet   -> lush dark-green country, thick mixed woods, ferns and mushrooms
-// and here and there a blossom grove. The valley round the home lake keeps its own mild weather.
-const mild = (x, z) => smooth(140, 330, Math.hypot(x, z)); // (0 in the valley, 1 beyond it: goes when the valley does)
+// and here and there a blossom grove. Round the home lake the country is always mild.
+const mild = (x, z) => smooth(140, 330, Math.hypot(x - HOME.x, z - HOME.z)); // (0 by the home lake, 1 beyond it)
 /** How cold a spot is, 0 mild .. 1 frozen. `h` is the ground's height there. */
 export function coldAt(x, z, h) {
   const n = fbm((x + SX * 17) * 0.0011 - 63.4, (z + SZ * 17) * 0.0011 + 28.9);
@@ -306,7 +324,13 @@ function jettyFits(lake, turn) {
  */
 export function kitOf(lake) {
   if (lake.kit) return lake.kit;
-  if (lake === HOME) return (lake.kit = { dock: true, fire: true, bench: true });
+  if (lake === HOME) {
+    // the home lake has everything; its arrangement faces the first of sixteen ways that gives the jetty deep water
+    const first = hash(WORLD.seed * 13 + 5, 77) * TAU;
+    lake.turn = first;
+    for (let k = 0; k < 16; k++) { const t = first + (k / 16) * TAU; if (jettyFits(lake, t)) { lake.turn = t; break; } }
+    return (lake.kit = { dock: true, fire: true, bench: true });
+  }
   if (!lake.settled) return (lake.kit = { dock: false, fire: false, bench: false });
   const R = mulberry32((Math.floor(hash(Math.round(lake.x), Math.round(lake.z)) * 4294967296) ^ 0x3C6EF372) | 0);
   const first = R() * TAU, wantDock = R() < 0.85, wantFire = R() < 0.8, wantBench = R() < 0.72;
@@ -361,6 +385,7 @@ export function shrineSite() {
   return (shrine = { x: best.x, z: best.z, fx: (L.x - best.x) / d, fz: (L.z - best.z) / d, r: 17 });
 }
 const HOME_PLACES = landmarksOf(HOME);
+DOCK_A = HOME_PLACES.dockA; CHAIR_A = HOME_PLACES.chairA;
 export const SPAWN = HOME_PLACES.spawn;
 
 // ── Jetty ──────────────────────────────────────────────────────

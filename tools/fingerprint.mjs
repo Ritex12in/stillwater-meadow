@@ -23,7 +23,8 @@ const fp = await p.evaluate(async () => {
   // import the very module instances the game uses (same URL, including any dev-server query)
   const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
   const S = await import(url('/src/core/shape.js')), ST = await import(url('/src/core/state.js')), W = ST.world;
-  const grid = (fn) => { const o = []; for (let z = -170; z <= 170; z += 5) for (let x = -170; x <= 170; x += 5) o.push(fn(x, z)); return o; };
+  const C = { x: Math.round(S.SPAWN.x), z: Math.round(S.SPAWN.z) }; // (sampled round where you start)
+  const grid = (fn) => { const o = []; for (let z = -170; z <= 170; z += 5) for (let x = -170; x <= 170; x += 5) o.push(fn(C.x + x, C.z + z)); return o; };
   const inst = (h) => { // instanced meshes: count + matrix checksum
     const out = []; const visit = (o) => { if (!o) return; if (Array.isArray(o)) return o.forEach(visit); if (o.isInstancedMesh) { let s = 0; const a = o.instanceMatrix.array; for (let i = 0; i < o.count * 16; i++) s += a[i] * ((i % 97) + 1); out.push([o.count, s]); } else if (o.children) o.children.forEach(visit); else if (typeof o === 'object') Object.values(o).forEach((v) => { if (v && (v.isObject3D || Array.isArray(v))) visit(v); }); };
     visit(h); return out; };

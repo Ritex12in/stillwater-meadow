@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, clamp, damp, lerp, turnTo, mulberry32 } from '../core/math.js';
-import { SPAWN, FIRE_SPOT, lakePoint, lakeAt, groundAt, animalWalkable, walkable, onIce, nearestShore, ICE_Y } from '../core/shape.js';
+import { SPAWN, FIRE_SPOT, DOCK_A, lakePoint, lakeAt, groundAt, animalWalkable, walkable, onIce, nearestShore, ICE_Y } from '../core/shape.js';
 import { hooks, pushOut, world, seasonState, seats } from '../core/state.js';
 import { windU, timeU } from '../core/materials.js';
 import { makeKid, KIDS, moveAttachments } from '../characters/kid.js';
@@ -50,7 +50,7 @@ export function initFriend() {
   store.friend = store.friend || {};
   onSave((s) => { s.friend = Object.assign({}, store.friend); });
   // she starts a little way along the shore from where you do
-  let home = lakePoint(Math.PI / 2 + 0.55, 1.28);
+  let home = lakePoint(DOCK_A, 1.28);
   if (!animalWalkable(home.x, home.z)) home = { x: SPAWN.x + 6, z: SPAWN.z + 3 };
   const st = { x: home.x, z: home.z, y: groundAt(home.x, home.z), rot: r() * TAU, move: 0, phase: 0, sitAmt: 0, seatTop: 0.44, petAmt: 0, idleT: 0, turn: 0, t: 0, dancing: false, rescue: null,
     state: 'idle', mode: 'alone', timer: 2 + r() * 3, target: null, wave: 0, waveT: 0, greeted: 0, together: false, met: false,

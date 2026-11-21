@@ -6,11 +6,11 @@ test('the land has no edge: you can stand far beyond the old valley, on ground t
   const errors = await open(page, 'weather=clear&season=summer', '#12');
   // somewhere dry and not too steep, well past where the valley used to end
   const spot = await page.evaluate(() => {
-    const g = window.__meadow.geo;
-    for (let d = 400; d < 900; d += 7) for (let a = 0; a < 6.28; a += 0.4) { const x = Math.cos(a) * d, z = Math.sin(a) * d; if (g.walkable(x, z)) return { x, z }; }
+    const g = window.__meadow.geo, h = window.__meadow.home;
+    for (let d = 400; d < 900; d += 7) for (let a = 0; a < 6.28; a += 0.4) { const x = h.x + Math.cos(a) * d, z = h.z + Math.sin(a) * d; if (g.walkable(x, z)) return { x, z }; }
     return null;
   });
-  expect(spot, 'there is walkable ground 400 m and more from the middle').not.toBeNull();
+  expect(spot, 'there is walkable ground 400 m and more from home').not.toBeNull();
   await teleport(page, spot.x, spot.z);
   await step(page, 2);
   const there = await page.evaluate(() => { const m = window.__meadow; return { x: m.player.x, z: m.player.z, y: m.player.y, ground: m.geo.height(m.player.x, m.player.z) }; });
@@ -20,12 +20,21 @@ test('the land has no edge: you can stand far beyond the old valley, on ground t
   const gap = await page.evaluate(() => {
     const m = window.__meadow, g = m.geo;
     m.ground.settle(m.player.x, m.player.z);
+    // (the drawn ground is the formula sampled every 1.2 m and joined flat between: at the samples the
+    // two are the same; between them they part only where the formula has a sharp crest)
     let worst = 0;
-    for (let i = 0; i < 200; i++) { const x = m.player.x + Math.cos(i) * i * 0.4, z = m.player.z + Math.sin(i) * i * 0.4; worst = Math.max(worst, Math.abs(g.heightAt(x, z) - g.height(x, z))); }
-    return { worst, fine: m.ground.stats().fine };
+    const off = [];
+    for (let i = 0; i < 200; i++) {
+      const x = m.player.x + Math.cos(i) * i * 0.4, z = m.player.z + Math.sin(i) * i * 0.4, gx = Math.round(x / 1.2) * 1.2, gz = Math.round(z / 1.2) * 1.2;
+      worst = Math.max(worst, Math.abs(g.heightAt(gx, gz) - g.height(gx, gz)));
+      off.push(Math.abs(g.heightAt(x, z) - g.height(x, z)));
+    }
+    off.sort((p, q) => p - q);
+    return { worst, usual: off[180], fine: m.ground.stats().fine };
   });
   expect(gap.fine, 'fine tiles are loaded round you').toBeGreaterThan(8);
-  expect(gap.worst).toBeLessThan(0.35);
+  expect(gap.worst, 'at its samples the drawn ground is the formula').toBeLessThan(0.02);
+  expect(gap.usual, 'and nine times in ten it is within a hand of it between them').toBeLessThan(0.12);
   noErrors(errors);
 });
 
@@ -34,8 +43,9 @@ test('walking two kilometres out and back, again and again, stops costing more: 
   const trip = () => page.evaluate(() => {
     const g = window.__meadow.ground;
     const settle = (x, z) => { g.settle(x, z); for (let i = 0; i < 200; i++) g.update(x, z); }; // (the updates let unused tiles go back to the pool)
-    settle(2000, 300);
-    settle(0, 20);
+    const h = window.__meadow.home;
+    settle(h.x + 2000, h.z + 300);
+    settle(h.x, h.z + 50);
     return g.stats();
   });
   const first = await trip(), second = await trip(), third = await trip();
@@ -91,9 +101,9 @@ test('travelling far and back, again and again, leaves the scene holding exactly
   const trip = () => page.evaluate(() => {
     const m = window.__meadow;
     const go = (x, z) => { m.player.x = x; m.player.z = z; m.player.slide = null; m.ground.settle(x, z); for (let i = 0; i < 200; i++) m.ground.update(x, z); m.wilds.settle(x, z); for (let i = 0; i < 10; i++) m.tick(1 / 30); };
-    go(2000, 300);
+    go(m.home.x + 2000, m.home.z + 300);
     const out = m.wilds.stats();
-    go(0, 20);
+    go(m.spawn.x, m.spawn.z);
     return { out, back: m.wilds.stats(), objects: m.objects(), trees: m.trees().length };
   });
   const first = await trip(), second = await trip(), third = await trip();
@@ -167,7 +177,7 @@ test('kinds of country: snow, heath, lush woods and blossom groves all exist, an
       const c = m.climate(x, z);
       add(c.snow > 0.8 ? 'snow' : c.grove > 0.8 ? 'grove' : c.dry > 0.8 ? 'heath' : c.lush > 0.8 ? 'lush' : c.snow + c.dry + c.lush + c.grove < 0.1 ? 'meadow' : 'between', w.square(ix, iz));
     }
-    return { kinds, home: m.climate(0, 20) };
+    return { kinds, home: m.climate(m.spawn.x, m.spawn.z) };
   });
   const k = land.kinds;
   for (const name of ['snow', 'heath', 'lush', 'grove', 'meadow']) expect(k[name] && k[name].squares, `there is ${name} country`).toBeGreaterThan(8);

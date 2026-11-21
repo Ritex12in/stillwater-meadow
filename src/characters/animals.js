@@ -4,7 +4,7 @@
 // but don't follow; a tamed animal behaves like a pet.
 import { scene } from '../core/render.js';
 import { TAU, rng, rand, rnd, clamp, damp, angDiff, turnTo } from '../core/math.js';
-import { lakePoint, heightAt, groundAt, animalWalkable } from '../core/shape.js';
+import { lakePoint, heightAt, groundAt, animalWalkable, DOCK_A } from '../core/shape.js';
 import { pushOut } from '../core/state.js';
 import { makeDog, makeCat } from './rigs.js';
 import { player } from './player.js';
@@ -38,15 +38,16 @@ function addAnimal(kind, rig, near, range, desc) {
 }
 
 export function buildAnimals() {
-  const homeA = lakePoint(Math.PI / 2 + 0.12, 1.2);
-  const homeB = lakePoint(Math.PI / 2 - 0.18, 1.22);
-  const homeC = lakePoint(Math.PI, 1.6);
+  // (round the shore from the jetty: by where you arrive, and a way off the other side)
+  const homeA = lakePoint(DOCK_A - 0.43, 1.2);
+  const homeB = lakePoint(DOCK_A - 0.73, 1.22);
+  const homeC = lakePoint(DOCK_A + 1.02, 1.6);
   addAnimal('dog', makeDog({ coat: '#d9a65a', accent: '#f2dcb0', ear: '#b9853f' }), homeA, 22, 'golden dog');
   addAnimal('dog', makeDog({ coat: '#3a3330', accent: '#e9e2d6', ear: '#2a2523', scale: 0.85, collar: '#3f8f86' }), homeB, 20, 'black-and-white dog');
   addAnimal('dog', makeDog({ coat: '#f1ece2', accent: '#ffffff', ear: '#8a5a3a', scale: 0.72, collar: '#4a6fb0' }), homeC, 18, 'little white dog');
   addAnimal('cat', makeCat({ fur: '#e0954a', belly: '#f6dcb8' }), homeA, 12, 'ginger cat');
   addAnimal('cat', makeCat({ fur: '#7f8288', belly: '#c9cbd0', eye: '#d9c14a' }), homeB, 12, 'grey cat');
-  addAnimal('cat', makeCat({ fur: '#2a2726', belly: '#3a3634', eye: '#d6c23a' }), lakePoint(Math.PI / 2 - 0.5, 1.5), 9, 'black cat');
+  addAnimal('cat', makeCat({ fur: '#2a2726', belly: '#3a3634', eye: '#d6c23a' }), lakePoint(DOCK_A - 1.05, 1.5), 9, 'black cat');
   addAnimal('cat', makeCat({ fur: '#f3efe7', belly: '#ffffff', eye: '#7fb6d9' }), homeC, 12, 'white cat');
 }
 
@@ -165,6 +166,7 @@ export function updateAnimal(a, dt, t) {
         if (dp > 26 + a.bond * 20 || a.timer <= 0) { a.state = 'idle'; a.timer = rnd(2, 5); a.home = { x: a.x, z: a.z }; }
         else {
           if (player.move > 0.1) a.side += dt * 0.05; // spot beside you only drifts while you walk
+          const sideWas = a.side;
           for (const o of animals) { // followers fan out: each dog makes room for the ones before it
             if (o === a) break;
             if (o.state !== 'follow') continue;
@@ -174,9 +176,10 @@ export function updateAnimal(a, dt, t) {
           const tx = player.x + Math.cos(a.side) * 2.3, tz = player.z + Math.sin(a.side) * 2.3;
           setTarget(a, tx, tz);
           const d = Math.hypot(tx - a.x, tz - a.z);
-          const settle = a.sit > 0.5 ? 1.8 : 0.7; // a seated dog stays put until you actually move off
+          const making = Math.abs(a.side - sideWas) > 1e-6; // (still making room: it does not sit down in another dog's place)
+          const settle = a.sit > 0.5 && !making ? 1.8 : 0.7; // a seated dog stays put until you actually move off
           if (d > settle) want = d > 5 ? 4.4 : Math.min(2.4, d * 1.1);
-          else wantSit = player.move < 0.1 ? 1 : 0;
+          else wantSit = player.move < 0.1 && !making ? 1 : 0;
         }
       } else if (a.beg && dp < 3.5) {
         // a dog that isn't yours yet sits and watches you, hoping for food (features/pets.js sets `beg`)

@@ -258,8 +258,9 @@ test('winter: winter clothes, a snowman, and the skating dance on the ice with h
   // out on the ice, hand in hand (she follows you onto it)
   await m(() => { const w = window.__meadow, f = w.friendSt; w.player.x = f.x + 1; w.player.z = f.z; });
   await press(page, 'KeyX', 1);
-  await teleport(page, -3, -13.2);
-  await m(() => { const w = window.__meadow, f = w.friendSt; f.x = -3.6; f.z = -13.2; w.player.rot = 2.5; });
+  const ice = await m(() => window.__meadow.geo.lakePoint(1.9, 0.5)); // (well out on the home lake)
+  await teleport(page, ice.x, ice.z);
+  await page.evaluate((p) => { const w = window.__meadow, f = w.friendSt; f.x = p.x - 0.6; f.z = p.z; w.player.rot = 2.5; }, ice);
   await step(page, 1.5);
   expect(await m(() => window.__meadow.geo.walkable(window.__meadow.friendSt.x, window.__meadow.friendSt.z))).toBe(true);
   await press(page, 'KeyK', 0.5);

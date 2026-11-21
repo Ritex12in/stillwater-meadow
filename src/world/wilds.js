@@ -9,19 +9,21 @@
 //   - squares near you also hand their trees to the real tree models (world/vegetation.js), with
 //     their shadows, their own shapes and the seasons' colours, and set out their boulders;
 //   - the squares closest of all grow their small plants: bushes, ferns, mushrooms and clumps of
-//     wildflowers (which fade out with distance anyway, so there is no point in more).
+//     wildflowers (which fade out with distance anyway, so there is no point in more), and the
+//     flowers you can pick: a few in any open country, meadows of them round a lake, and thick
+//     drifts beside a lake's path and along its bank.
 // What grows where follows the climate (core/shape.js): thick mixed woods in lush country, a few
 // airy birches on the dry heath, pines and little else in the cold, and now and then a grove of
 // blossom trees over a carpet of flowers.
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
 // walk.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
-import { height, lakeT, WORLD, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
+import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
 import { TILE_N, CELL, rockAmt } from './terrain.js';
-import { setWildTrees, MODEL_FAR, TREE_COLOURS } from './vegetation.js';
+import { setWildTrees, MODEL_FAR, TREE_COLOURS, dressFlower } from './vegetation.js';
 import { setFarTrees } from './farforest.js';
 import { treeFamily } from './kitplants.js';
 
@@ -33,7 +35,7 @@ const S = TILE_N * CELL;
  */
 export const WILD = { load: 235, drop: 265, nearIn: MODEL_FAR + 8, nearOut: MODEL_FAR + 30, closeIn: 66, closeOut: 86, tries: 96 };
 const squares = new Map();
-let cards = 0, lost = 0, near = 0, stale = false, rockCount = 0, smallCount = 0, lostRocks = 0, lostSmall = 0, rockBlocks = [];
+let cards = 0, lost = 0, near = 0, stale = false, rockCount = 0, smallCount = 0, pickCount = 0, lostRocks = 0, lostSmall = 0, rockBlocks = [];
 /** The cards show each tree's season colour: ask for them to be redone when the season has turned. */
 world.refreshFarTrees = () => { stale = true; };
 
@@ -128,6 +130,77 @@ export function growSmall(ix, iz, trees) {
   return out;
 }
 
+/**
+ * How many spots a square tries for flowers to pick: a few anywhere, many more where it lies in
+ * the meadow round a lake (within `meadow` lake-radii of one).
+ */
+const PICK = { tries: 70, lakeTries: 1100, meadow: 2.4 };
+/** Where a lake's sand ends and its grass begins, in lake-radii. */
+const sandEnd = (L) => Math.max(1.06, 1 + 0.14 * L.beach);
+/**
+ * Where a lake's drifts of flowers are: two in three beside its path if it has one (either side),
+ * the rest on the bank just above the sand. More round a bigger lake, fewer on the heath, none
+ * round a frozen one. The same every time; kept on the lake.
+ */
+function driftsOf(lake) {
+  if (lake.drifts) return lake.drifts;
+  const R = mulberry32((Math.floor(hash(Math.round(lake.x) + 11, Math.round(lake.z) - 29) * 4294967296) ^ Math.imul(WORLD.seed, 0x9E3779B1) ^ 0x3D4F1A) | 0);
+  const c = lake.clime || { dry: 0, lush: 0, snow: 0 }, n = lake.frozen || c.snow > 0.3 ? 0 : Math.round(40 * (lake.R0 / 30) * (1 - c.dry * 0.6)), out = [];
+  for (let i = 0; i < n; i++) {
+    const a = R() * TAU, side = R() < 0.5 ? -1 : 1, off = R(), kind = Math.floor(R() * 64), size = 1.3 + R() * 1.3, count = 30 + Math.floor(R() * 26), seed = Math.floor(R() * 4294967296) | 0;
+    const t = lake.ring && i % 3 < 2 ? PATH_T + side * (3.4 + off * 2.5) / lake.r(a) : sandEnd(lake) + 0.03 + off * 0.07, p = lake.point(a, t);
+    out.push({ i, x: p.x, z: p.z, kind, size, count, seed });
+  }
+  return (lake.drifts = out);
+}
+/**
+ * The flowers you can pick in one square. The same answer every time, and each flower has a name
+ * of its own (`id`) that it keeps, so a picked one can be remembered while its square is away.
+ * Only the land's own rules decide (the lakes, their paths and clearings, the climate): never
+ * where the landmarks happen to stand, nor which ground is loaded.
+ */
+export function growPicks(ix, iz) {
+  const R = seedOf(ix, iz, 0x7A11E5), x0 = ix * S, z0 = iz * S, out = [];
+  const mx = x0 + S / 2, mz = z0 + S / 2, dry = dryOf(rainAt(mx, mz)), snow = snowOf(coldAt(mx, mz, height(mx, mz)));
+  if (snow > 0.4) return out; // (none under snow)
+  const lakes = lakesNear(mx, mz, 220).filter((L) => Math.hypot(L.x - mx, L.z - mz) < L.rmax * PICK.meadow + S * 0.75);
+  const tries = lakes.length ? PICK.lakeTries : PICK.tries, thin = 1 - dry * 0.6;
+  for (let k = 0; k < tries; k++) {
+    // (every try takes the same draws, so turning one spot down never moves or renames the flowers after it)
+    const x = x0 + R() * S, z = z0 + R() * S, s = 0.8 + R() * 0.6, ry = R() * TAU, a = R(), b = R(), c = R(), keep = R(), stay = R();
+    if (fbm(x * 0.07 + 20, z * 0.07 - 4) < 0.56) continue; // they grow in patches
+    const L = lakeAt(x, z), lt = L.t(x, z), meadow = lt < PICK.meadow;
+    if (k >= PICK.tries && !meadow) continue;
+    // (a settled lake's meadow is thick with them; a wild lake's less so; open country has a few, fewer in the woods)
+    if (stay > (meadow ? (L.settled ? 1 : 0.6) : 1 - woodAt(x, z) * 0.6) * thin) continue;
+    if (lt < sandEnd(L) || L.path(x, z) > 0.2 || clearingAt(x, z)) continue;
+    const h = height(x, z);
+    if (rockAmt(h, slopeOf(x, z)) > 0.2) continue;
+    out.push(dressFlower({ id: ix + ':' + iz + ':' + k, x, z, y: h - 0.02, s, ry, keep }, undefined, a, b, c));
+  }
+  // the drifts of the lakes here whose middle lies in this square
+  for (const L of lakes) {
+    for (const d of driftsOf(L)) {
+      if (d.x < x0 || d.x >= x0 + S || d.z < z0 || d.z >= z0 + S) continue;
+      const D = mulberry32(d.seed);
+      for (let m = 0; m < d.count; m++) {
+        const a = D() * TAU, far = d.size * Math.sqrt(D()) * (0.6 + 0.4 * D()), s = 0.8 + D() * 0.6, ry = D() * TAU, c = D(), keep = D();
+        const x = d.x + Math.cos(a) * far * 1.4, z = d.z + Math.sin(a) * far; // drifts are a little long
+        const N = lakeAt(x, z);
+        if (N.t(x, z) < sandEnd(N) + 0.01 || N.path(x, z) > 0.15 || clearingAt(x, z)) continue;
+        out.push(dressFlower({ id: L.id + ':d' + d.i + ':' + m, x, z, y: height(x, z) - 0.02, s, ry, keep }, d.kind, 0, 0, c));
+      }
+    }
+  }
+  return out;
+}
+/** For tests and tools: every flower to pick within `r` metres of a spot, whether or not its square is loaded. */
+export function picksNear(x, z, r) {
+  const out = [];
+  for (let iz = Math.floor((z - r) / S); iz <= Math.floor((z + r) / S); iz++) for (let ix = Math.floor((x - r) / S); ix <= Math.floor((x + r) / S); ix++) for (const f of growPicks(ix, iz)) if (Math.hypot(f.x - x, f.z - z) < r) out.push(f);
+  return out;
+}
+
 /** Distance from the camera to a square (0 inside it). */
 const away = (q, cx, cz) => Math.hypot(Math.max(q.ix * S - cx, 0, cx - q.ix * S - S), Math.max(q.iz * S - cz, 0, cz - q.iz * S - S));
 
@@ -143,7 +216,7 @@ export function updateWilds(cx, cz, all = false) {
     for (let ix = i0; ix <= i1; ix++) {
       const key = ix + ':' + iz;
       if (squares.has(key) || (!all && made >= 2)) continue;
-      const q = { ix, iz, trees: null, rocks: null, small: null, near: false, close: false };
+      const q = { ix, iz, trees: null, rocks: null, small: null, picks: null, near: false, close: false };
       if (away(q, cx, cz) >= WILD.load) continue;
       q.trees = growSquare(ix, iz);
       squares.set(key, q);
@@ -157,7 +230,7 @@ export function updateWilds(cx, cz, all = false) {
     const isNear = q.near ? d < WILD.nearOut : d < WILD.nearIn;
     if (isNear !== q.near) { q.near = isNear; modelsDirty = true; if (isNear && !q.rocks) q.rocks = growRocks(q.ix, q.iz); }
     const isClose = q.close ? d < WILD.closeOut : d < WILD.closeIn;
-    if (isClose !== q.close) { q.close = isClose; smallDirty = true; if (isClose && !q.small && kit) q.small = growSmall(q.ix, q.iz, q.trees); }
+    if (isClose !== q.close) { q.close = isClose; smallDirty = true; if (isClose && !q.small && kit) q.small = growSmall(q.ix, q.iz, q.trees); if (isClose && !q.picks) q.picks = growPicks(q.ix, q.iz); }
   });
   if (cardsDirty || stale || cards === 0) {
     stale = false;
@@ -187,6 +260,12 @@ export function updateWilds(cx, cz, all = false) {
     squares.forEach((q) => { if (q.close && q.small) for (const k in all4) for (const it of q.small[k]) all4[k].push(it); });
     smallCount = all4.bushes.length + all4.ferns.length + all4.shrooms.length + all4.clover.length + all4.flowers.length;
     lostSmall = (world.setWildUndergrowth ? world.setWildUndergrowth(all4) : 0) + (world.setWildFlowers ? world.setWildFlowers(all4.flowers) : 0);
+    // the flowers to pick: features/flowers.js keeps them, and says which are drawn
+    const picks = [];
+    squares.forEach((q) => { if (q.close && q.picks) for (const f of q.picks) picks.push(f); });
+    pickCount = picks.length;
+    world.picks = picks;
+    if (world.setPicks) world.setPicks(picks);
   }
   return cardsDirty || modelsDirty || smallDirty;
 }
@@ -195,7 +274,7 @@ export function updateWilds(cx, cz, all = false) {
 export function settleWilds(x, z) { updateWilds(x, z, true); }
 
 /**
- * For tests and the debug panel: squares kept, trees with a card, trees drawn as models, boulders
- * and small plants set out. `dropped` is things that found no free slot to be drawn in: it should stay 0.
+ * For tests and the debug panel: squares kept, trees with a card, trees drawn as models, boulders,
+ * small plants and flowers to pick set out. `dropped` is things that found no free slot to be drawn in: it should stay 0.
  */
-export const wildStats = () => ({ squares: squares.size, cards, near, rocks: rockCount, small: smallCount, dropped: lost + lostRocks + lostSmall + ((world.roundTop && world.roundTop.dropped) || 0) });
+export const wildStats = () => ({ squares: squares.size, cards, near, rocks: rockCount, small: smallCount, picks: pickCount, dropped: lost + lostRocks + lostSmall + (world.picksDropped || 0) + ((world.roundTop && world.roundTop.dropped) || 0) });

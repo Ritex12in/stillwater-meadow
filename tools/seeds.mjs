@@ -21,13 +21,13 @@ for (let seed = first; seed <= last; seed++) {
       const m = window.__meadow, g = m.geo;
       for (let i = 0; i < 30; i++) m.tick(1 / 30);
       const root = g.dockAt(-1, 0), end = g.dockAt(8, 0), moor = g.dockAt(9.85, 0), c = m.climate(m.spawn.x, m.spawn.z);
-      const fl = m.flowers().filter((f) => f.shown && Math.hypot(f.x - m.spawn.x, f.z - m.spawn.z) < 140);
+      const fl = m.wilds.picksNear(m.spawn.x, m.spawn.z, 140), shownNow = m.flowers().filter((f) => f.shown).length;
       const rod = m.rod();
       return {
         home: [Math.round(m.home.x), Math.round(m.home.z), Math.round(m.home.r)], anchor: m.anchor(), kit: m.kit,
         spawnDry: g.walkable(m.player.x, m.player.z) && m.player.y > 0.3, jetty: g.height(root.x, root.z) > 0.2 && g.height(end.x, end.z) < -0.3 && g.height(moor.x, moor.z) < -0.3,
         benchDry: g.height(g.BENCH_SPOT.x, g.BENCH_SPOT.z) > 0.3, fireDry: g.height(g.FIRE_SPOT.x, g.FIRE_SPOT.z) > 0.3,
-        mild: c.snow + c.dry + c.lush < 0.05, flowers: fl.length, kinds: new Set(fl.map((f) => f.kind)).size,
+        mild: c.snow + c.dry + c.lush < 0.05, flowers: fl.length, kinds: new Set(fl.map((f) => f.kind)).size, shownNow, lost: m.wilds.stats().dropped,
         cones: rod && rod.lying ? rod.lying.length : 0, conesFar: rod && rod.lying && rod.lying.length ? Math.round(Math.max(...rod.lying.map((q) => Math.hypot(q.x - m.spawn.x, q.z - m.spawn.z)))) : null, trees: m.trees().length, lakes: m.lakes(1500).length, settled: m.settled(3000).length,
         shrine: m.shrine ? Math.round(Math.hypot(m.shrine.x - m.home.x, m.shrine.z - m.home.z)) : null,
       };

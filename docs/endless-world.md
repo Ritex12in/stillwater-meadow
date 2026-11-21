@@ -57,7 +57,7 @@ Each one leaves the game playable and tested.
 | 4a | **Places from the seed, lakes first.** A grid of places, each chosen from the land and climate round it. Lakes of varied size and shape, each in its own valley: water, reeds, lilies, ducks, jumping fish, fishing; frozen all year in snow country; seen from afar. The save holds seed and position; a list to jump to places. The home valley still stands. | Height is continuous between neighbouring lakes; a lake is the same every visit; water is drawn from a fixed pool (`tests/lakes.spec.js`). | done |
 | 4b-1 | **Landmarks that follow you.** Settled lakes (each outranking its eight neighbours, so at least half a kilometre apart) have a kit worked out from the seed and checked against the land: a jetty with the boat and skipper where the shore allows, a campfire with logs, a bench with lawn chairs and path lamps; each turned its own way. One of each object, moved to the nearest settled lake when the old one is well behind. Each place keeps its own state (bench bouquet, boat bouquet, fire). | Home is bit-for-bit unchanged; there and back leaves seats, obstacles and scene objects as they were; a bouquet stays at its own bench across a reload (`tests/places.spec.js`). | done |
 | 4b-2 | **Lake life at every lake.** Reeds and lily pads per lake, worked out from the lake and its country and drawn from fixed slots for the three nearest; the ducks, the heron, the frogs and the mist are at the lake you are at (not ducks on ice). | Each lake's are the same every visit; none undrawn; a tour of lakes leaves the scene as it was (`tests/lakes.spec.js`). | done |
-| 4c | **The valley goes.** (In three parts: the hand-placed valley removed and the start lake generated from the seed, done; flowers picked anywhere; the shrine in blossom groves.) Start beside a generated lake with the full set. The shrine is rebuilt in blossom groves (its geometry is baked to the ground it stands on, so it is rebuilt, not moved). The fixed valley and its hand-placed plants, fences and pebbles are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
+| 4c | **The valley goes.** (In three parts: the hand-placed valley removed and the start lake generated from the seed, done; flowers picked anywhere, done; the shrine in blossom groves.) Start beside a generated lake with the full set. The shrine is rebuilt in blossom groves (its geometry is baked to the ground it stands on, so it is rebuilt, not moved). The fixed valley and its hand-placed plants, fences and pebbles are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
 | 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed; (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | |
@@ -215,8 +215,31 @@ or dropped once a pack is chosen.
   bouquets and fire while the landmarks are elsewhere; `store.benchBouquet`/`boatBouquet` are
   always the current place's, named by `store.anchor` (so old saves and features work unchanged).
 - A lake's bowl is wider, in radii, for small lakes (`lake.bowl`), or they lie in a pit.
-- Still home-only until 4c: the fences, pebbles, the snowman, the animals' homes, the shrine,
-  pickable flowers, pine cones, deer.
+- Still at the home lake only: the shrine (last part of 4c), the pine cones and the deer. The
+  animals' homes, the girl's and the snowman's spot are given from the jetty, so they turn with
+  the lake's arrangement.
+
+## How the flowers you pick work (milestone 4c)
+
+- `growPicks(ix, iz)` in `world/wilds.js` gives the flowers of one 57.6 m square, from the seed
+  and the square's place alone (its own random stream, so nothing else moves). Three sorts: a few
+  in patches in any open country (70 tries a square; fewer in woods and on the heath); a meadow
+  of them within 2.4 radii of a lake (1100 tries for a square that reaches one; a wild lake's
+  meadow is thinner than a settled one's); and **drifts** of one kind beside a lake's path and on
+  its bank (`driftsOf(lake)`, about 40 for a lake the size of home, kept on the lake). None under
+  snow, on sand, on a path or in a clearing.
+- Every flower has a name it keeps: `ix:iz:try` for the scattered ones, `lake:dN:m` for a drift's.
+  A rejected try still takes its draws, so names never shift.
+- Only the squares closest to you (the same tier as bushes and ferns) hold their flowers.
+  `features/flowers.js` keeps that list, leaves out the ones the season has taken (`keep` against
+  the season's share) and the picked ones, and hands the rest to `world.drawPicks`, which fills
+  fixed slots (`buildFlowers` in `world/vegetation.js`; 1000 of a kind, the worst measured is
+  about 700 round the biggest lakes).
+- A picked flower is remembered by name with the time it was picked, until it has grown back
+  (four minutes), so it stays picked while you are away. This is not saved across a reload.
+- `picksNear(x, z, r)` (on the test handle as `wilds.picksNear`) answers by rule, whether or not
+  the squares are loaded; `tools/seeds.mjs` uses it to check each world starts with flowers.
+- Kinds are still the same seven everywhere; kinds by country come with the flower journal (4d).
 
 ## How lake life works (milestone 4b-2)
 

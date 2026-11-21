@@ -237,18 +237,16 @@ export function kitGrass(blades) {
 // ───────────── two more flower kinds ─────────────
 /** Kinds 5 (cup flower) and 6 (yellow bells) come from the kit; their colour is in the texture. */
 export const KIT_FLOWER_COLOURS = { 5: col('#e7785c'), 6: col('#f2c53d') };
-export function kitFlowerParts(flowers) {
+export function kitFlowerSlots(capacity) {
   const f3 = fit(pieces('Flower_3_Single'), 0.62), f4 = fit(pieces('Flower_4_Single'), 0.6);
   [f3, f4].forEach((m) => Object.values(m).forEach((g) => shadeByHeight(g, 0.7, 1.1)));
   const fade = (m) => softEdges(bothSides(addWind(m, 0.6, KIT_FLOWER_FADE)));
   const leafMat = fade(new THREE.MeshLambertMaterial({ map: tex('leaves'), alphaTest: 0.5, vertexColors: true }));
   const petalMat = softEdges(neonAtNight(bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ map: tex('flowers'), alphaTest: 0.5, vertexColors: true }), 0.6, KIT_FLOWER_FADE), 'lam'))));
-  const plain = flowers.map((f) => Object.assign({}, f, { color: null }));
   const kind = (f) => (f.kind >= 5 ? f.kind - 5 : -1);
-  const o = { cell: 40, far: KIT_FLOWER_FADE[1] };
   return [
-    instancedVariants([first(f3, /Leaves/), first(f4, /Leaves/)], leafMat, plain, kind, o),
-    instancedVariants([first(f3, /Flowers/), first(f4, /Flowers/)], petalMat, plain, kind, o),
+    [slotSet([first(f3, /Leaves/), first(f4, /Leaves/)], leafMat, capacity), kind],
+    [slotSet([first(f3, /Flowers/), first(f4, /Flowers/)], petalMat, capacity), kind],
   ];
 }
 

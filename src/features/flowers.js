@@ -1,5 +1,6 @@
 // Pick flowers (G), carry a bouquet, give it to the skipper or leave it on the bench.
-// Picked flowers grow back after a few minutes; there are fewer in autumn and none in winter.
+// Flowers grow wherever the land says (world/wilds.js, square by square); the ones near you are
+// kept here. Picked flowers grow back after a few minutes; there are fewer in autumn and none in winter.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { lerp } from '../core/math.js';
@@ -50,21 +51,27 @@ function buildBouquet(colors) {
 }
 
 export function initFlowers() {
-  const items = world.flowerItems, set = world.flowerSet;
-  const picked = new Float32Array(items.length).fill(-1e9);
-  const shownF = new Uint8Array(items.length).fill(1);
-  debugView = () => items.map((it, i) => ({ x: it.x, z: it.z, shown: !!shownF[i], kind: it.kind }));
-  const keep = items.map((it) => ((Math.sin(it.x * 12.9898 + it.z * 78.233) * 43758.5453) % 1 + 1) % 1); // stable per flower
-  const setShown = (i, on) => {
-    if (shownF[i] === on) return;
-    shownF[i] = on;
-    set.setVisibleAt(i, !!on);
+  // `items`: the flowers of the squares near you (they change as you walk); `shown`: those of them
+  // standing just now. A picked flower is remembered by its name until it has grown back, so it
+  // stays picked while you are away and its square is forgotten and grown again.
+  let items = world.picks || [], shown = [], lastFrac = -1, nearFlower = null, nearDist = 9;
+  const picked = new Map();
+  const redraw = () => {
+    const frac = seasonState.flowerFrac, now = clock.elapsed;
+    for (const [id, t] of picked) if (now - t > REGROW) picked.delete(id);
+    shown = items.filter((it) => it.keep < frac && !picked.has(it.id));
+    world.picksDropped = world.drawPicks ? world.drawPicks(shown) : 0;
+    lastFrac = frac;
   };
+  world.setPicks = (list) => { items = list; nearFlower = null; redraw(); };
+  debugView = () => { const up = new Set(shown); return items.map((it) => ({ id: it.id, x: it.x, z: it.z, shown: up.has(it), kind: it.kind })); };
+  /** Once a second: redraw if the season has taken or given flowers, or a picked one has grown back. */
   const refresh = () => {
-    const frac = seasonState.flowerFrac;
-    for (let i = 0; i < items.length; i++) setShown(i, keep[i] < frac && clock.elapsed - picked[i] > REGROW ? 1 : 0);
-    set.commit();
+    let due = seasonState.flowerFrac !== lastFrac;
+    if (!due) for (const t of picked.values()) if (clock.elapsed - t > REGROW) { due = true; break; }
+    if (due) redraw();
   };
+  redraw();
 
   let bouquet = Array.isArray(store.bouquet) ? store.bouquet.slice(0, MAX) : [];
   let inHand = null;
@@ -112,14 +119,12 @@ export function initFlowers() {
   onSave((s) => { s.bouquet = bouquet.slice(); });
 
   const nearBench = () => benchSeat && Math.hypot(benchSeat.x - player.x, benchSeat.z - player.z) < 2.3;
-  let nearFlower = -1, nearDist = 9;
   const scan = () => {
-    nearFlower = -1;
+    nearFlower = null;
     let best = 1.2;
-    for (let i = 0; i < items.length; i++) {
-      if (!shownF[i]) continue;
-      const it = items[i], d = Math.abs(it.x - player.x) + Math.abs(it.z - player.z);
-      if (d < best) { best = d; nearFlower = i; }
+    for (const it of shown) {
+      const d = Math.abs(it.x - player.x) + Math.abs(it.z - player.z);
+      if (d < best) { best = d; nearFlower = it; }
     }
     nearDist = best;
   };
@@ -165,15 +170,14 @@ export function initFlowers() {
   });
   registerAction({
     id: 'pick', key: 'KeyG', keyLabel: 'G', score: () => (nearDist < 0.7 ? 20 : 0), // standing on a flower picks it
-    available: () => activity.free && bouquet.length < MAX && nearFlower >= 0,
+    available: () => activity.free && bouquet.length < MAX && !!nearFlower,
     label: () => `Pick a flower${bouquet.length ? ` (${bouquet.length}/${MAX})` : ''}`,
     run: () => {
-      const i = nearFlower;
-      if (i < 0) return;
-      picked[i] = clock.elapsed;
-      setShown(i, 0);
-      set.commit();
-      bouquet.push('#' + items[i].color.getHexString() + ':' + items[i].kind);
+      const f = nearFlower;
+      if (!f) return;
+      picked.set(f.id, clock.elapsed);
+      redraw();
+      bouquet.push('#' + f.color.getHexString() + ':' + f.kind);
       rebuildHand();
       player.pickT = 0.6;
       if (bouquet.length === 1) toast(hasRod() ? 'Picked a flower. Gather more, then give the bouquet to the skipper or leave it on the bench.' : 'Picked a flower. A full bouquet of three kinds or more could win you the skipper\'s fishing rod.', 4.5);

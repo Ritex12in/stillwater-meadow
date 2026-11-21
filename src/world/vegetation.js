@@ -1,15 +1,15 @@
 // The models, materials and drawing slots for trees, boulders, reeds and lily pads (what grows
 // where is decided per square of land in world/wilds.js and per lake in world/lakelife.js), the
-// grass, and the flowers you can pick by the home lake.
+// grass, and the flowers you can pick (world/wilds.js says where those grow too).
 import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { TAU, fbm, vnoise, mulberry32 } from '../core/math.js';
-import { height, lakeT, lakeR, pathAmt, onDock, nearReserved, PATH_T, LAKE, HOME, WORLD } from '../core/shape.js';
-import { std, col, weatherize, addWind, bothSides, instancedVariants, lodSet, slotSet, softEdges, neonAtNight } from '../core/materials.js';
+import { TAU, vnoise } from '../core/math.js';
+import { HOME } from '../core/shape.js';
+import { std, col, weatherize, addWind, bothSides, lodSet, slotSet, softEdges, neonAtNight } from '../core/materials.js';
 import { pineFarGeos, crownFarGeos, pineTrunkFarGeos, crownTrunkFarGeos, pineGeos, crownGeos, flowerHeadGeos, flowerCentreGeo, flowerStemGeo, variantAt, FLOWER_KINDS, FLOWER_CENTRE } from './detail.js';
 import { world, obstacles } from '../core/state.js';
 import { kit, fit } from '../core/assets.js';
-import { kitTrees, kitRocks, kitFlowerParts, KIT_FLOWER_COLOURS } from './kitplants.js';
+import { kitTrees, kitRocks, kitFlowerSlots, KIT_FLOWER_COLOURS } from './kitplants.js';
 import { setLakeLifeSets, updateLakeLife } from './lakelife.js';
 import { buildGrassField } from './grassfield.js';
 export { buildUndergrowth } from './kitplants.js';
@@ -96,33 +96,6 @@ export function buildGrass() {
 }
 
 /**
- * Dense drifts of one flower along the path and just above the shore, where you walk and look.
- * Own random stream, appended after the scattered flowers: nothing placed before them moves.
- */
-function addDrifts(flowers, petals) {
-  const r = mulberry32(90417), first = flowers.length;
-  const spot = (x, z) => lakeT(x, z) >= 1.15 && pathAmt(x, z) <= 0.15 && !nearReserved(x, z, 1.4) && !onDock(x, z);
-  const centres = [];
-  for (let i = 0; i < 40; i++) {
-    const a = r() * TAU, R = lakeR(a);
-    // two in three by the path (either side of it), the rest on the bank above the sand
-    const t = i % 3 < 2 ? PATH_T + (r() < 0.5 ? -1 : 1) * (3.4 + r() * 2.5) / R : 1.19 + r() * 0.07;
-    centres.push({ x: LAKE.x + Math.cos(a) * R * t, z: LAKE.z + Math.sin(a) * R * t, kind: Math.floor(r() * 64), size: 1.3 + r() * 1.3, n: 30 + Math.floor(r() * 26) });
-  }
-  for (const c of centres) {
-    if (!spot(c.x, c.z)) continue;
-    const colour = petals[c.kind % petals.length];
-    for (let k = 0; k < c.n; k++) {
-      const a = r() * TAU, d = c.size * Math.sqrt(r()) * (0.6 + 0.4 * r());
-      const x = c.x + Math.cos(a) * d * 1.4, z = c.z + Math.sin(a) * d; // drifts are a little long
-      if (!spot(x, z)) continue;
-      flowers.push({ x, z, y: height(x, z) - 0.02, s: 0.8 + r() * 0.6, ry: r() * TAU, color: r() < 0.9 ? colour : petals[Math.floor(r() * petals.length)], drift: c.kind });
-    }
-  }
-  world.driftCount = flowers.length - first;
-}
-
-/**
  * The meadow pack's flower clumps (CC0) standing in for the five hand-built kinds, in the order
  * daisy, tulip, poppy, lavender, allium; `colour` is what a picked one adds to the bouquet.
  */
@@ -133,56 +106,65 @@ const MEADOW_FLOWERS = [
   { model: 'Flower_5_Clump', colour: col('#b98ae6') },  // violet iris
   { model: 'Flower_1_Clump', colour: col('#4aa9d0') },  // blue hydrangea
 ];
-function meadowFlowerParts(flowers) {
-  const geos = MEADOW_FLOWERS.map(({ model }) => {
+const hasMeadow = () => !!(kit && kit.models.Flower_1_Clump);
+function meadowFlowerGeos() {
+  return MEADOW_FLOWERS.map(({ model }) => {
     const parts = fit(Object.fromEntries(Object.entries(kit.models[model]).map(([k, g]) => [k, g.clone()])), model === 'Flower_1_Clump' ? 0.62 : 0.52);
     const g = Object.values(parts)[0], n = g.attributes.normal;
     for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0); // petals lit evenly from above, not edge-on dark
     return g;
   });
-  const mat = softEdges(neonAtNight(bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ map: kit.tex.meadow_flowers, alphaTest: 0.5, vertexColors: true }), 0.6, FLOWER_FADE), 'lam'))));
-  return instancedVariants(geos, mat, flowers.map((f) => Object.assign({}, f, { color: null })), (f) => (f.kind < FLOWER_KINDS.length ? f.kind : -1), { cell: 50, far: FLOWER_FADE[1] });
 }
 
+const PETALS = ['#ffffff', '#f6d65a', '#f19cb7', '#b7a3e6', '#ff9f7a', '#fdf0b0'].map(col);
+/** How many kinds of flower there are to pick (two more, 5 and 6, come with the nature kit). */
+export const flowerKinds = () => (kit ? FLOWER_KINDS.length + 2 : FLOWER_KINDS.length);
+/**
+ * Give a flower to pick its kind, its colour (what it adds to a bouquet) and its height. Kinds
+ * grow in patches with a few strays among them; `drift`, if given, is the kind of the drift the
+ * flower stands in. `a`, `b` and `c` are three random numbers of the flower's own.
+ */
+export function dressFlower(f, drift, a, b, c) {
+  const kinds = flowerKinds();
+  const patch = Math.floor(vnoise(f.x * 0.12 + 7, f.z * 0.12 + 3) * kinds * 1.6) % kinds;
+  f.kind = drift !== undefined ? drift % kinds : a < 0.7 ? patch : Math.floor(b * kinds) % kinds;
+  if (KIT_FLOWER_COLOURS[f.kind]) f.color = KIT_FLOWER_COLOURS[f.kind];
+  else if (hasMeadow()) f.color = MEADOW_FLOWERS[f.kind].colour; // the clump's own colour, for the bouquet
+  else f.color = b < 0.8 ? PETALS[Math.floor(vnoise(f.x * 0.15, f.z * 0.15) * PETALS.length) % PETALS.length] : PETALS[Math.floor(c * PETALS.length) % PETALS.length];
+  f.sy = f.s * (0.75 + 0.6 * c);
+  return f;
+}
+
+/** How many flowers of one kind can be drawn at once. */
+const FLOWER_SLOTS = 1000;
+/**
+ * Make the shapes and the slots the flowers you can pick are drawn from. world/wilds.js decides
+ * which grow in each square of land; features/flowers.js leaves out the picked ones and the ones
+ * the season has taken, and hands the rest to `world.drawPicks`.
+ */
 export function buildFlowers() {
-  const flowers = [];
-  const petals = ['#ffffff', '#f6d65a', '#f19cb7', '#b7a3e6', '#ff9f7a', '#fdf0b0'].map(col);
-  // (scattered over the meadow round the home lake, from a random stream of their own)
-  const R = mulberry32(WORLD.seed * 7 + 40417), reach = HOME.rmax * 2.4;
-  for (let i = 0; i < 9000 && flowers.length < 1800; i++) {
-    const a = R() * TAU, r = Math.sqrt(R()) * reach;
-    const x = HOME.x + Math.cos(a) * r, z = HOME.z + Math.sin(a) * r;
-    if (lakeT(x, z) < 1.14 || pathAmt(x, z) > 0.2 || nearReserved(x, z, 1.1)) continue;
-    if (fbm(x * 0.07 + 20, z * 0.07 - 4) < 0.56) continue;
-    const patch = Math.floor(vnoise(x * 0.15, z * 0.15) * petals.length) % petals.length;
-    flowers.push({ x, z, y: height(x, z) - 0.02, s: 0.8 + R() * 0.6, ry: R() * TAU, color: R() < 0.8 ? petals[patch] : petals[Math.floor(R() * petals.length)] });
+  const own = (f) => (f.kind < FLOWER_KINDS.length ? f.kind : -1);
+  const draw = []; // [slots, which of their shapes a flower takes (-1: none), (what is drawn for the list)]
+  if (hasMeadow()) {
+    // the five hand-built kinds show as the meadow pack's flower clumps when it loaded
+    const mat = softEdges(neonAtNight(bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ map: kit.tex.meadow_flowers, alphaTest: 0.5, vertexColors: true }), 0.6, FLOWER_FADE), 'lam'))));
+    draw.push([slotSet(meadowFlowerGeos(), mat, FLOWER_SLOTS), own]);
+  } else {
+    const stemMat = bothSides(addWind(new THREE.MeshLambertMaterial({ color: '#4f7a36', vertexColors: true }), 0.6, FLOWER_FADE));
+    const headMat = neonAtNight(bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), 0.6, FLOWER_FADE), 'lam')));
+    const centreMat = addWind(new THREE.MeshLambertMaterial({ color: '#ffffff' }), 0.6, FLOWER_FADE);
+    const centreOf = (f) => f.centre || (f.centre = Object.assign({}, f, { color: col(FLOWER_CENTRE[FLOWER_KINDS[f.kind]]) }));
+    draw.push([slotSet([flowerStemGeo()], stemMat, FLOWER_SLOTS * 3), (f) => (own(f) < 0 ? -1 : 0)]);
+    draw.push([slotSet(flowerHeadGeos(), headMat, FLOWER_SLOTS, { colored: true }), own]);
+    draw.push([slotSet([flowerCentreGeo()], centreMat, FLOWER_SLOTS * 2, { colored: true }), () => 0, (list) => list.filter((f) => FLOWER_CENTRE[FLOWER_KINDS[f.kind]]).map(centreOf)]);
   }
-  addDrifts(flowers, petals);
-  // kinds grow in drifts, with a few strays; stems vary in height
-  // (with the kit there are two more kinds, 5 and 6, whose colour comes with the model)
-  const kinds = kit ? FLOWER_KINDS.length + 2 : FLOWER_KINDS.length;
-  const meadow = !!(kit && kit.models.Flower_1_Clump);
-  flowers.forEach((f) => {
-    const drift = Math.floor(vnoise(f.x * 0.12 + 7, f.z * 0.12 + 3) * kinds * 1.6) % kinds;
-    f.kind = f.drift !== undefined ? f.drift % kinds : variantAt(f.x, f.z, 10, 5) < 7 ? drift : variantAt(f.x, f.z, kinds, 6);
-    if (KIT_FLOWER_COLOURS[f.kind]) f.color = KIT_FLOWER_COLOURS[f.kind];
-    else if (meadow) f.color = MEADOW_FLOWERS[f.kind].colour; // the clump's own colour, for the bouquet
-    f.sy = f.s * (0.75 + 0.6 * variantAt(f.x, f.z, 100, 7) / 100);
-  });
-  const stemMat = bothSides(addWind(new THREE.MeshLambertMaterial({ color: '#4f7a36', vertexColors: true }), 0.6, FLOWER_FADE));
-  const headMat = neonAtNight(bothSides(weatherize(addWind(new THREE.MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), 0.6, FLOWER_FADE), 'lam')));
-  const centreMat = addWind(new THREE.MeshLambertMaterial({ color: '#ffffff' }), 0.6, FLOWER_FADE);
-  const centres = flowers.map((f) => Object.assign({}, f, { color: FLOWER_CENTRE[FLOWER_KINDS[f.kind]] ? col(FLOWER_CENTRE[FLOWER_KINDS[f.kind]]) : null }));
-  world.flowerItems = flowers;
-  // the five hand-built kinds show as the meadow pack's flower clumps when it loaded
-  const parts = meadow ? [meadowFlowerParts(flowers)] : [
-    instancedVariants([flowerStemGeo()], stemMat, flowers.map((f) => Object.assign({}, f, { color: null })), (f) => (f.kind < FLOWER_KINDS.length ? 0 : -1), { cell: 50, far: FLOWER_FADE[1] }),
-    instancedVariants(flowerHeadGeos(), headMat, flowers, (f) => (f.kind < FLOWER_KINDS.length ? f.kind : -1), { cell: 50, far: FLOWER_FADE[1] }),
-    instancedVariants([flowerCentreGeo()], centreMat, centres, (f) => (f.color ? 0 : -1), { cell: 50, far: FLOWER_FADE[1] }),
-  ];
-  if (kit) parts.push(...kitFlowerParts(flowers));
-  /** Every part of flower `i` shows or hides together. */
-  world.flowerSet = { setVisibleAt(i, on) { parts.forEach((p) => p.setVisibleAt(i, on)); }, commit() { parts.forEach((p) => p.commit()); } };
+  if (kit) draw.push(...kitFlowerSlots(FLOWER_SLOTS));
+  /** Draw these flowers and no others. Returns how many found no free slot (it should be none). */
+  world.drawPicks = (list) => {
+    let lost = 0;
+    for (const [slots, shape, pick] of draw) { slots.setItems(pick ? pick(list) : list, shape); lost += slots.dropped; }
+    return lost;
+  };
 }
 
 /** A water lily: two rings of pointed petals opening into a cup round a golden centre. */

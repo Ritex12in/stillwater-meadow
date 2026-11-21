@@ -1,6 +1,6 @@
 // The endless land: ground everywhere, the same for the same seed, and no dearer the further you go.
 import { test, expect } from './harness.js';
-import { open, step, teleport, noErrors } from './helpers.js';
+import { open, step, teleport, press, noErrors } from './helpers.js';
 
 test('the land has no edge: you can stand far beyond the old valley, on ground that matches its formula', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer', '#12');
@@ -186,5 +186,68 @@ test('kinds of country: snow, heath, lush woods and blossom groves all exist, an
   expect(k.grove.blossom / k.grove.trees, 'groves are blossom trees').toBeGreaterThan(0.4);
   expect(k.meadow.blossom / k.meadow.trees).toBeLessThan(0.08);
   expect(land.home.snow + land.home.dry + land.home.lush + land.home.grove, 'the valley keeps its mild weather').toBeLessThan(0.01);
+  noErrors(errors);
+});
+
+test('flowers to pick grow wherever the land allows: far from home too, each remembered while you are away, none under snow', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  await step(page, 0.5);
+  const sign = () => page.evaluate(() => { const m = window.__meadow; return m.wilds.picksNear(m.home.x, m.home.z, 90).map((f) => f.id + '@' + f.x.toFixed(3) + ',' + f.z.toFixed(3) + ':' + f.kind).join(' '); });
+  // by the home lake: a bouquet of three kinds is a short walk away (the skipper asks for one)
+  const home = await page.evaluate(() => {
+    const m = window.__meadow, by = {};
+    for (const f of m.wilds.picksNear(m.spawn.x, m.spawn.z, 60)) by[f.kind] = (by[f.kind] || 0) + 1;
+    return { kinds: Object.values(by).filter((n) => n >= 4).length, shown: m.flowers().filter((f) => f.shown).length, dropped: m.wilds.stats().dropped };
+  });
+  expect(home.kinds, 'kinds with four or more flowers within 60 m of where you start').toBeGreaterThanOrEqual(3);
+  expect(home.shown).toBeGreaterThan(200);
+  expect(home.dropped).toBe(0);
+  const before = await sign();
+  // far out in open country (no lake's meadow): find a few, by the land's rule alone
+  const spot = await page.evaluate(() => {
+    const m = window.__meadow, h = m.home;
+    for (let d = 1500; d < 2600; d += 60) for (let a = 0; a < 6.28; a += 0.5) {
+      const x = h.x + Math.cos(a) * d, z = h.z + Math.sin(a) * d;
+      if (!m.geo.walkable(x, z) || m.lakes(200).some((L) => Math.hypot(L.x - x, L.z - z) < 300)) continue;
+      const f = m.wilds.picksNear(x, z, 30);
+      if (f.length >= 3 && m.geo.walkable(f[0].x + 0.4, f[0].z)) return { x: f[0].x + 0.4, z: f[0].z, id: f[0].id };
+    }
+    return null;
+  });
+  expect(spot, 'flowers grow 1.5 km and more from home').not.toBeNull();
+  // (arrive, let the camera catch up, and have everything round you grown at once rather than a little each frame)
+  const go = (x, z) => page.evaluate(([x, z]) => { const m = window.__meadow; m.travelTo(x, z); for (let i = 0; i < 30; i++) m.tick(1 / 30); m.ground.settle(x, z); m.wilds.settle(x, z); }, [x, z]);
+  await go(spot.x, spot.z);
+  const seen = (id) => page.evaluate((id) => { const f = window.__meadow.flowers().find((q) => q.id === id); return f ? f.shown : null; }, id);
+  expect(await seen(spot.id), 'it stands there').toBe(true);
+  await press(page, 'KeyG', 0.8);
+  const got = await page.evaluate(() => { const m = window.__meadow, mine = m.flowers().filter((f) => !f.shown); return { bouquet: (m.store.bouquet || []).length, gone: mine.map((f) => f.id), dropped: m.wilds.stats().dropped }; });
+  expect(got.bouquet, 'picked').toBe(1);
+  expect(got.gone.length).toBe(1);
+  expect(got.dropped).toBe(0);
+  const picked = got.gone[0];
+  // go a long way off (its square is forgotten) and come back: it is still picked
+  await go(spot.x + 700, spot.z);
+  expect(await seen(picked), 'out of reach, it is not kept at all').toBeNull();
+  await go(spot.x, spot.z);
+  expect(await seen(picked), 'still picked on coming back').toBe(false);
+  // and after a few minutes it has grown again
+  await page.evaluate(() => { const m = window.__meadow; for (let i = 0; i < 2460; i++) m.tick(0.1); });
+  expect(await seen(picked), 'grown back').toBe(true);
+  // none under snow
+  const snow = await page.evaluate(() => {
+    const m = window.__meadow, S = 57.6;
+    for (let iz = -45; iz <= 45; iz += 2) for (let ix = -45; ix <= 45; ix += 2) {
+      const x = (ix + 0.5) * S, z = (iz + 0.5) * S;
+      if (m.geo.height(x, z) < 60 && m.climate(x, z).snow > 0.8) return { n: m.wilds.picks(ix, iz).length };
+    }
+    return null;
+  });
+  expect(snow, 'there is snow country to look in').not.toBeNull();
+  expect(snow.n).toBe(0);
+  // the same flowers, with the same names, after loading the world again
+  await page.reload();
+  await page.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });
+  expect(await sign(), 'the same flowers after a reload').toBe(before);
   noErrors(errors);
 });

@@ -9,7 +9,7 @@
 // lake nearest that spot (lakeAt), so the same code holds for one lake or many. For now there is
 // one: HOME, the valley's own. The older single-lake names (LAKE, lakeR, lakePoint, SPAWN,
 // dockStart, ...) still stand for that lake and its places.
-import { smooth, fbm, mulberry32 } from './math.js';
+import { smooth, clamp, fbm, mulberry32 } from './math.js';
 import { seasonState } from './state.js';
 import { query } from './env.js';
 
@@ -93,6 +93,35 @@ export function height(x, z) {
   const k = smooth(0.8, 1.6, t);
   return floor * (1 - k) + base * k - lake.path(x, z) * 0.08;
 }
+
+// ── Climate ────────────────────────────────────────────────────
+// Two broad fields, read from the same seeded noise as the land, decide what kind of country a
+// place is: how cold it is and how much rain it gets. Everything that covers the land reads them
+// (the ground's colour and snow, the grass, which trees grow and how thickly, the flowers), so
+// the kinds of country change together as you travel, and blend where they meet:
+//   cold  -> snow in drifts, then snowfields; pines; no flowers      (also: the higher, the colder)
+//   dry   -> golden heath, tall pale grass, a few airy trees, more boulders
+//   wet   -> lush dark-green country, thick mixed woods, ferns and mushrooms
+// and here and there a blossom grove. The valley round the home lake keeps its own mild weather.
+const mild = (x, z) => smooth(140, 330, Math.hypot(x, z)); // (0 in the valley, 1 beyond it: goes when the valley does)
+/** How cold a spot is, 0 mild .. 1 frozen. `h` is the ground's height there. */
+export function coldAt(x, z, h) {
+  const n = fbm((x + SX * 17) * 0.0011 - 63.4, (z + SZ * 17) * 0.0011 + 28.9);
+  return clamp(smooth(0.575, 0.7, n) * mild(x, z) + smooth(78, 132, h), 0, 1);
+}
+/** How much rain a spot gets, 0 parched .. 1 soaked (0.5 in between, and in the valley). */
+export function rainAt(x, z) {
+  const n = fbm((x + SX * 17) * 0.0013 + 19.2, (z + SZ * 17) * 0.0013 - 51.7);
+  return 0.5 + (n - 0.5) * mild(x, z);
+}
+/** From the rain: how parched (0..1) and how lush (0..1) a spot is. */
+export const dryOf = (rain) => smooth(0.475, 0.37, rain), lushOf = (rain) => smooth(0.535, 0.65, rain);
+/** How much a spot is part of a blossom grove (0..1): rare pockets, a hundred metres or so across. */
+export function groveAt(x, z) {
+  return smooth(0.675, 0.74, fbm((x + SX * 17) * 0.0042 + 133.1, (z + SZ * 17) * 0.0042 - 87.5)) * mild(x, z);
+}
+/** How much snow lies at a spot with this much cold (before the ragged edge the ground's shader gives it). */
+export const snowOf = (cold) => smooth(0.46, 0.62, cold);
 
 // ── The ground as drawn ────────────────────────────────────────
 // The ground is drawn in tiles; where a fine tile is loaded, heights are read from its own

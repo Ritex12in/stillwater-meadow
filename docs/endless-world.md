@@ -30,8 +30,8 @@ Each one leaves the game playable and tested.
 | 2a | **Endless ground.** Land from a world seed (`?seed=`), drawn in tiles round the camera at five sizes; the painted mountain ring replaced by real far terrain; grass, clouds and birds follow the player; the walk limit removed (steep slopes block instead). The valley's own trees and flowers still stand where they did. | Tile buffers stop growing over repeated 2 km trips (`tests/world.spec.js`); same seed, same land. Smoothness still needs a look on a real GPU. | done |
 | 2b | **Trees everywhere.** Each 57.6 m square beyond the valley grows its own trees from the seed; real models near the player, cards further off; the camera, walkers, animals and seasons treat them like the valley's. | A square regrows identically; no tree is dropped for want of a slot; repeated 2 km trips leave the scene's object count unchanged (`tests/world.spec.js`). | done |
 | 2c | **Small plants and rocks beyond the valley.** Boulders (with the tree models), and in the squares closest to the player bushes, ferns, mushrooms and drifts of daisies, lupins and tulips. The valley's own build-once plants stay until milestone 4 retires the valley. Picking flowers out there waits for milestone 4 too. | A square regrows identically; nothing dropped (`tests/world.spec.js`). | done |
-| 3 | **Biomes.** Meadow, forest, hills, mountains and snow, blending into each other. | | next |
-| 4 | **Lakes and landmarks everywhere.** The fixed home goes. | |
+| 3 | **Kinds of country.** A climate (cold, rain) read from the seed: snowfields and pines in the cold, golden heath with a few birches where it is dry, thick dark-green woods where it is wet, mild meadow between, and rare blossom groves. The ground, grass, trees, boulders and flowers all follow it, and far tiles show it from a distance. | Each kind exists within 2.6 km and grows its own trees; the valley stays mild (`tests/world.spec.js`). | done |
+| 4 | **Lakes and landmarks everywhere.** The fixed home goes. | | next |
 | 5 | **Travelling.** Companions keep up; the save holds seed and position; a way to find places again. | |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. | |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | |
@@ -119,6 +119,24 @@ or dropped once a pack is chosen.
   show as pale shapes; fog, rain and snow push it back to full.
 - `world/grassfield.js` keeps a 144 x 144 map of height and "grass grows here" round the camera
   and shifts it as the camera moves.
+
+## How the climate works (milestone 3)
+
+- `core/shape.js`: `coldAt(x, z, h)` (a broad noise field, plus altitude) and `rainAt(x, z)`
+  (another), with `snowOf`, `dryOf`, `lushOf` turning them into 0..1 amounts, and `groveAt` for
+  blossom groves. `mild()` keeps the valley round the origin neutral; it goes with the valley in
+  milestone 4.
+- Ground: each tile vertex carries `clime` (cold, dry). The ground shader tints dry ground gold
+  and lays snow where cold passes a threshold, with a ragged edge from its own noise. Lush country
+  darkens the vertex tint. Snow on the peaks is the same mechanism (cold rises with height).
+- Grass: the camera-centred map's two spare channels hold cold and dry; tufts vanish under snow
+  and grow taller and golden on the heath.
+- Trees, boulders, small plants (`world/wilds.js`): density from woods-noise scaled by climate;
+  pines by cold; birches and open-crowned trees on the heath; blossom trees and tulip carpets in
+  groves; no small plants or flowers under snow.
+- `window.__meadow.climate(x, z)` returns `{ snow, dry, lush, grove }` for tests.
+- Not done: weather per region (snowfall in the cold), snow on tree crowns in snowfields, and
+  climate-specific sounds.
 
 ## How the trees work (milestone 2b)
 

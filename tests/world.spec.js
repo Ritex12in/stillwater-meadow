@@ -155,3 +155,26 @@ test('the wilds are furnished: each square has its own boulders, bushes and flow
   expect(there.dropped).toBe(0);
   noErrors(errors);
 });
+
+test('kinds of country: snow, heath, lush woods and blossom groves all exist, and each grows its own trees', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const land = await page.evaluate(() => {
+    const m = window.__meadow, w = m.wilds, S = 57.6, kinds = {};
+    const add = (k, trees) => { const o = kinds[k] || (kinds[k] = { squares: 0, trees: 0, pines: 0, blossom: 0 }); o.squares++; o.trees += trees.length; o.pines += trees.filter((t) => t.type === 'pine').length; o.blossom += trees.filter((t) => t.type === 'blossom').length; };
+    for (let iz = -45; iz <= 45; iz += 2) for (let ix = -45; ix <= 45; ix += 2) {
+      const x = (ix + 0.5) * S, z = (iz + 0.5) * S;
+      if (m.geo.height(x, z) > 60) continue; // (lowland only: mountains are rock and snow whatever the climate)
+      const c = m.climate(x, z);
+      add(c.snow > 0.8 ? 'snow' : c.grove > 0.8 ? 'grove' : c.dry > 0.8 ? 'heath' : c.lush > 0.8 ? 'lush' : c.snow + c.dry + c.lush + c.grove < 0.1 ? 'meadow' : 'between', w.square(ix, iz));
+    }
+    return { kinds, home: m.climate(0, 20) };
+  });
+  const k = land.kinds;
+  for (const name of ['snow', 'heath', 'lush', 'grove', 'meadow']) expect(k[name] && k[name].squares, `there is ${name} country`).toBeGreaterThan(8);
+  expect(k.snow.pines / k.snow.trees, 'the cold grows pines').toBeGreaterThan(0.85);
+  expect(k.lush.trees / k.lush.squares, 'lush country is thickly wooded').toBeGreaterThan(2.5 * k.heath.trees / k.heath.squares);
+  expect(k.grove.blossom / k.grove.trees, 'groves are blossom trees').toBeGreaterThan(0.4);
+  expect(k.meadow.blossom / k.meadow.trees).toBeLessThan(0.08);
+  expect(land.home.snow + land.home.dry + land.home.lush + land.home.grove, 'the valley keeps its mild weather').toBeLessThan(0.01);
+  noErrors(errors);
+});

@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { smooth } from '../core/math.js';
-import { heightAt, slopeAt, lakeT, pathAmt, nearReserved, onDock, BENCH_SPOT, SPAWN } from '../core/shape.js';
+import { heightAt, slopeAt, lakeT, pathAmt, nearReserved, onDock, BENCH_SPOT, SPAWN, coldAt, rainAt, dryOf } from '../core/shape.js';
 import { weatherize, bothSides, timeU, windU, camU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { onShrineGround } from './shrine.js';
@@ -17,7 +17,7 @@ import { rockAmt } from './terrain.js';
 /** Share of the tufts drawn (the grass-density setting). */
 export const grassU = { density: { value: 1 } };
 
-// ── the ground map: height and how grassy each spot is, on the ground's own 1.2 m grid ──
+// ── the ground map: height, how grassy each spot is, and its climate (cold, dry), on the ground's own 1.2 m grid ──
 // A window onto the endless ground, MAP_N texels square, that keeps itself round the camera: once
 // the camera has moved a few texels the window shifts, keeping what it already knows and working
 // out only the strip that has come into it.
@@ -39,8 +39,8 @@ export function updateGrassMap(cx, cz) {
   for (let j = 0; j < MAP_N; j++) {
     for (let i = 0; i < MAP_N; i++) {
       const o = (j * MAP_N + i) * 4, oi = i + dx, oj = j + dz;
-      if (oi >= 0 && oi < MAP_N && oj >= 0 && oj < MAP_N) { const q = (oj * MAP_N + oi) * 4; mapNext[o] = mapData[q]; mapNext[o + 1] = mapData[q + 1]; }
-      else { const x = (ix + i) * MAP_STEP, z = (iz + j) * MAP_STEP, h = heightAt(x, z); mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h); }
+      if (oi >= 0 && oi < MAP_N && oj >= 0 && oj < MAP_N) { const q = (oj * MAP_N + oi) * 4; mapNext[o] = mapData[q]; mapNext[o + 1] = mapData[q + 1]; mapNext[o + 2] = mapData[q + 2]; mapNext[o + 3] = mapData[q + 3]; }
+      else { const x = (ix + i) * MAP_STEP, z = (iz + j) * MAP_STEP, h = heightAt(x, z); mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h); mapNext[o + 2] = coldAt(x, z, h); mapNext[o + 3] = dryOf(rainAt(x, z)); }
     }
   }
   [mapData, mapNext] = [mapNext, mapData];
@@ -114,9 +114,11 @@ function grassMaterial(map, tex) {
           float cut = mix(uFade.x, uFade.y, sqrt(h3));
           float k = (1.0 - smoothstep(cut - 5.0, cut, d)) * smoothstep(0.25, 0.6, g.y) * smoothstep(uInner - 3.0, uInner, d);
           k *= step(gh(cell + 53.7), uDensity); // the grass-density setting keeps this share of the tufts
+          // the climate (g.z cold, g.w dry): grass thins out where snow lies, tuft by tuft, and is gone under a snowfield
+          k *= 1.0 - smoothstep(0.4, 0.62, g.z + (h1 - 0.5) * 0.16);
           // meadow patches: taller, lusher grass in drifts, shorter turf between
           float drift = gh(floor(base / 7.0)) * 0.5 + gh(floor(base / 3.1) + 5.0) * 0.5;
-          float tall = mix(0.15, 0.42, h3 * 0.5 + drift * 0.5) * uScale * k;
+          float tall = mix(0.15, 0.42, h3 * 0.5 + drift * 0.5) * uScale * k * (1.0 + g.w * 0.45); // (taller on the heath)
           float ang = h1 * 6.2832;
           vec3 p = position;
           // (thinned-away tufts shrink to nothing sideways too: flat, they would stick out of a slope)
@@ -133,6 +135,8 @@ function grassMaterial(map, tex) {
           transformed = vec3(base.x + p.x, g.x - 0.04 + p.y, base.y + p.z);
           // dark roots, sunlit tips, and a little colour drift from tuft to tuft
           vec3 tuftTint = mix(vec3(0.85, 0.97, 0.85), vec3(1.1, 1.02, 0.82), h2) * (0.85 + 0.25 * drift);
+          tuftTint *= mix(vec3(1.0), vec3(1.34, 1.1, 0.6), g.w);                        // gold on the heath
+          tuftTint = mix(tuftTint, vec3(1.05, 1.1, 1.0), smoothstep(0.25, 0.5, g.z) * 0.5); // frosted pale toward the snow
           ${tex ? '// the painted texture shades root to tip\n          vColor.rgb = tuftTint * 1.15;' : 'vColor.rgb = mix(vec3(0.24, 0.36, 0.15), vec3(0.62, 0.74, 0.34), color.r) * tuftTint;'}
         }`);
     sh.fragmentShader = 'varying float vGust;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>

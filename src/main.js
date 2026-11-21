@@ -6,7 +6,7 @@ import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU, updateDetail, neonU } from './core/materials.js';
-import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, heightAt } from './core/shape.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, heightAt, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt } from './core/shape.js';
 import { hooks, seasonState, seats, world } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU } from './world/sky.js';
@@ -311,6 +311,8 @@ window.__meadow = {
   fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, pets: petsView, fetch: fetchView, friend: friendView, get friendSt() { return friend && friend.st; }, dance: danceView, snowman: snowmanView, wardrobe: wardrobeNow, emote: playEmote, emoteState, toast,
   geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') },
   seed: WORLD.seed,
+  /** The climate at a spot: how much snow lies, how parched, how lush, how much of a blossom grove (each 0..1). */
+  climate: (x, z) => { const rain = rainAt(x, z); return { snow: snowOf(coldAt(x, z, height(x, z))), dry: dryOf(rain), lush: lushOf(rain), grove: groveAt(x, z) }; },
   // the ground's tiles: what is loaded, and ways to bring it up to date without waiting for frames
   ground: { stats: groundStats, update: updateGround, pump: pumpGround, settle: settleGround },
   // the trees beyond the valley: what is loaded, a way to bring it up to date, and one square's trees

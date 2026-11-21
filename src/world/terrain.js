@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { smooth, fbm } from '../core/math.js';
-import { height, lakeT, pathAmt, setGroundSampler } from '../core/shape.js';
+import { height, lakeT, pathAmt, setGroundSampler, coldAt, rainAt, dryOf, lushOf, snowOf } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -47,7 +47,7 @@ const EDGE_OF = [(k) => k, (k) => TILE_N * V + k, (k) => k * V, (k) => k * V + T
 
 let groundMat = null, textured = false;
 const g1 = col('#5c9040'), g2 = col('#86b44e'), g3 = col('#3d7034'), sand = col('#dcc895'), bed = col('#7a7856');
-const dirt = col('#c4ab7c'), moss = col('#5c7444'), rock = col('#8d8b7d');
+const dirt = col('#c4ab7c'), moss = col('#5c7444'), rock = col('#8d8b7d'), heath = col('#b9a35c'), snowy = col('#eef2f8');
 const MOSS_TINT = new THREE.Color(0.8, 0.85, 0.7), c = new THREE.Color();
 
 /** How rocky the ground is (0 grass .. 1 bare rock): steep slopes and the high mountains. */
@@ -108,10 +108,11 @@ function takePart() {
   if (p) return p;
   partsMade++;
   const geo = new THREE.BufferGeometry();
-  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, h: new Float32Array(GRID) };
+  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, clm: new Float32Array(VERTS * 2), h: new Float32Array(GRID) };
   geo.setAttribute('position', new THREE.BufferAttribute(part.pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(part.nrm, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(part.col, 3));
+  geo.setAttribute('clime', new THREE.BufferAttribute(part.clm, 2));
   if (textured) geo.setAttribute('splat', new THREE.BufferAttribute(part.spl, 4));
   geo.setIndex(tileIndex);
   geo.boundingSphere = new THREE.Sphere();
@@ -126,7 +127,7 @@ function takePart() {
 /** Fill a tile's buffers from the land's formula. A generator: it yields every few rows so the work can be spread over frames. */
 function* fill(t) {
   const part = takePart(), s = tileSize(t.lv), cs = s / TILE_N, x0 = t.ix * s, z0 = t.iz * s;
-  const { pos, nrm, col: cols, spl, h: hOut } = part;
+  const { pos, nrm, col: cols, spl, clm, h: hOut } = part;
   // heights, one cell beyond the tile on every side: normals then come from the land itself, not
   // from this tile's triangles, so light runs unbroken across the joins
   for (let j = 0; j < W; j++) {
@@ -149,6 +150,10 @@ function* fill(t) {
       const lt = lakeT(x, z);
       const wSand = 1 - smooth(1.02, 1.16, lt), wBed = smooth(0.05, -0.8, h), wDirt = lt < 2.2 ? pathAmt(x, z) * 0.9 : 0;
       const wRock = rockAmt(h, slope) * 0.85, wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6;
+      // the climate here: snow does not lie on cliffs; lush country is a deeper green
+      const rain = rainAt(x, z), dry = dryOf(rain), cold = coldAt(x, z, h) * (1 - smooth(0.9, 1.5, slope) * 0.55);
+      clm[k * 2] = cold; clm[k * 2 + 1] = dry;
+      c.multiplyScalar(1 - lushOf(rain) * 0.16);
       if (textured) {
         // the grass patches become a tint around 1 (the texture brings the colour); weights go apart
         // keep only a little of the patch hue, and its brightness relative to the average green
@@ -156,7 +161,7 @@ function* fill(t) {
         c.setRGB(1 + (c.r / L - 1) * 0.25, 1 + (c.g / L - 1) * 0.25, 1 + (c.b / L - 1) * 0.25).multiplyScalar(L / 0.32 * 0.88).lerp(MOSS_TINT, wMoss);
         spl[k * 4] = wSand; spl[k * 4 + 1] = wBed; spl[k * 4 + 2] = wDirt; spl[k * 4 + 3] = wRock;
       } else {
-        c.lerp(sand, wSand).lerp(bed, wBed).lerp(dirt, wDirt).lerp(moss, wMoss).lerp(rock, wRock);
+        c.lerp(heath, dry * 0.75).lerp(sand, wSand).lerp(bed, wBed).lerp(dirt, wDirt).lerp(moss, wMoss).lerp(rock, wRock).lerp(snowy, snowOf(cold) * 0.9);
       }
       cols[k * 3] = c.r; cols[k * 3 + 1] = c.g; cols[k * 3 + 2] = c.b;
     }
@@ -170,6 +175,7 @@ function* fill(t) {
       for (let q = 0; q < 3; q++) { pos[to * 3 + q] = pos[from * 3 + q]; nrm[to * 3 + q] = nrm[from * 3 + q]; cols[to * 3 + q] = cols[from * 3 + q]; }
       pos[to * 3 + 1] -= drop;
       if (spl) for (let q = 0; q < 4; q++) spl[to * 4 + q] = spl[from * 4 + q];
+      clm[to * 2] = clm[from * 2]; clm[to * 2 + 1] = clm[from * 2 + 1];
     }
   }
   const { geo, mesh } = part;
@@ -293,10 +299,11 @@ function groundDetail(mat, textured) {
         tLeaves: { value: kit.tex.leaves_litter }, uAutumn: groundU.autumn,
       });
     }
-    sh.vertexShader = 'varying vec3 vGround;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+    sh.vertexShader = 'varying vec3 vGround;\nattribute vec2 clime;\nvarying vec2 vClime;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
       vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      vClime = clime;
       ${textured ? 'vSplat = splat;' : ''}`);
-    sh.fragmentShader = 'varying vec3 vGround;\nuniform vec3 uCam;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
+    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec2 vClime;\nuniform vec3 uCam;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
       // (wrapped first: far from the middle of the world the numbers get too big for sin() to scatter)
       float gHash(vec2 p) { return fract(sin(dot(mod(p, 1024.0), vec2(127.1, 311.7))) * 43758.5453); }
       float gNoise(vec2 p) {
@@ -360,9 +367,12 @@ function groundDetail(mat, textured) {
         diffuseColor.rgb *= 1.0 + shade;
         // sunlit patches lean yellow-green, shaded ones blue-green
         diffuseColor.rgb += vec3(0.025, 0.02, -0.02) * (broad - 0.5) * 2.0 * diffuseColor.g;
-        // snow lies on the high peaks all year, with a ragged lower edge
-        float capLine = 118.0 + (broad - 0.5) * 36.0 + (mid - 0.5) * 8.0;
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.93, 0.98), smoothstep(capLine, capLine + 14.0, vGround.y));
+        ${textured ? `// the climate: parched heath turns the grass gold (clumps of it paler, patches greener)
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(1.3, 1.07, 0.64) * (0.92 + 0.16 * mid), vClime.y);` : ''}
+        // in the cold, snow lies in ragged drifts that close up into snowfields (and on the high peaks all year)
+        float snowIn = vClime.x + (broad - 0.5) * 0.3 + (mid - 0.5) * 0.14;
+        vec3 snowCol = mix(vec3(0.78, 0.85, 0.96), vec3(0.95, 0.97, 1.0), smoothstep(0.3, 0.75, broad));
+        diffuseColor.rgb = mix(diffuseColor.rgb, snowCol, smoothstep(0.47, 0.6, snowIn));
       }`);
     farHaze(sh);
   };

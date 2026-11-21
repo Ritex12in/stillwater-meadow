@@ -10,7 +10,7 @@
 import { query } from '../core/env.js';
 const KEY = 'stillwater-meadow';
 const LEGACY_KEY = 'stillwater-meadow-v1';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 function read(key) {
   try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; }
@@ -24,6 +24,22 @@ function migrate(data) {
     // v1 (single-file build) stored the same fields without a version or settings block
     data.settings = data.settings || {};
     data.version = 2;
+  }
+  if (data.version === 2) {
+    // v3: what you carry is in the backpack (systems/pack.js): the rod, the fish from the creel, the pine cones
+    const pack = Array.from({ length: 24 }, () => null);
+    let uid = 0;
+    const put = (it) => { const at = pack.indexOf(null); if (at >= 0) pack[at] = Object.assign({ uid: ++uid, key: null, n: 1 }, it); };
+    if (data.rod || (data.journal && Object.keys(data.journal).length)) put({ type: 'rod' }); // (a save with catches had the rod)
+    if (Array.isArray(data.creel)) {
+      const by = new Map();
+      for (const f of data.creel) if (f && f.id) { if (!by.has(f.id)) by.set(f.id, []); by.get(f.id).push(f.cm); }
+      for (const [id, cms] of by) put({ type: 'fish', key: id, n: cms.length, list: cms });
+    }
+    if (data.cones > 0) put({ type: 'cone', n: Math.min(16, data.cones) });
+    data.pack = pack; data.packUid = uid;
+    delete data.rod; delete data.creel; delete data.cones;
+    data.version = 3;
   }
   return data;
 }

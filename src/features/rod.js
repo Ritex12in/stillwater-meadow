@@ -13,18 +13,21 @@ import { ferry, sk, skipper } from '../characters/boat.js';
 
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
-import { store, saveSoon } from '../systems/save.js';
+
 import { growSquare } from '../world/wilds.js';
 import { toast } from '../ui/hud.js';
-import { carry } from '../ui/backpack.js';
+import { itemKind, has, count, add, takeAll } from '../systems/pack.js';
+import { ICONS } from '../ui/icons.js';
 
 export const BOUQUET_FULL = 12, BOUQUET_KINDS = 3, CONES_NEEDED = 5;
 
 /** Does the player own the rod? */
-export const hasRod = () => !!store.rod;
+export const hasRod = () => has('rod');
+itemKind('rod', { name: 'Fishing rod', icon: ICONS.rod, detail: () => 'The skipper\'s old rod. Press R by the water to cast.' });
+itemKind('cone', { name: 'Pine cone', max: 16, icon: ICONS.cone, detail: (it) => (hasRod() ? `${it.n} pine ${it.n === 1 ? 'cone' : 'cones'}.` : `${it.n} of the ${CONES_NEEDED} the skipper asks for in winter.`) });
 let coneView = () => [];
 /** For tests: the pine cones still lying about, and whether they are showing. */
-export const rodView = () => ({ rod: !!store.rod, cones: store.cones || 0, lying: coneView() });
+export const rodView = () => ({ rod: hasRod(), cones: count('cone'), lying: coneView() });
 const winter = () => seasonState.name === 'Winter';
 
 /** What the skipper thinks of a bouquet (array of "#colour:kind"), when you have no rod yet. */
@@ -37,8 +40,7 @@ export function judgeBouquet(bouquet) {
 
 /** Hand over the rod (called by whichever gift earned it). */
 export function giveRod(how) {
-  store.rod = true;
-  saveSoon();
+  if (!hasRod()) add('rod');
   sk.nod = 1; sk.waveT = 2;
   hero.face.flash('love', 4);
   toast(`The skipper takes the ${how} with a grin and hands you his old fishing rod. Press R by the water to cast.`, 6);
@@ -51,12 +53,11 @@ export function nearSkipper(range = 3.2) {
 }
 
 export function initRod() {
-  if (!store.rod && store.journal && Object.keys(store.journal).length) store.rod = true; // older saves
 
   // the skipper says what he wants the first time you come near without a rod
   let told = false;
   hooks.frame.push(() => {
-    if (store.rod || told || !nearSkipper(4)) return;
+    if (hasRod() || told || !nearSkipper(4)) return;
     told = true;
     toast(winter()
       ? `The skipper: "No flowers this time of year. Bring me ${CONES_NEEDED} pine cones from under the pines and my old rod is yours."`
@@ -86,36 +87,33 @@ export function initRod() {
     scene.add(m);
     cones.push({ m, x, z, taken: false });
   }
-  store.cones = store.cones || 0;
-  carry('rod', () => (store.rod ? { name: 'Fishing rod', detail: 'the skipper\'s old rod · R to cast', color: '#8a5a34' } : null), 10);
-  carry('cones', () => (store.cones > 0 ? { name: 'Pine cones', detail: store.rod ? String(store.cones) : `${store.cones} of ${CONES_NEEDED} for the skipper`, color: '#7a4f2c' } : null), 40);
   coneView = () => cones.filter((c) => !c.taken).map((c) => ({ x: c.x, z: c.z, shown: c.m.visible }));
   let nearCone = null;
   registerAction({
     id: 'pick-cone', key: 'KeyG', keyLabel: 'G', score: () => 15,
     available: () => activity.free && nearCone,
-    label: () => `Pick up a pine cone (${store.cones}/${CONES_NEEDED})`,
+    label: () => `Pick up a pine cone (${count('cone')}/${CONES_NEEDED})`,
     run: () => {
       if (!nearCone) return;
+      if (!add('cone')) { toast('Your backpack is full.'); return; }
       nearCone.taken = true; nearCone.m.visible = false;
-      store.cones++; saveSoon();
       player.pickT = 0.6;
-      if (store.cones === CONES_NEEDED) toast('That makes five pine cones. Take them to the skipper at the jetty.', 4.5);
+      if (count('cone') === CONES_NEEDED) toast('That makes five pine cones. Take them to the skipper at the jetty.', 4.5);
     },
   });
   registerAction({
     id: 'give-cones', key: 'KeyG', keyLabel: 'G', score: () => 11,
-    available: () => activity.free && !store.rod && winter() && store.cones > 0 && nearSkipper(),
+    available: () => activity.free && !hasRod() && winter() && count('cone') > 0 && nearSkipper(),
     label: () => 'Give the pine cones to the skipper',
     run: () => {
-      if (store.cones < CONES_NEEDED) { toast(`The skipper: "That's ${store.cones}. I'll need ${CONES_NEEDED}."`, 4); return; }
-      store.cones = 0;
+      if (count('cone') < CONES_NEEDED) { toast(`The skipper: "That's ${count('cone')}. I'll need ${CONES_NEEDED}."`, 4); return; }
+      takeAll('cone'); // (paid before the rod goes in, so there is room for it)
       giveRod('pine cones');
     },
   });
   let scanIn = 0;
   hooks.frame.push((dt) => {
-    const want = winter() && !store.rod && store.cones < CONES_NEEDED;
+    const want = winter() && !hasRod() && count('cone') < CONES_NEEDED;
     for (const c of cones) c.m.visible = want && !c.taken;
     scanIn -= dt;
     if (scanIn > 0) return;

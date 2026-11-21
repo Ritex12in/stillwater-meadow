@@ -34,7 +34,7 @@ test('settled lakes lie far apart, each with its own landmarks; the home lake ha
 
 test('the landmarks follow you from lake to lake: everything works there, and nothing is left behind', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer', '#12');
-  await page.evaluate(() => { window.__meadow.store.rod = true; });
+  await page.evaluate(() => { window.__meadow.pack.add('rod'); });
   const there = (await settled(page)).find((L) => L.id !== 'home' && L.kit.dock && L.kit.fire && L.kit.bench);
   await page.evaluate((id) => { window.__meadow.visitLake(id); }, there.id);
   await step(page, 0.5);

@@ -23,6 +23,7 @@ import { animals } from '../characters/animals.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
 import { store, saveSoon, onSave } from '../systems/save.js';
+import { has } from '../systems/pack.js';
 import { cur } from '../systems/time.js';
 import { wx } from '../systems/weather.js';
 import { spawnHeart } from '../world/effects.js';
@@ -76,7 +77,7 @@ export function initFriend() {
   /** Something to say, picked from what's true right now; each call moves on to the next. */
   const chat = () => {
     const L = [];
-    if (!store.rod) L.push('The skipper has an old fishing rod. I hear he likes a good bouquet.');
+    if (!has('rod')) L.push('The skipper has an old fishing rod. I hear he likes a good bouquet.');
     else if (!species()) L.push('You got the rod! The fish bite best off the end of the jetty.');
     else L.push(`${species()} kinds of fish in your journal? I've only ever seen the minnows.`);
     const pets = tamed();

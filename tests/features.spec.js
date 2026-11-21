@@ -7,7 +7,7 @@ const side = (page) => page.evaluate(() => { const d = window.__meadow.geo.dockD
 test('fishing: cast, hook a bite, and the catch goes in the journal', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer', '#18');
   await step(page, 0.5);
-  await page.evaluate(() => { window.__meadow.store.rod = true; });
+  await page.evaluate(() => { window.__meadow.pack.add('rod'); });
   const p = await page.evaluate(() => window.__meadow.geo.dockAt(5, 0));
   const s = await side(page);
   await teleport(page, p.x, p.z, s.x, s.z);
@@ -35,14 +35,14 @@ test('fishing: cast, hook a bite, and the catch goes in the journal', async ({ p
   const journal = await page.evaluate(() => window.__meadow.store.journal);
   expect(Object.keys(journal).length).toBe(1);
   await expect(page.locator('#toast')).toContainText('You caught');
-  expect((await page.evaluate(() => window.__meadow.store.creel)).length, 'the catch went into the creel').toBe(1);
+  expect((await page.evaluate(() => window.__meadow.pack.fish())).length, 'the catch went into the creel').toBe(1);
   noErrors(errors);
 });
 
 test('fishing punishes reeling non-stop: the line snaps', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer', '#18');
   await step(page, 0.5);
-  await page.evaluate(() => { window.__meadow.store.rod = true; });
+  await page.evaluate(() => { window.__meadow.pack.add('rod'); });
   const p = await page.evaluate(() => window.__meadow.geo.dockAt(5, 0));
   const s = await side(page);
   await teleport(page, p.x, p.z, s.x, s.z);
@@ -53,7 +53,7 @@ test('fishing punishes reeling non-stop: the line snaps', async ({ page }) => {
   await page.keyboard.press('KeyR');
   await page.keyboard.down('KeyR'); await step(page, 12); await page.keyboard.up('KeyR');
   await expect(page.locator('#toast')).toContainText('Snap');
-  expect(await page.evaluate(() => window.__meadow.store.creel.length)).toBe(0);
+  expect(await page.evaluate(() => window.__meadow.pack.fish().length)).toBe(0);
   noErrors(errors);
 });
 
@@ -153,7 +153,7 @@ test('dogs following you fan out instead of overlapping', async ({ page }) => {
 test('feeding a dog fish tames it: then you name it, pet it, and it greets you after a reload', async ({ page }) => {
   const errors = await open(page, 'weather=clear');
   await step(page, 0.5);
-  await page.evaluate(() => { window.__meadow.store.creel = [{ id: 'perch', cm: 20 }, { id: 'carp', cm: 40 }]; });
+  await page.evaluate(() => { const p = window.__meadow.pack; p.add('fish', 'perch', 20); p.add('fish', 'carp', 40); });
   // the others stay at home, out of the way, so T always means this dog
   const dog = await page.evaluate(() => {
     const [a, ...rest] = window.__meadow.animals;
@@ -177,7 +177,7 @@ test('feeding a dog fish tames it: then you name it, pet it, and it greets you a
   await press(page, 'KeyT', 1.5);
   pet = (await page.evaluate(() => window.__meadow.pets()))[0];
   expect(pet.tamed).toBe(true);
-  expect(await page.evaluate(() => window.__meadow.store.creel.length)).toBe(0);
+  expect(await page.evaluate(() => window.__meadow.pack.fish().length)).toBe(0);
   await expect(page.locator('#nameDialog')).toBeVisible();
   await page.locator('#nameInput').fill('Biscuit');
   await page.locator('#nameInput').press('Enter');
@@ -200,7 +200,7 @@ test('feeding a dog fish tames it: then you name it, pet it, and it greets you a
 test('an untamed cat runs from you, but eats a thrown fish if you keep still at a distance', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer');
   await step(page, 0.5);
-  await page.evaluate(() => { window.__meadow.store.creel = [{ id: 'minnow', cm: 8 }]; });
+  await page.evaluate(() => { window.__meadow.pack.add('fish', 'minnow', 8); });
   // (a spot 5 m from the cat on the land side, away from the lake, and the way from there to the cat)
   const landward = () => page.evaluate(() => {
     const m = window.__meadow, a = m.animals[3], h = m.home, d = Math.hypot(a.x - h.x, a.z - h.z), ux = (a.x - h.x) / d, uz = (a.z - h.z) / d;

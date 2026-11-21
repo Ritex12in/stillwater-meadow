@@ -223,7 +223,18 @@ body.photo-mode > *:not(#world):not(.photo-bar):not(.photo-vignette):not(.photo-
 
 /* Pets, in the journal */
 .panel h3.sub { margin: 16px 0 8px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
-.catches li.empty { display: block; }
+/* the backpack: a grid of slots */
+.pack-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 12px; }
+.pack-grid .slot { position: relative; aspect-ratio: 1; padding: 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.04); cursor: default; }
+.pack-grid .slot.full { background: rgba(255, 255, 255, 0.09); cursor: pointer; }
+.pack-grid .slot.full:hover { background: rgba(255, 255, 255, 0.15); }
+.pack-grid .slot.chosen { border-color: rgba(255, 255, 255, 0.55); }
+.pack-grid .slot.held { box-shadow: inset 0 0 0 2px #ffd27a; }
+.pack-grid .slot svg { width: 100%; height: 100%; display: block; }
+.pack-grid .slot .n { position: absolute; right: 5px; bottom: 3px; font: 700 11px var(--font-ui); color: var(--ink); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); font-variant-numeric: tabular-nums; }
+.pack-info { display: grid; gap: 6px; margin-top: 12px; min-height: 64px; font-size: 13px; color: var(--ink-soft); }
+.pack-info b { color: var(--ink); font-size: 14px; }
+.pack-info .row { display: flex; gap: 6px; flex-wrap: wrap; }
 .catches.pets li { grid-template-columns: 18px minmax(0, 1fr); row-gap: 2px; }
 .catches.pets .sw { width: auto; height: auto; border: 0; border-radius: 0; font-size: 14px; line-height: 1; }
 .catches.pets .st { grid-column: 2; text-align: left; }

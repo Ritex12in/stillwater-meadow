@@ -81,28 +81,24 @@ test('a new player gets a world of their own, kept in the save; any text is a se
   noErrors(errors);
 });
 
-test('the backpack shows what you carry, and the compass points true: north as the sky has it, home and the shrine marked', async ({ page }) => {
+test('the backpack holds what you carry in slots, and the compass points true: north as the sky has it, home and the shrine marked', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer', '#12');
   await step(page, 0.5);
   // nothing carried yet
-  expect(await page.evaluate(() => window.__meadow.backpack())).toEqual([]);
+  expect((await page.evaluate(() => window.__meadow.backpack())).every((x) => x === null)).toBe(true);
   await press(page, 'KeyI', 0.2);
   expect(await page.locator('#backpack').isVisible()).toBe(true);
-  await expect(page.locator('#packList')).toContainText('Nothing yet');
+  await expect(page.locator('#packGrid .slot')).toHaveCount(24);
+  await expect(page.locator('#packInfo')).toContainText('Nothing yet');
   await press(page, 'KeyI', 0.2);
-  // a rod, two fish and a few flowers
-  await page.evaluate(() => { const s = window.__meadow.store; s.rod = true; s.creel = [{ id: 'perch', cm: 20 }, { id: 'perch', cm: 24 }]; });
-  for (let k = 0; k < 2; k++) {
-    const f = await page.evaluate(() => { const m = window.__meadow; return m.flowers().filter((it) => it.shown).sort((a, b) => Math.hypot(a.x - m.player.x, a.z - m.player.z) - Math.hypot(b.x - m.player.x, b.z - m.player.z))[0]; });
-    await teleport(page, f.x + 0.4, f.z);
-    await press(page, 'KeyG', 0.8);
-  }
-  const held = await page.evaluate(() => window.__meadow.backpack().map((t) => t.id + ': ' + t.detail));
-  expect(held.map((t) => t.split(':')[0])).toEqual(['rod', 'creel', 'bouquet']);
-  expect(held[1]).toContain('2 Yellow Perch');
-  expect(held[2]).toContain('2 flowers');
+  // a rod and two fish of one kind: two slots, the fish stacked
+  await page.evaluate(() => { const p = window.__meadow.pack; p.add('rod'); p.add('fish', 'perch', 20); p.add('fish', 'perch', 24); });
+  const held = (await page.evaluate(() => window.__meadow.backpack())).filter(Boolean);
+  expect(held.map((t) => `${t.type} ${t.name} ${t.n}`)).toEqual(['rod Fishing rod 1', 'fish Yellow Perch 2']);
   await press(page, 'KeyI', 0.2);
-  await expect(page.locator('#packList li')).toHaveCount(3);
+  await expect(page.locator('#packGrid .slot.full')).toHaveCount(2);
+  await page.locator('#packGrid .slot.full').nth(1).click();
+  await expect(page.locator('#packInfo')).toContainText('20 cm, 24 cm');
   await press(page, 'KeyI', 0.2);
 
   // the compass: facing north (-z) reads 0, facing east (+x) reads 90 (the sun rises in the east: +x)
@@ -128,5 +124,19 @@ test('the backpack shows what you carry, and the compass points true: north as t
   expect(Math.abs(((home.bearing - want + 540) % 360) - 180)).toBeLessThan(1);
   expect(marks.view.marks.some((k) => k.kind === 'shrine' && k.name === marks.shrine.name)).toBe(true);
   expect(marks.view.marks.length).toBeLessThanOrEqual(4);
+  noErrors(errors);
+});
+
+test('an older save moves what you carried into the backpack: the rod, the fish from the creel, the pine cones', async ({ page }) => {
+  const errors = await visit(page, '/?seed=1&weather=clear#12');
+  await page.evaluate(() => {
+    localStorage.setItem('stillwater-meadow', JSON.stringify({ version: 2, seed: 1, lastVisit: Date.now() - 1000, settings: {}, journal: { perch: { n: 2, best: 24 } }, creel: [{ id: 'perch', cm: 20 }, { id: 'carp', cm: 41 }, { id: 'perch', cm: 24 }], cones: 3 }));
+    Storage.prototype.setItem = function () {}; // (this page must not write its own save over the old one as it goes)
+  });
+  await page.reload();
+  await page.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });
+  const got = await page.evaluate(() => window.__meadow.pack.view().filter(Boolean).map((it) => `${it.type}:${it.key || ''}:${it.n}:${(it.list || []).join('/')}`));
+  expect(got).toEqual(['rod::1:', 'fish:perch:2:20/24', 'fish:carp:1:41', 'cone::3:']);
+  expect(await page.evaluate(() => window.__meadow.rod())).toMatchObject({ rod: true, cones: 3 });
   noErrors(errors);
 });

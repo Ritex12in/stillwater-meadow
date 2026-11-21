@@ -35,7 +35,7 @@ test('lakes lie all over the land: each in its own bowl, apart from its neighbou
 
 test('going to a lake: its water is there, you can fish it, and visiting many leaves nothing behind', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer', '#12');
-  await page.evaluate(() => { window.__meadow.store.rod = true; });
+  await page.evaluate(() => { window.__meadow.pack.add('rod'); });
   const lakes = await page.evaluate(() => window.__meadow.lakes(2500).filter((L) => L.id !== 'home'));
   const openLake = lakes.find((L) => !L.frozen), frozen = lakes.find((L) => L.frozen);
   // an open lake: water is drawn for it, you stand dry on its shore, and a cast is on offer

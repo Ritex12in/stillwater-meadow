@@ -4,7 +4,7 @@
 // after the bite and it's gone. Then the fight: hold R to reel, ease off while the fish pulls, and
 // keep the line's tension out of the red without letting it go slack. Every species fights in its
 // own fixed pattern, so you can learn them; the journal (J) notes how each one fights.
-// Catches go into your creel (8 fish) to feed the cats and dogs; with a full creel you let them go.
+// Catches go into your backpack (8 fish at most) to feed the cats and dogs; with 8 you let them go.
 // Different fish bite at different times, weathers and seasons. In winter you fish through the ice.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
@@ -19,12 +19,13 @@ import { boatSeat, ferry } from '../characters/boat.js';
 import { activity } from '../systems/activity.js';
 import { registerAction, bindKey, moving } from '../systems/actions.js';
 import { camForward } from '../systems/input.js';
-import { store, saveSoon, onSave } from '../systems/save.js';
+import { store } from '../systems/save.js';
 import { timeCtl } from '../systems/time.js';
 import { wx } from '../systems/weather.js';
 import { spawnRipple, spawnHeart } from '../world/effects.js';
 import { toast, togglePanel, onPanel } from '../ui/hud.js';
-import { carry } from '../ui/backpack.js';
+import { itemKind, units, count, add, take, roomFor } from '../systems/pack.js';
+import { ICONS } from '../ui/icons.js';
 import { plop, meow } from './voices.js';
 import { hasRod } from './rod.js';
 
@@ -57,6 +58,11 @@ const TAKE = { 1: 0.035, 2: 0.055, 3: 0.075 };      // line a pulling fish takes
 // depth: how far out the float must land for each tier (lakeT: 1 at the shore, 0 at the middle)
 const DEPTH = { 1: 1.2, 2: 0.86, 3: 0.72 };
 export const CREEL_MAX = 8;
+itemKind('fish', {
+  name: (it) => speciesName(it.key), max: CREEL_MAX,
+  icon: (it) => ICONS.fish((SPECIES.find((q) => q.id === it.key) || {}).color),
+  detail: (it) => `${it.n} caught · ${it.list.map((cm) => cm + ' cm').join(', ')}. Cats and dogs love them.`,
+});
 
 /**
  * How fast reeling wins line from this fish: set so that reeling through every rest and easing off
@@ -75,27 +81,27 @@ function pickSpecies(depthT) {
 }
 const relaxed = () => !!(store.settings && store.settings.relaxedFishing);
 
-// ── the creel: fish you carry to feed the animals ──
+// ── fish you carry (in the backpack) to feed the animals ──
 /** The fish you're carrying: [{ id, cm }]. */
-export const creel = () => store.creel;
+export const creel = () => units('fish').map((u) => ({ id: u.key, cm: u.unit }));
 const spOf = (id) => SPECIES.find((s) => s.id === id);
 export const fishValue = (f) => VALUE[(spOf(f.id) || SPECIES[6]).tier];
 export const speciesName = (id) => (spOf(id) || { name: 'fish' }).name;
 /** Take a fish out of the creel: `prefer` (a species id) if you have one, else the most valuable. */
 export function takeFish(prefer) {
-  const c = store.creel;
+  const c = creel();
   if (!c.length) return null;
   let i = prefer ? c.findIndex((f) => f.id === prefer) : -1;
   if (i < 0) { i = 0; c.forEach((f, k) => { if (fishValue(f) > fishValue(c[i])) i = k; }); }
-  const [f] = c.splice(i, 1);
-  saveSoon(); renderCreel();
-  return f;
+  const t = take('fish', c[i].id, (cms) => cms.indexOf(c[i].cm));
+  renderCreel();
+  return t ? { id: t.key, cm: t.unit } : null;
 }
 let creelEl = null;
 function renderCreel() {
   if (!creelEl) return;
   creelEl.hidden = !hasRod();
-  creelEl.textContent = `Creel ${store.creel.length}/${CREEL_MAX}`;
+  creelEl.textContent = `Fish ${count('fish')}/${CREEL_MAX}`;
 }
 
 function makeFish(sp, cm) {
@@ -135,15 +141,6 @@ let releaseCharge = () => {};
 
 export function initFishing() {
   const journal = store.journal;
-  store.creel = Array.isArray(store.creel) ? store.creel.slice(0, CREEL_MAX) : [];
-  onSave((s) => { s.creel = store.creel.slice(); });
-  carry('creel', () => {
-    if (!hasRod() && !store.creel.length) return null;
-    const by = new Map();
-    for (const f of store.creel) by.set(f.id, (by.get(f.id) || 0) + 1);
-    const inside = [...by].map(([id, n]) => `${n} ${speciesName(id)}`).join(', ');
-    return { name: 'Creel', detail: `${store.creel.length} of ${CREEL_MAX}` + (inside ? ` · ${inside}` : ' · empty'), color: '#b08d57' };
-  }, 20);
 
   // ── on-screen pieces: the creel count, and the cast/fight gauge ──
   creelEl = document.createElement('p');
@@ -407,11 +404,10 @@ export function initFishing() {
         bobber.visible = false; line.visible = false;
         const j = journal[F.sp.id];
         journal[F.sp.id] = { n: (j ? j.n : 0) + 1, best: Math.max(j ? j.best : 0, F.cm) };
-        F.kept = store.creel.length < CREEL_MAX;
-        if (F.kept) store.creel.push({ id: F.sp.id, cm: F.cm });
-        saveSoon(); renderCreel();
+        F.kept = count('fish') < CREEL_MAX && roomFor('fish', F.sp.id) && add('fish', F.sp.id, F.cm);
+        renderCreel();
         const record = j && F.cm > j.best;
-        const where = F.kept ? ` · into the creel (${store.creel.length}/${CREEL_MAX})` : ' · your creel is full, so you let it go';
+        const where = F.kept ? ` · into your backpack (${count('fish')}/${CREEL_MAX})` : count('fish') >= CREEL_MAX ? ` · you carry ${CREEL_MAX} fish already, so you let it go` : ' · your backpack is full, so you let it go';
         toast(`${!j ? 'New species! ' : record ? 'New record! ' : ''}You caught a ${F.sp.name} · ${F.cm} cm${where}`, 4.5);
         hero.face.flash(!j || record ? 'love' : 'happy', 3.5);
         world.caughtAt = clock.elapsed; // (a friend watching cheers)
@@ -428,7 +424,7 @@ export function initFishing() {
       F.fish.position.copy(tmp);
       F.fish.rotation.set(Math.sin(t * 9) * 0.25, player.rot + Math.PI / 2, 0);
       if (F.t <= 0) {
-        if (F.kept) stop(); // it goes in the creel
+        if (F.kept) stop(); // it goes in the backpack
         else { F.state = 'release'; F.t = 0; F.from.copy(F.fish.position); }
       }
     } else if (F.state === 'release') {

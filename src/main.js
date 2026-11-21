@@ -43,6 +43,7 @@ import { store, onSave, flush } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
 import { initWorldPanel, initPlaces } from './ui/world-panel.js';
 import { initBackpack, backpackView } from './ui/backpack.js';
+import * as pack from './systems/pack.js';
 import { initCompass, compassView } from './ui/compass.js';
 import { updateAnchor, moveAnchor, anchorId, settledAbout } from './systems/anchor.js';
 import { initSettings } from './ui/settings.js';
@@ -358,6 +359,8 @@ window.__meadow = {
   geo: { get lakePoint() { return lakePoint; }, lakeT, walkable, dockAt, dockDir, onDock, FIRE_SPOT, BENCH_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') }, // (lakePoint: whichever lake the landmarks stand at)
   seed: WORLD.seed,
   backpack: backpackView,
+  /** The backpack's contents and the ways to change them (systems/pack.js). */
+  pack: { view: pack.packView, add: pack.add, addItem: pack.addItem, take: pack.take, count: pack.count, hold: pack.hold, held: pack.held, fish: () => pack.units('fish').map((u) => ({ id: u.key, cm: u.unit })) },
   compass: compassView,
   /** The home lake's middle, and where you first arrive beside it. */
   home: { x: HOME.x, z: HOME.z, r: HOME.R0, rmax: HOME.rmax }, spawn: { x: SPAWN.x, z: SPAWN.z },

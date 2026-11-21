@@ -170,3 +170,71 @@ test('a lake with no jetty has none: no deck to stand on, no boat to board, and 
   expect(await woods(), 'the woods are the same now the landmarks are here').toBe(before);
   noErrors(errors);
 });
+
+test('the shrine stands at the shrine site nearest you: level ground the land keeps clear, away from every lake, the same sites every time', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  await step(page, 0.5);
+  const survey = () => page.evaluate(() => {
+    const m = window.__meadow, g = m.geo, S = 57.6;
+    const sites = m.shrines(3500).map((s) => {
+      // level across its ring, and nothing growing there: no tree, no flower to pick
+      let rough = 0, trees = 0, picks = 0;
+      for (let k = 0; k < 80; k++) { const a = k * 0.7, d = (k % 10) * 2.6; rough = Math.max(rough, Math.abs(g.height(s.x + Math.cos(a) * d, s.z + Math.sin(a) * d) - s.y)); }
+      for (let iz = Math.floor((s.z - 24) / S); iz <= Math.floor((s.z + 24) / S); iz++) for (let ix = Math.floor((s.x - 24) / S); ix <= Math.floor((s.x + 24) / S); ix++) {
+        trees += m.wilds.square(ix, iz).filter((t) => Math.hypot(t.x - s.x, t.z - s.z) < s.r + 7).length;
+        picks += m.wilds.picks(ix, iz).filter((f) => Math.hypot(f.x - s.x, f.z - s.z) < s.r + 7).length;
+      }
+      return { id: s.id, x: s.x, z: s.z, y: s.y, fx: s.fx, fz: s.fz, rough, trees, picks, grove: m.climate(s.x, s.z).grove, from: Math.hypot(s.x - m.player.x, s.z - m.player.z) };
+    });
+    // the levelled ground never reaches a lake's own: on every lake's bowl, shore and path the land is as the seed gave it
+    let lakeGap = 0, looked = 0;
+    for (const L of m.lakes(3500)) for (let k = 0; k < 150; k++) {
+      const a = k * 0.61, d = L.rmax * 1.9 * ((k % 15) + 1) / 15, x = L.x + Math.cos(a) * d, z = L.z + Math.sin(a) * d;
+      if (g.lakeT(x, z) > 1.65) continue;
+      looked++; lakeGap = Math.max(lakeGap, Math.abs(g.height(x, z) - m.rawHeight(x, z)));
+    }
+    let apart = Infinity;
+    for (let i = 0; i < sites.length; i++) for (let j = i + 1; j < sites.length; j++) apart = Math.min(apart, Math.hypot(sites[i].x - sites[j].x, sites[i].z - sites[j].z));
+    return { sites, lakeGap, looked, apart, stands: m.shrine.id, at: m.shrineStands, counts: m.counts() };
+  });
+  const first = await survey();
+  expect(first.sites.length, 'there are shrine sites within 3.5 km').toBeGreaterThanOrEqual(3);
+  expect(first.sites.some((s) => s.id === 'home'), 'one of them is by the home lake').toBe(true);
+  for (const s of first.sites) {
+    expect(s.rough, `site ${s.id} is level`).toBeLessThan(0.05);
+    expect(s.trees + s.picks, `nothing grows on site ${s.id}`).toBe(0);
+    if (s.id !== 'home') expect(s.grove, `site ${s.id} is in a blossom grove`).toBeGreaterThan(0.55);
+  }
+  expect(first.apart, 'no two sites are close').toBeGreaterThan(315);
+  expect(first.looked).toBeGreaterThan(500);
+  expect(first.lakeGap, 'no lake shore is changed by a shrine').toBe(0);
+  // it stands at the nearest one: by the home lake to begin with
+  const nearest = first.sites[0];
+  expect(first.stands).toBe(nearest.id);
+  expect(Math.hypot(first.at.x - nearest.x, first.at.z - nearest.z)).toBeLessThan(0.01);
+  // go to a grove's site: it is there when you arrive, the very same shrine (nothing new is made)
+  const grove = first.sites.find((s) => s.id !== nearest.id);
+  await page.evaluate((s) => { const m = window.__meadow; m.travelTo(s.x + s.fx * 23, s.z + s.fz * 23, s.x, s.z); for (let i = 0; i < 30; i++) m.tick(1 / 30); m.ground.settle(m.player.x, m.player.z); m.wilds.settle(m.player.x, m.player.z); }, grove);
+  const there = await page.evaluate(() => { const m = window.__meadow; return { stands: m.shrine.id, at: m.shrineStands, y: m.player.y, counts: m.counts() }; });
+  expect(there.stands).toBe(grove.id);
+  expect(Math.hypot(there.at.x - grove.x, there.at.z - grove.z)).toBeLessThan(0.01);
+  expect(Math.abs(there.at.y - grove.y)).toBeLessThan(0.01);
+  expect(Math.abs(there.y - grove.y), 'you stand on its level ground').toBeLessThan(0.3);
+  expect(there.counts.objects, 'nothing was made or thrown away').toBe(first.counts.objects);
+  // its hall is in the way there, and no longer where it stood before
+  const blocked = await page.evaluate(([g, h]) => { const m = window.__meadow; return [m.blockedAt(g.x, g.z), m.blockedAt(h.x, h.z)]; }, [grove, nearest]);
+  expect(blocked).toEqual([true, false]);
+  // walking on from it, it stays while it is in sight, and has moved on once another site is nearer and this one far behind
+  await page.evaluate((s) => { const m = window.__meadow; m.player.x = s.x + 100; m.player.z = s.z; for (let i = 0; i < 90; i++) m.tick(1 / 30); }, grove);
+  expect(await page.evaluate(() => window.__meadow.shrine.id), 'still there from 100 m').toBe(grove.id);
+  // the same sites after loading the world again
+  const sign = (r) => r.sites.map((s) => [s.id, s.x.toFixed(3), s.z.toFixed(3), s.y.toFixed(3), s.fx.toFixed(4)].join(',')).sort().join(' ');
+  await page.evaluate(() => { const m = window.__meadow; m.visitLake('home'); });
+  await page.reload();
+  await page.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });
+  await step(page, 0.5);
+  const again = await survey();
+  expect(sign(again), 'the same sites after a reload').toBe(sign(first));
+  expect(again.stands, 'and the shrine is at the one nearest where you are').toBe(again.sites[0].id);
+  noErrors(errors);
+});

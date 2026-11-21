@@ -6,7 +6,7 @@ import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug, query } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU, updateDetail, neonU } from './core/materials.js';
-import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, heightAt, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME } from './core/shape.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME } from './core/shape.js';
 import { hooks, seasonState, seats, world, obstacles } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU } from './world/sky.js';
@@ -20,7 +20,7 @@ import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows, lampSpo
 
 import { buildWildflowers } from './world/wildflowers.js';
 import { buildFarForest } from './world/farforest.js';
-import { chooseShrineSite, buildShrine } from './world/shrine.js';
+import { chooseShrineSite, buildShrine, shrineNear } from './world/shrine.js';
 import { buildClouds, buildFireflies, buildButterflies, buildPollen, buildBirds, birds, birdMat, updateAmbientLife, tintClouds, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
 import { buildEffects, updateEffects } from './world/effects.js';
 import { player, buildPlayer, updatePlayer } from './characters/player.js';
@@ -126,6 +126,7 @@ buildBoat();
 buildEffects();
 buildWeather();
 registerPetting();
+shrineNear(player.x, player.z, true); // (the shrine stands at the site nearest where you start)
 settleWilds(player.x, player.z);
 // when the landmarks move to another lake: the grass keeps off them there, and the shadows are redrawn
 hooks.anchor.push(() => { resetGrassMap(); renderer.shadowMap.needsUpdate = true; });
@@ -141,6 +142,7 @@ function travelTo(x, z, faceX, faceZ) {
   if (faceX !== undefined) { player.rot = Math.atan2(faceX - x, faceZ - z); camState.yaw = Math.atan2(x - faceX, z - faceZ); }
   updateAnchor(0, true); // (if this is another settled lake, its jetty, fire and bench are here when you arrive)
   updateLifeLake(0, x, z, true);
+  shrineNear(x, z, true); // (and the shrine, if a site of its own is nearer here)
   settleGround(x, z); settleWilds(x, z); updateWater(x, z); updateLakeLife(x, z);
   flush();
 }
@@ -346,7 +348,7 @@ requestAnimationFrame(frame);
 
 // A small handle for automated tests and the debug panel.
 window.__meadow = {
-  get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, get shrine() { return world.shrine; }, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
+  get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, get shrine() { return world.shrine; }, get shrineStands() { return world.shrineStands; }, blockedAt: (x, z) => obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r), tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
   fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, pets: petsView, fetch: fetchView, friend: friendView, get friendSt() { return friend && friend.st; }, dance: danceView, snowman: snowmanView, wardrobe: wardrobeNow, emote: playEmote, emoteState, toast,
   geo: { get lakePoint() { return lakePoint; }, lakeT, walkable, dockAt, dockDir, onDock, FIRE_SPOT, BENCH_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') }, // (lakePoint: whichever lake the landmarks stand at)
@@ -368,6 +370,8 @@ window.__meadow = {
   // the ground's tiles: what is loaded, and ways to bring it up to date without waiting for frames
   ground: { stats: groundStats, update: updateGround, pump: pumpGround, settle: settleGround },
   // the trees beyond the valley: what is loaded, a way to bring it up to date, and one square's trees
+  /** The shrine sites within `r` metres of you (the shrine stands at `shrine`, one of them). */
+  shrines: (r = 1500) => shrineSitesNear(player.x, player.z, r), rawHeight,
   wilds: { stats: wildStats, settle: settleWilds, square: growSquare, rocks: growRocks, small: (ix, iz) => growSmall(ix, iz, growSquare(ix, iz)), picks: growPicks, picksNear },
   /** How many objects the scene holds (it must not creep up as you travel). */
   objects: () => { let n = 0; scene.traverse(() => { n++; }); return n; },

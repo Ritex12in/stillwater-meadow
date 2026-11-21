@@ -202,13 +202,14 @@ function land(x, z, open) {
 }
 /** How much a spot is in the mountains (0 none .. 1 the heart of a range). */
 function rangeAt(x, z) { return smooth(0.5, 0.72, fbm((x + SX * 31) * 0.0014 + 41.3, (z + SZ * 31) * 0.0014 - 17.9)); }
+let shaped = false; // (did the last rawHeight() land on a lake's own shaped ground: its bowl, shore and path?)
 /**
- * Exact terrain height: the land, held down in the valleys of the lakes within reach, with the
- * nearest lake's bowl and path cut in. The ground's tiles are built from it. (Every lake's valley
- * is a smooth factor and the bowls never overlap, so the land has no seam where "the nearest
- * lake" changes from one to another.)
+ * The land as the seed gives it, before the ground under any shrine is levelled: held down in the
+ * valleys of the lakes within reach, with the nearest lake's bowl and path cut in. (Every lake's
+ * valley is a smooth factor and the bowls never overlap, so the land has no seam where "the
+ * nearest lake" changes from one to another.) Where a shrine may stand is decided from this.
  */
-export function height(x, z) {
+export function rawHeight(x, z) {
   const list = lakesAround(x, z);
   let open = 1, lake = null, t = 99;
   for (let i = 0; i < list.length; i++) {
@@ -219,10 +220,24 @@ export function height(x, z) {
     if (lt < t) { t = lt; lake = L; }
   }
   const base = land(x, z, open);
-  if (!lake || t >= lake.bowl + 0.1) return base; // (beyond the bowl and the path)
+  shaped = !!lake && t < lake.bowl + 0.1;
+  if (!shaped) return base; // (beyond the bowl and the path)
   const floor = t < 1 ? -3.2 * (1 - t * t) : (t - 1) * 2.0;
   const k = smooth(0.8, lake.bowl, t);
   return floor * (1 - k) + base * k - lake.path(x, z) * 0.08;
+}
+
+/**
+ * Exact terrain height: the land, with the ground under each shrine made level (flat for PAD_FLAT
+ * metres round its middle, easing back into the lie of the land by PAD_OUT). The ground's tiles
+ * are built from it. A shrine never stands on a lake's own ground, so that is left as it is.
+ */
+export function height(x, z) {
+  const h = rawHeight(x, z);
+  if (shaped) return h;
+  const s = shrineSiteAt(x, z, PAD_OUT);
+  if (!s) return h;
+  return h + (s.y - h) * (1 - smooth(PAD_FLAT, PAD_OUT, Math.hypot(x - s.x, z - s.z)));
 }
 
 // ── Climate ────────────────────────────────────────────────────
@@ -348,8 +363,7 @@ const marksOf = (lake) => lake.marks || (lake.marks = landmarksOf(lake));
  * landmarks happens to be), so a square of land always grows the same things.
  */
 export function clearingAt(x, z) {
-  const s = shrineSite();
-  if ((x - s.x) ** 2 + (z - s.z) ** 2 < (s.r + 7) ** 2) return true;
+  if (shrineSiteAt(x, z, SHRINE_R + 7)) return true;
   const L = lakeAt(x, z);
   if (!L.settled) return false;
   const dx = x - L.x, dz = z - L.z, d = Math.hypot(dx, dz), r = L.r(Math.atan2(dz, dx));
@@ -358,31 +372,99 @@ export function clearingAt(x, z) {
   const m = marksOf(L), near = (p, reach) => (x - p.x) ** 2 + (z - p.z) ** 2 < reach * reach;
   return near(m.spawn, 8) || near(m.fire, 5.5) || near(m.bench, 4) || near(m.chairs[0], 3.5) || near(m.chairs[1], 3.5) || near(m.dockStart, 5.5);
 }
-// ── The shrine ─────────────────────────────────────────────────
-let shrine = null;
+// ── Shrines ────────────────────────────────────────────────────
+// Where a shrine may stand is fixed by the land, so by the seed: one site a little way back from
+// the home lake, and others out in the world, in blossom groves. The land is ruled into squares of
+// SHRINE_CELL metres and a square has a site if a grove with level, low, snowless ground lies in
+// its middle half, clear of every lake. The ground under a site is levelled (see height()), and
+// trees, boulders and small plants keep off it (clearingAt). There is one shrine; it stands at
+// the site nearest you (world/shrine.js moves it while it is out of sight).
 /**
- * Where the shrine grove stands, and which way it faces: a level place some way back from the
- * home lake, away from where you arrive, the fire and the bench, looking toward the water. Fixed
- * by the land (so by the seed), not by what happens to be planted: the woods keep clear of it.
- * `{ x, z, fx, fz, r }`: its middle, the way it faces, the radius of its ring of cherries.
+ * How sites are chosen, in metres: the squares' side; how far out the levelled ground is flat and
+ * where it has eased back into the land; the ring the shrine and its path lie within; how many
+ * spots a square tries; how much of a grove a spot must be; how far the ground may rise or fall
+ * round it; and how far a site keeps from the home lake's own.
  */
-export function shrineSite() {
-  if (shrine) return shrine;
-  const L = HOME, m = marksOf(L);
+const SHRINE_CELL = 640, PAD_FLAT = 25, PAD_OUT = 46, SHRINE_R = 17, SHRINE_TRIES = 14, SHRINE_GROVE = 0.6, SHRINE_RELIEF = 5, SHRINE_APART = 320;
+const shrineCells = new Map();
+let homeShrine = null, lastShrine = null, lastSX = NaN, lastSZ = NaN;
+/** How much the land rises or falls round a spot (the worst of twelve looks, 18 and 34 m out). */
+function reliefAt(x, z, h) {
+  let worst = 0;
+  for (let k = 0; k < 12; k++) { const a = (k / 12) * TAU, d = k % 2 ? 34 : 18; worst = Math.max(worst, Math.abs(rawHeight(x + Math.cos(a) * d, z + Math.sin(a) * d) - h)); }
+  return worst;
+}
+/** Would levelled ground round this spot keep off every lake's own shaped ground (its bowl, shore and path)? */
+function clearOfLakes(x, z) {
+  const lakes = lakesNear(x, z, 220);
+  for (const L of lakes) {
+    if (L.t(x, z) < L.bowl + 0.2) return false;
+    for (let k = 0; k < 24; k++) { const a = (k / 24) * TAU; if (L.t(x + Math.cos(a) * (PAD_OUT + 2), z + Math.sin(a) * (PAD_OUT + 2)) < L.bowl + 0.2) return false; }
+  }
+  return true;
+}
+/**
+ * The site by the home lake: the most level place back from it, looking toward the water. Near
+ * the lake where the country is gentle; where the home lake lies among steep hills, as far off
+ * as it takes to find level ground (a few hundred metres at most). `{ id, x, z, y, fx, fz, r }`: its name, its middle, the height its ground is levelled
+ * to, the way it faces, and the radius of the ring it lies within.
+ */
+export function homeShrineSite() {
+  if (homeShrine) return homeShrine;
+  const L = HOME;
   let best = null;
-  for (let a = 0; a < TAU; a += TAU / 72) {
-    for (let r = L.rmax * 2.2; r <= L.rmax * 3.4; r += 4) {
-      const x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r, h = height(x, z);
-      if (L.t(x, z) < 2.1 || h < 0.8 || h > 9 || lakeAt(x, z) !== L) continue;
-      if (Math.hypot(x - m.spawn.x, z - m.spawn.z) < 45 || Math.hypot(x - m.fire.x, z - m.fire.z) < 30 || Math.hypot(x - m.bench.x, z - m.bench.z) < 30) continue;
-      let slope = 0;
-      for (let k = 0; k < 8; k++) slope = Math.max(slope, Math.abs(height(x + Math.cos(k * TAU / 8) * 9, z + Math.sin(k * TAU / 8) * 9) - h));
-      if (!best || slope < best.slope) best = { x, z, slope };
+  for (let a = 0; a < TAU; a += TAU / 60) {
+    for (let r = L.rmax * 2.4; r <= L.rmax * 12; r += 7) {
+      const x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r, h = rawHeight(x, z);
+      if (h < 0.8 || h > 70 || snowOf(coldAt(x, z, h)) > 0.15 || !clearOfLakes(x, z)) continue;
+      const score = reliefAt(x, z, h) + (r / L.rmax) * 0.45; // (level first; of two as level, the nearer)
+      if (!best || score < best.score) best = { x, z, score };
     }
   }
-  if (!best) best = { x: L.x - L.rmax * 2.6, z: L.z };
+  if (!best) best = { x: L.x - L.rmax * 3.4, z: L.z };
   const d = Math.hypot(L.x - best.x, L.z - best.z);
-  return (shrine = { x: best.x, z: best.z, fx: (L.x - best.x) / d, fz: (L.z - best.z) / d, r: 17 });
+  return (homeShrine = { id: 'home', x: best.x, z: best.z, y: rawHeight(best.x, best.z), fx: (L.x - best.x) / d, fz: (L.z - best.z) / d, r: SHRINE_R });
+}
+/** The shrine site of one square of the land, or null: most squares have none. Worked out once, then kept. */
+function shrineOfCell(cx, cz) {
+  const key = cx + ':' + cz;
+  if (shrineCells.has(key)) return shrineCells.get(key);
+  const R = mulberry32((Math.floor(hash(cx * 5 + 17, cz * 11 - 3) * 4294967296) ^ Math.imul(WORLD.seed, 0x85EBCA6B) ^ 0x51A7E) | 0), home = homeShrineSite();
+  let best = null;
+  for (let k = 0; k < SHRINE_TRIES; k++) {
+    // (in the square's middle half, so two sites are never close and levelled ground never crosses into the next square)
+    const x = (cx + 0.25 + R() * 0.5) * SHRINE_CELL, z = (cz + 0.25 + R() * 0.5) * SHRINE_CELL;
+    if (groveAt(x, z) < SHRINE_GROVE) continue;
+    const h = rawHeight(x, z);
+    if (h < 1 || h > 48 || snowOf(coldAt(x, z, h)) > 0.15 || Math.hypot(x - home.x, z - home.z) < SHRINE_APART || !clearOfLakes(x, z)) continue;
+    const relief = reliefAt(x, z, h);
+    if (relief < SHRINE_RELIEF && (!best || relief < best.relief)) best = { x, z, h, relief };
+  }
+  let site = null;
+  if (best) {
+    // it looks down the gentlest way out: its path climbs to it from the lowest ground about
+    let low = Infinity, fx = 0, fz = 1;
+    for (let k = 0; k < 16; k++) { const a = (k / 16) * TAU, y = rawHeight(best.x + Math.cos(a) * 34, best.z + Math.sin(a) * 34); if (y < low) { low = y; fx = Math.cos(a); fz = Math.sin(a); } }
+    site = { id: key, x: best.x, z: best.z, y: best.h, fx, fz, r: SHRINE_R };
+  }
+  shrineCells.set(key, site);
+  return site;
+}
+/** The shrine site whose middle is within `reach` metres of a spot (at most PAD_OUT), or null. */
+export function shrineSiteAt(x, z, reach = PAD_OUT) {
+  const h = homeShrineSite();
+  if ((x - h.x) ** 2 + (z - h.z) ** 2 < reach * reach) return h;
+  const cx = Math.floor(x / SHRINE_CELL), cz = Math.floor(z / SHRINE_CELL);
+  if (cx !== lastSX || cz !== lastSZ) { lastSX = cx; lastSZ = cz; lastShrine = shrineOfCell(cx, cz); }
+  const s = lastShrine;
+  return s && (x - s.x) ** 2 + (z - s.z) ** 2 < reach * reach ? s : null;
+}
+/** Every shrine site within `r` metres of a spot, nearest first. */
+export function shrineSitesNear(x, z, r) {
+  const out = [], h = homeShrineSite(), near = (s) => Math.hypot(s.x - x, s.z - z);
+  if (near(h) < r) out.push(h);
+  for (let cz = Math.floor((z - r) / SHRINE_CELL); cz <= Math.floor((z + r) / SHRINE_CELL); cz++) for (let cx = Math.floor((x - r) / SHRINE_CELL); cx <= Math.floor((x + r) / SHRINE_CELL); cx++) { const s = shrineOfCell(cx, cz); if (s && near(s) < r) out.push(s); }
+  return out.sort((a, b) => near(a) - near(b));
 }
 const HOME_PLACES = landmarksOf(HOME);
 DOCK_A = HOME_PLACES.dockA; CHAIR_A = HOME_PLACES.chairA;

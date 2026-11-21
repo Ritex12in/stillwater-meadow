@@ -328,3 +328,39 @@ test('seasons by place: the year turns every 8 days; cold uplands whiten and the
   expect(r.bad, 'no time of year at home without a way to the rod').toEqual([]);
   noErrors(errors);
 });
+
+test('weather moves over the land: the same for everyone at a moment, carried by the wind, rain here and sun there, and Auto is the weather where you stand', async ({ page }) => {
+  const errors = await open(page, 'season=summer', '#12');
+  const r = await page.evaluate(async () => {
+    const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
+    const W = await import(url('/src/systems/weatherfield.js')), m = window.__meadow, h = m.home, t0 = Date.UTC(2026, 10, 22, 12);
+    const a = W.weatherAt(h.x + 300, h.z, t0, 12), b = W.weatherAt(h.x + 300, h.z, t0, 12);
+    // carried by the wind: a minute later, the cloud that was here is a wind's minute downwind
+    const dx = Math.cos(W.WIND.angle) * W.WIND.speed * 60, dz = Math.sin(W.WIND.angle) * W.WIND.speed * 60;
+    let drift = 0, still = 0;
+    for (let i = 0; i < 40; i++) {
+      const x = h.x + Math.cos(i) * i * 70, z = h.z + Math.sin(i) * i * 70, t = (t0 + i * 977000) / 1000;
+      const now = W.cloudAt(x, z, t);
+      drift = Math.max(drift, Math.abs(W.cloudAt(x + dx, z + dz, t + 60) - now));
+      still += Math.abs(W.cloudAt(x, z, t + 60 * 30) - now);
+    }
+    // somewhere in the next days there is a moment with rain in one place and sun in another
+    let mixed = null;
+    for (let k = 0; k < 96 && !mixed; k++) {
+      const t = t0 + k * 3600000, kinds = new Set();
+      for (let z = -3000; z <= 3000; z += 500) for (let x = -3000; x <= 3000; x += 500) kinds.add(W.weatherAt(h.x + x, h.z + z, t, 12).type);
+      if (kinds.has('clear') && (kinds.has('rain') || kinds.has('snow') || kinds.has('storm'))) mixed = [...kinds];
+    }
+    // Auto: the game feels the field where you stand
+    m.wx.auto = true; m.wx.nextChange = 0;
+    for (let i = 0; i < 10; i++) m.tick(1 / 30);
+    const here = W.weatherAt(m.player.x, m.player.z, Date.now(), m.timeCtl.hour);
+    return { same: JSON.stringify(a) === JSON.stringify(b), drift, still: still / 40, mixed, auto: m.wx.type, here: here.type };
+  });
+  expect(r.same, 'one place, one moment, one weather').toBe(true);
+  expect(r.drift, 'the cloud moves with the wind').toBeLessThan(0.02);
+  expect(r.still, 'and half an hour later, where you stand, it has moved on').toBeGreaterThan(0.01);
+  expect(r.mixed, 'rain in one place while the sun shines in another').not.toBeNull();
+  expect(r.auto).toBe(r.here);
+  noErrors(errors);
+});

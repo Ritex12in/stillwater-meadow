@@ -13,7 +13,7 @@ import { coldAt, coldBase, northness, ASPECT, HOME, lakeChill, height } from '..
 import { yearPhase, seasonValue, isCooling, phaseName, dayOfPhase, chillNow, snowFrom, iceFrom, flowersOut, leavesAt, SEASON_PHASE, ICE_LAG, seasonU } from '../core/year.js';
 import { bindKey } from '../systems/actions.js';
 import { store, saveSoon } from '../systems/save.js';
-import { wx, setWeather } from '../systems/weather.js';
+import { wx } from '../systems/weather.js';
 import { cur } from '../systems/time.js';
 import { makeFalling } from '../world/particles.js';
 import { ferry } from '../characters/boat.js';
@@ -194,11 +194,6 @@ export function initSeasons() {
     if (!st.winterHere && k === 'snow' && (st.season < 0.3 || rnd() < 0.7)) return 'rain';
     return k;
   };
-  hooks.frame.push(() => {
-    if (!wx.auto) return;
-    if (st.winterHere && (wx.type === 'rain' || wx.type === 'storm')) setWeather('snow', false);
-    else if (!st.winterHere && st.season < 0.3 && wx.type === 'snow') setWeather('rain', false);
-  });
   return { resize: (h) => falling.resize(h) };
 }
 

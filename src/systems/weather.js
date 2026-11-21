@@ -1,4 +1,6 @@
-// Weather: clear, rain, thunderstorm, fog and snow, drifting on its own or picked by hand.
+// Weather: clear, rain, thunderstorm, fog and snow. On its own (Auto) it is the land's: the field in
+// systems/weatherfield.js, felt where you stand, the same for everyone in a world at the same
+// moment. Or picked by hand.
 // Owns the precipitation, lightning, mist banks and the rainbow, and reshapes the sky palette.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
@@ -10,6 +12,7 @@ import { seasonState, hooks } from '../core/state.js';
 import { makeFalling } from '../world/particles.js';
 import { waterU } from '../world/water.js';
 import { voice, audio } from './audio.js';
+import { weatherAt } from './weatherfield.js';
 
 export const WX_TYPES = {
   clear: { cloud: 0.08, rain: 0, storm: 0, fog: 0, snow: 0, wind: 0.3 },
@@ -20,14 +23,6 @@ export const WX_TYPES = {
 };
 const WX_KEYS = ['cloud', 'rain', 'storm', 'fog', 'snow', 'wind'];
 export const WX_LABEL = { clear: '', rain: 'Rain', storm: 'Thunderstorm', fog: 'Fog', snow: 'Snow' };
-const WX_NEXT = {
-  clear: { clear: 2, rain: 3, fog: 2, snow: 1.2, storm: 0.5 },
-  rain: { clear: 4, storm: 1.5, rain: 1, fog: 1 },
-  storm: { rain: 3, clear: 1 },
-  fog: { clear: 4, rain: 1, fog: 1 },
-  snow: { clear: 3, snow: 1, fog: 1 },
-};
-const WX_DURATION = { clear: [240, 480], rain: [150, 300], storm: [90, 180], fog: [150, 300], snow: [180, 360] }; // seconds
 export const WX_ORDER = ['auto', 'clear', 'rain', 'storm', 'fog', 'snow'];
 const RAINBOW_SECONDS = 80;
 
@@ -49,7 +44,7 @@ export function setWeather(type, manual) {
 export function goAutoWeather() {
   wx.auto = true;
   wx.rate = 0.12;
-  wx.nextChange = rnd(...WX_DURATION[wx.type]) * 0.6;
+  wx.nextChange = 0; // (look at the land's weather straight away)
   changed();
 }
 export function cycleWeather() {
@@ -65,15 +60,6 @@ export function restoreWeather(saved) {
   wx.auto = false; wx.type = saved.type;
   WX_KEYS.forEach((k) => { wx[k] = WX_TYPES[saved.type][k]; });
   changed();
-}
-function pickNextWeather(hour) {
-  const w = Object.assign({}, WX_NEXT[wx.type]);
-  if (w.fog !== undefined && hour > 4 && hour < 9.5) w.fog *= 2.5; // misty mornings
-  let total = 0;
-  for (const k in w) total += w[k];
-  let r = rnd() * total;
-  for (const k in w) { r -= w[k]; if (r <= 0) return seasonState.mapWeather(k); }
-  return 'clear';
 }
 
 // ── Palette ────────────────────────────────────────────────────
@@ -203,11 +189,16 @@ export const onRainStopped = (fn) => rainStopListeners.add(fn);
 
 /** `env` = { hour, sunElev, center } */
 export function updateWeather(dt, env) {
+  // on its own: the land's weather where you stand, looked up now and then and eased toward
   if (wx.auto) {
     wx.nextChange -= dt;
-    if (wx.nextChange <= 0) { setWeather(pickNextWeather(env.hour), false); wx.nextChange = rnd(...WX_DURATION[wx.type]); }
+    if (wx.nextChange <= 0 || !wx.field) {
+      wx.nextChange = 1;
+      wx.field = weatherAt(env.center.x, env.center.z, Date.now(), env.hour);
+      if (wx.field.type !== wx.type) { wx.type = wx.field.type; changed(); }
+    }
   }
-  const target = WX_TYPES[wx.type];
+  const target = wx.auto && wx.field ? wx.field : WX_TYPES[wx.type];
   WX_KEYS.forEach((k) => { wx[k] = damp(wx[k], target[k], wx.rate, dt); });
   wx.wet = clamp(wx.wet + (wx.rain > 0.2 ? dt * 0.05 * wx.rain : -dt * 0.006), 0, 1);
   wx.cover = clamp(wx.cover + (wx.snow > 0.4 ? dt * 0.012 * wx.snow : -dt * (0.005 + Math.max(0, env.sunElev) * 0.0003)), 0, 1);
@@ -227,7 +218,7 @@ export function updateWeather(dt, env) {
   boltMat.opacity = wx.flash;
 
   if (wx.rain > 0.4) wx.rainedRecently = true;
-  if (wx.rainedRecently && wx.rain < 0.12 && WX_TYPES[wx.type].rain === 0) {
+  if (wx.rainedRecently && wx.rain < 0.12 && target.rain < 0.05) {
     wx.rainedRecently = false;
     rainStopListeners.forEach((fn) => fn());
     if (env.sunElev > 4 && wx.type !== 'snow') wx.rainbowT = RAINBOW_SECONDS;

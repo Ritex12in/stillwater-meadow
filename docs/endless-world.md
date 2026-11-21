@@ -34,7 +34,8 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
   shared by everyone in the same world at the same moment; and, for now, no manmade things away
   from home ("it's weird to see a lamp post out of nowhere near lakes in a snow desert"): the home
   lake keeps its jetty, boat and skipper, fire, bench, chairs, lamps and path; every other lake is
-  wild; the shrines in blossom groves stay.
+  wild; the shrines in blossom groves stay. (Amended the same day: buildings that match their
+  biome are welcome, see "Plan: a fantasy world of biomes"; out-of-place things stay out.)
 - **Worlds and carrying (2026-11-22):** seeds as in Minecraft: any text is a seed, the same text
   the same world, a new player gets a random one. The backpack is a real inventory of slots
   (flowers, later tools and other things); bouquets are tied from flowers in it.
@@ -321,28 +322,66 @@ Picking weather in the World panel overrides it where you stand; Auto is the lan
 **5. Then.** The World panel says what it is like where you stand ("Here: early spring, light
 rain"); dark skies and rain curtains in the direction of a far storm come after.
 
-## Plan: more biomes (asked 2026-11-22, not decided yet)
+## Plan: a fantasy world of biomes (decided 2026-11-22, not started)
 
-The owner shared a mood board of twelve biomes to add, saved as
-[reference/biomes-moodboard.png](reference/biomes-moodboard.png): Verdant Plains, Enchanted Forest,
-Cherry Blossom Valley, Snowy Highlands, Crystal Caverns, Golden Desert, Volcanic Wasteland,
-Floating Islands, Coastal Isles, Mystic Swamp, Windy Cliffs, Aurora Tundra. It is a reference for
-the look and the variety wanted, not art to copy.
+The owner shared a mood board of twelve biomes, saved as
+[reference/biomes-moodboard.png](reference/biomes-moodboard.png) (a guide to the look and variety,
+not art to copy): Verdant Plains, Enchanted Forest, Cherry Blossom Valley, Snowy Highlands,
+Crystal Caverns, Golden Desert, Volcanic Wasteland, Floating Islands, Coastal Isles, Mystic Swamp,
+Windy Cliffs, Aurora Tundra. Owner's decisions:
+- **A fantasy world.** All twelve come in, fantasy ones included. Natural laws still shape the
+  ordinary land (climate, treeline, snow, erosion); the fantasy is layered on top, by rule.
+- **Buildings that match their place are welcome:** a castle on a highland crag, ruined arches on
+  the plains and in the desert, pagodas in the blossom valley, huts on stilts in the swamp, a
+  windmill on the windy cliffs, beach huts and ships on the coast, a sky city on floating islands.
+  What stays out is the out-of-place: lamps, benches and jetties at wild lakes (decided earlier).
+- **Made in code, not downloaded:** models are built in three.js from code, as the shrine, the
+  great cherry (world/proctrees.js), the flowers (world/detail.js) and the children already are,
+  using the techniques studied in Lumen Isles (the webgl2-world-kit skill: cut-out leaves in the
+  shader, glow, waterfalls, a cloud sea, particles, bloom), adapted to three.js r128.
+- **Order:** ours to choose (below).
 
-Proposed approach (Minecraft-style): biomes chosen from a few broad fields that also shape the
-land: temperature and moisture (have), distance from the sea (sea, coast, inland), ruggedness
-(plains, hills, cliffs, mountains), and a rare "wonder" field for the fantasy ones; blended at
-their edges. Proposed order, after seasons and weather (the warm regions are needed): (1) northern
-lights and tundra details, Verdant Plains tuning, petals drifting in blossom valleys; (2) Golden
-Desert, Mystic Swamp, Enchanted Forest; (3) Windy Cliffs with rivers and waterfalls; (4) Coastal
-Isles with the ocean; (5) Volcanic Wasteland; (6) crystal grottos and floating islands as rare
-wonders. The ground is a height map, so caves and overhangs need separate pieces (crystal
-grottos instead of caverns; floating islands as their own meshes).
+**How biomes are chosen (as Minecraft does).** A few broad fields of (seed, x, z) that also shape the
+land, so landform and biome always agree: temperature (with the warm side from the seasons plan),
+moisture, continentalness (sea, coast, inland; with the ocean), ruggedness (plains, hills, cliffs,
+mountains), and a rare "wonder" field for the fantasy places. A table of biomes, each a region of
+those fields, blended at the edges. Each biome is one entry in a registry: its ground colours and
+textures, its plants (kinds, density, spacing), its rocks, its small things, its structures (by
+site), its ambience (particles, fog, sky tint, glow at night, sounds) and its weather leanings.
+Existing country (meadow, heath, lush woods, groves, snow, taiga, tundra) becomes entries in it.
 
-Open questions put to the owner: whether the fantasy biomes (floating islands, crystal caverns,
-glowing forests, lava) come in as rare wonders or not at all, given the "follow natural laws"
-direction; whether the buildings in the pictures (castles, ruins, pagodas, huts, windmill, ships)
-stay out for now, as decided for manmade things, or ruins only are allowed; and the order.
+**How things are made.** A kit of generators, each seeded so every copy differs a little: trees by
+kind (giant old trees, willows, palms, wind-bent pines), cacti, crystals, glowing mushrooms and
+lotus, rocks, arches and mesas; and building parts (walls, towers, roofs of several styles,
+arches, stairs, stilts, sails, windmill sails) assembled into structures. Built once per variant,
+merged, drawn from fixed slots like the plants (or set down whole like the shrine); far ones as
+cards or simplified shapes. Glow uses the existing night-glow and bloom. Structures stand at sites
+fixed by the seed, on ground levelled for them (the shrine's method), kept clear of plants.
+
+**Order** (foundations first, then quick wins, then new kinds of land, the hardest last):
+1. **Foundations:** the biome fields and registry (existing country moved into it), the warm side
+   of temperature, and the generator kit with its first pieces.
+2. **Seasons and weather by place** (planned above), now reading the biome fields.
+3. **Glow and sky:** Aurora Tundra (northern lights over cold country, ice shards on frozen lakes),
+   Enchanted Forest (rare old-growth: giant trees, hanging moss, glowing mushrooms and small
+   crystals, fireflies), Cherry Blossom Valley (petals drifting across the valley, pagodas).
+4. **New climates:** Golden Desert (wind-shaped dunes, cacti, sandstone mesas and arches, ruins,
+   heat shimmer), Mystic Swamp (shallow pools, willows, mist, glowing lotus, huts on stilts),
+   Verdant Plains (open grassland, lone trees, a castle on a hill, ruined arches).
+5. **New land shapes:** rivers and waterfalls; Windy Cliffs (stepped plateaus and sheer drops, a sea
+   of cloud below as in Lumen Isles, wind-bent trees, a windmill); Snowy Highlands (cliffs, frozen
+   waterfalls, an ice castle).
+6. **The sea:** Coastal Isles (ocean, beaches, clear shallows, palms, sea arches, beach huts, ships).
+7. **Fire:** Volcanic Wasteland (a volcano cone with a crater, dark basalt, glowing lava channels
+   you cannot walk into, ash and smoke, a ruined aqueduct).
+8. **Wonders:** Floating Islands (rock islands with waterfalls pouring off, a sky city; a way up to
+   be designed: wind currents, a glider, or stepping stones) and Crystal Caverns (the ground is a
+   height map, so no real caves: open crystal grottos, and cave mouths leading into a separate
+   interior).
+
+**Risks.** Code-made buildings must reach the mood board's charm in the game's low-poly style: show
+the owner each new kind of piece early. Draw cost: biome edges, glow and far structures need
+budgets checked on the owner's machine. The scope is many milestones; each lands playable.
 
 ## How nature shapes the land (after milestone 4d, step 1)
 

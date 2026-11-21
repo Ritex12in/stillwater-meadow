@@ -79,14 +79,19 @@ export function initFlowers() {
 
   let onBench = null, onBoat = null;
   const benchSeat = seats.find((s) => s.name === 'bench');
-  const placeOnBench = (colors) => {
-    if (onBench) scene.remove(onBench);
-    onBench = buildBouquet(colors);
+  const layOnBench = () => {
+    if (!onBench) return;
     const side = benchSeat.rot + Math.PI / 2;
     onBench.position.set(benchSeat.x + Math.sin(side) * 0.6, heightAt(benchSeat.x, benchSeat.z) + 0.53, benchSeat.z + Math.cos(side) * 0.6);
     onBench.rotation.set(0, benchSeat.rot + 0.4, Math.PI / 2 - 0.15);
+  };
+  const placeOnBench = (colors) => {
+    if (onBench) scene.remove(onBench);
+    onBench = buildBouquet(colors);
+    layOnBench();
     scene.add(onBench);
   };
+  hooks.anchor.push(layOnBench); // (the bench has moved to another lake)
   const placeOnBoat = (colors) => {
     if (onBoat) boat.remove(onBoat);
     onBoat = buildBouquet(colors);

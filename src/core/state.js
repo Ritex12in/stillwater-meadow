@@ -17,7 +17,7 @@ export const seasonState = {
 };
 
 /** Per-frame callbacks registered by systems and features. */
-export const hooks = { frame: [], pose: [], camera: [] };
+export const hooks = { frame: [], pose: [], camera: [], anchor: [] }; // (anchor: called after the lake's landmarks have moved to another lake, to put what stands on them there too)
 
 export function pushOut(p, r) {
   for (const o of obstacles) {

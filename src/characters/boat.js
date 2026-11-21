@@ -4,7 +4,7 @@ import { scene } from '../core/render.js';
 import { TAU, clamp, lerp, damp, smooth, angDiff, rnd } from '../core/math.js';
 import { lakeT, lakePoint, dockAt, DOCK_A, DOCK_LEN, DOCK_Y } from '../core/shape.js';
 import { std, weatherize, glowTex } from '../core/materials.js';
-import { seasonState } from '../core/state.js';
+import { seasonState, hooks } from '../core/state.js';
 import { makePerson } from './rigs.js';
 import { player, sitDown, standUp } from './player.js';
 import { activity } from '../systems/activity.js';
@@ -35,8 +35,11 @@ const lanternLight = new THREE.PointLight('#ffb070', 0, 9, 2);
 const skPole = new THREE.Group();
 let wakeMat = null;
 
-export function buildBoat() {
-  // the tour: one calm loop around the lake that starts and ends at the mooring
+/** The tour: one calm loop round the lake the jetty stands at, starting and ending at the mooring. */
+function layTour() {
+  Object.assign(MOOR, dockAt(DOCK_LEN + 0.85, 0));
+  Object.assign(BOARD_POINT, dockAt(DOCK_LEN - 0.55, 0));
+  boatSeat.slideMinY = DOCK_Y + 0.05;
   const T_MOOR = lakeT(MOOR.x, MOOR.z), pts = [], N = 28;
   for (let i = 0; i < N; i++) {
     const p = i === 0 ? MOOR : lakePoint(DOCK_A + (i / N) * TAU, T_MOOR);
@@ -44,6 +47,12 @@ export function buildBoat() {
   }
   boatPath = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
   BOAT_PATH_LEN = boatPath.getLength();
+}
+
+export function buildBoat() {
+  layTour();
+  // the jetty has moved to another lake: the boat is moored there, its tour laid round that lake
+  hooks.anchor.push(() => { layTour(); Object.assign(ferry, { state: 'docked', dist: 0, speed: 0, timer: 0, dockedT: 10, bowT: 0, rideT: 0 }); });
   scene.add(boat);
 
   const bambooA = weatherize(std('#b9a35e'), 'std'), bambooB = weatherize(std('#a89050'), 'std');

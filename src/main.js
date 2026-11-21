@@ -35,7 +35,7 @@ import { updateCamera, camTarget } from './systems/camera.js';
 import { cur, sunDir, moonDir, lightDir, solar, timeCtl, advanceTime, periodName, formatHour, goLive, setManual, wrap24 } from './systems/time.js';
 import { wx, WX_LABEL, buildWeather, updateWeather, updatePrecip, weatherModify, cycleWeather, onRainStopped, restoreWeather, resizeWeather } from './systems/weather.js';
 import { quality, initQuality, tickQuality, onQualityChange, loadingStarted, loadingFinished } from './systems/quality.js';
-import { grassU, updateGrassMap } from './world/grassfield.js';
+import { grassU, updateGrassMap, resetGrassMap } from './world/grassfield.js';
 import { farForest } from './world/farforest.js';
 import { updateWilds, settleWilds, wildStats, growSquare, growRocks, growSmall } from './world/wilds.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
@@ -127,6 +127,8 @@ buildWeather();
 registerPetting();
 // (after everything above, which is laid out once round the valley's own trees)
 settleWilds(player.x, player.z);
+// when the landmarks move to another lake: the grass keeps off them there, and the shadows are redrawn
+hooks.anchor.push(() => { resetGrassMap(); renderer.shadowMap.needsUpdate = true; });
 
 // ── Interface and systems ──
 initHud();
@@ -339,7 +341,7 @@ window.__meadow = {
   get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, get shrine() { return world.shrine; }, tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
   fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, pets: petsView, fetch: fetchView, friend: friendView, get friendSt() { return friend && friend.st; }, dance: danceView, snowman: snowmanView, wardrobe: wardrobeNow, emote: playEmote, emoteState, toast,
-  geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') },
+  geo: { get lakePoint() { return lakePoint; }, walkable, dockAt, dockDir, onDock, FIRE_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') }, // (lakePoint: whichever lake the landmarks stand at)
   seed: WORLD.seed,
   /** Lakes: those about you, the ones with water drawn just now, and a way to go to one or to any spot. */
   lakes: lakesAbout, waterLakes, visitLake, travelTo,

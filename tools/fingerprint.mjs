@@ -22,7 +22,7 @@ const fp = await p.evaluate(async () => {
   const m = window.__meadow;
   // import the very module instances the game uses (same URL, including any dev-server query)
   const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
-  const S = await import(url('/src/core/shape.js')), W = (await import(url('/src/core/state.js'))).world;
+  const S = await import(url('/src/core/shape.js')), ST = await import(url('/src/core/state.js')), W = ST.world;
   const grid = (fn) => { const o = []; for (let z = -170; z <= 170; z += 5) for (let x = -170; x <= 170; x += 5) o.push(fn(x, z)); return o; };
   const inst = (h) => { // instanced meshes: count + matrix checksum
     const out = []; const visit = (o) => { if (!o) return; if (Array.isArray(o)) return o.forEach(visit); if (o.isInstancedMesh) { let s = 0; const a = o.instanceMatrix.array; for (let i = 0; i < o.count * 16; i++) s += a[i] * ((i % 97) + 1); out.push([o.count, s]); } else if (o.children) o.children.forEach(visit); else if (typeof o === 'object') Object.values(o).forEach((v) => { if (v && (v.isObject3D || Array.isArray(v))) visit(v); }); };
@@ -37,6 +37,7 @@ const fp = await p.evaluate(async () => {
     ahead: Array.from({ length: 40 }, (_, i) => S.waterAhead(S.lakePoint(i * 0.157, 1.05), { x: -Math.cos(i * 0.157), z: -Math.sin(i * 0.157) })),
     trees: m.trees().map((t) => [t.x, t.z, t.type, t.s]), shrine: W.shrine, player: [m.player.x, m.player.z, m.player.rot],
     animals: m.animals.map((a) => [a.x, a.z]), sceneInst: inst(scene), sceneCount: (() => { let n = 0; scene.traverse(() => n++); return n; })(),
+    obstacles: ST.obstacles.map((o) => [o.x, o.z, o.r]), seats: ST.seats.map((q) => [q.name, q.x, q.z, q.baseY, q.rot, q.top, q.standOff]),
     rngNext: m.rng(), baked: S.heightAt(10.3, 40.7) !== S.height(10.3, 40.7), urls: [url('/src/core/shape.js')],
   };
 });

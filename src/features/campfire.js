@@ -17,9 +17,7 @@ import { toast } from '../ui/hud.js';
 export const fire = { on: false, lit: 0, left: 0 };
 
 export function initCampfire() {
-  const baseY = height(C.x, C.z);
   const pit = new THREE.Group();
-  pit.position.set(C.x, baseY, C.z);
   scene.add(pit);
   const stoneMat = weatherize(std('#8a8a80'), 'std');
   const stoneGeo = new THREE.IcosahedronGeometry(1, 0);
@@ -47,21 +45,40 @@ export function initCampfire() {
   const embers = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0).scale(1, 0.35, 1), emberMat);
   embers.position.y = 0.06;
   pit.add(embers);
-  obstacles.push({ x: C.x, z: C.z, r: 0.85 });
+  const pitBlock = { x: 0, z: 0, r: 0.85 };
+  obstacles.push(pitBlock);
 
-  const facing = Math.atan2(LAKE.x - C.x, LAKE.z - C.z);
-  const logAngles = [facing + Math.PI, facing + Math.PI + 2.1];
-  logAngles.forEach((a) => {
-    const x = C.x + Math.sin(a) * 2.3, z = C.z + Math.cos(a) * 2.3, y = height(x, z);
-    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 1.5, 8).rotateZ(Math.PI / 2), logMat);
-    const rot = Math.atan2(C.x - x, C.z - z);
-    log.position.set(x, y + 0.18, z);
-    log.rotation.y = rot;
-    log.castShadow = true; log.receiveShadow = true;
-    scene.add(log);
-    seats.push({ name: 'log', x, z, baseY: y, top: 0.36, rot, standOff: 0.9 });
-    obstacles.push({ x, z, r: 0.45 });
+  // two logs to sit on, on the side of the fire away from the lake
+  const logs = [0, 1].map(() => {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 1.5, 8).rotateZ(Math.PI / 2), logMat);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    scene.add(mesh);
+    const l = { mesh, seat: { name: 'log', x: 0, z: 0, baseY: 0, top: 0.36, rot: 0, standOff: 0.9 }, block: { x: 0, z: 0, r: 0.45 } };
+    seats.push(l.seat);
+    obstacles.push(l.block);
+    return l;
   });
+  const logAngles = [0, 0], slots = []; // (slots: the places round the fire where the animals settle, between the logs)
+  /** Put the fire and its logs where the lake's fire spot is (again whenever the landmarks move to another lake). */
+  const place = () => {
+    pit.position.set(C.x, height(C.x, C.z), C.z);
+    pitBlock.x = C.x; pitBlock.z = C.z;
+    const facing = Math.atan2(LAKE.x - C.x, LAKE.z - C.z);
+    logAngles[0] = facing + Math.PI; logAngles[1] = facing + Math.PI + 2.1;
+    logs.forEach((l, i) => {
+      const a = logAngles[i], x = C.x + Math.sin(a) * 2.3, z = C.z + Math.cos(a) * 2.3, y = height(x, z), rot = Math.atan2(C.x - x, C.z - z);
+      l.mesh.position.set(x, y + 0.18, z);
+      l.mesh.rotation.y = rot;
+      l.seat.x = x; l.seat.z = z; l.seat.baseY = y; l.seat.rot = rot;
+      l.block.x = x; l.block.z = z;
+    });
+    slots.length = 0;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * TAU;
+      if (!logAngles.some((la) => Math.abs(angDiff(a, la)) < 0.45)) slots.push(a);
+    }
+  };
+  place();
 
   const flameTex = (() => {
     const c = document.createElement('canvas'); c.width = 64; c.height = 128;
@@ -126,12 +143,8 @@ export function initCampfire() {
     run: toggle,
   });
 
-  const slots = [];
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * TAU;
-    if (logAngles.some((la) => Math.abs(angDiff(a, la)) < 0.45)) continue;
-    slots.push(a);
-  }
+  // the landmarks have moved to another lake: the animals leave the old fire, and the fire is set out afresh
+  hooks.anchor.push(() => { release(); place(); });
   const gather = () => {
     const used = new Set(animals.filter((a) => a.goal && a.goal.src === 'fire').map((a) => a.goal.slot));
     for (const a of animals) {

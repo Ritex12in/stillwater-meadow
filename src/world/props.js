@@ -1,20 +1,25 @@
 // Built things: the jetty, the bench, lawn chairs and the path lamps.
+//
+// Each is made once and then *placed*: put where the lake's landmarks are (core/shape.js). The
+// landmarks can move to another lake (anchorTo), and then everything here is placed again, along
+// with its seat to sit on, the obstacle that stops you walking through it, and the lamps' light.
 import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { TAU, rand, pick, angDiff } from '../core/math.js';
 import { height, LAKE, lakePoint, PATH_T, dockStart, dockDir, DOCK_A, DOCK_BACK, DOCK_LEN, DOCK_HALF, DOCK_Y, chairSpots, BENCH_SPOT } from '../core/shape.js';
 import { std, weatherize, glowTex } from '../core/materials.js';
-import { world, obstacles, seats } from '../core/state.js';
+import { world, obstacles, seats, hooks } from '../core/state.js';
 import { kitBench } from './kitprops.js';
 
 export const lampMat = new THREE.MeshStandardMaterial({ color: '#fff4d6', emissive: '#ffbb55', emissiveIntensity: 0, transparent: true, opacity: 0.85, roughness: 0.2 });
 export const lampGlows = [];
 
+let dock = null, bench = null, benchSeat = null, benchBlock = null;
+
 export function buildDockAndBench() {
-  const dock = new THREE.Group();
-  dock.position.set(dockStart.x, 0, dockStart.z);
-  dock.rotation.y = Math.atan2(dockDir.x, dockDir.z);
+  // the jetty: planks and posts, made round the point where it leaves the shore, deck at height 0
+  dock = new THREE.Group();
   const plankCols = ['#9b7653', '#8c6a4a', '#a7815c'];
   const plankMats = new Map(); // one material per colour instead of one per plank
   const plankGeo = new THREE.BoxGeometry(DOCK_HALF * 2, 0.08, 0.5);
@@ -22,7 +27,7 @@ export function buildDockAndBench() {
     const c = pick(plankCols);
     if (!plankMats.has(c)) plankMats.set(c, weatherize(std(c), 'std'));
     const m = new THREE.Mesh(plankGeo, plankMats.get(c));
-    m.position.set(rand(-0.03, 0.03), DOCK_Y, s + 0.25);
+    m.position.set(rand(-0.03, 0.03), 0, s + 0.25);
     m.rotation.y = rand(-0.015, 0.015);
     m.castShadow = true; m.receiveShadow = true;
     dock.add(m);
@@ -31,17 +36,15 @@ export function buildDockAndBench() {
   for (let s = 0.5; s < DOCK_LEN; s += 2.8) {
     for (const side of [-1, 1]) {
       const post = new THREE.Mesh(postGeo, postMat);
-      post.position.set(side * (DOCK_HALF - 0.08), DOCK_Y - 0.9, s);
+      post.position.set(side * (DOCK_HALF - 0.08), -0.9, s);
       post.castShadow = true;
       dock.add(post);
     }
   }
   scene.add(dock);
 
-  const bp = world.benchPos = BENCH_SPOT;
-  const bench = new THREE.Group();
-  bench.position.set(bp.x, height(bp.x, bp.z), bp.z);
-  bench.rotation.y = Math.atan2(LAKE.x - bp.x, LAKE.z - bp.z);
+  world.benchPos = BENCH_SPOT;
+  bench = new THREE.Group();
   const wood = weatherize(std('#8a6646'), 'std'), iron = std('#3a3f3f');
   if (!kitBench(bench)) [
     [new THREE.BoxGeometry(1.9, 0.07, 0.5), wood, 0, 0.48, 0, 0],
@@ -54,8 +57,22 @@ export function buildDockAndBench() {
     bench.add(mesh);
   });
   scene.add(bench);
-  obstacles.push({ x: bp.x, z: bp.z, r: 0.95 });
-  seats.push({ name: 'bench', x: bp.x, z: bp.z, baseY: bench.position.y, top: 0.515, rot: bench.rotation.y, standOff: 1.35 });
+  benchBlock = { x: 0, z: 0, r: 0.95 };
+  benchSeat = { name: 'bench', x: 0, z: 0, baseY: 0, top: 0.515, rot: 0, standOff: 1.35 };
+  obstacles.push(benchBlock);
+  seats.push(benchSeat);
+  placeDockAndBench();
+  hooks.anchor.push(placeDockAndBench);
+}
+/** Put the jetty at the lake's jetty spot, and the bench at its bench spot, facing the water. */
+function placeDockAndBench() {
+  dock.position.set(dockStart.x, DOCK_Y, dockStart.z);
+  dock.rotation.y = Math.atan2(dockDir.x, dockDir.z);
+  const bp = BENCH_SPOT;
+  bench.position.set(bp.x, height(bp.x, bp.z), bp.z);
+  bench.rotation.y = Math.atan2(LAKE.x - bp.x, LAKE.z - bp.z);
+  benchBlock.x = bp.x; benchBlock.z = bp.z;
+  benchSeat.x = bp.x; benchSeat.z = bp.z; benchSeat.baseY = bench.position.y; benchSeat.rot = bench.rotation.y;
 }
 
 function makeChair(paint) {
@@ -77,23 +94,34 @@ function makeChair(paint) {
   add(0.62, 0.06, 0.04, 0, 1.12, -0.46, -0.32);
   return g;
 }
-function placeChair(x, z, baseY, rot, paint) {
-  const c = makeChair(paint);
-  c.position.set(x, baseY, z);
-  c.rotation.y = rot;
-  scene.add(c);
-  obstacles.push({ x, z, r: 0.45 });
-  seats.push({ name: 'chair', x, z, baseY, top: 0.44, rot, standOff: 0.9 });
+// two lawn chairs by the water, and one at the end of the jetty
+const chairs = [];
+function addChair(paint) {
+  const c = { g: makeChair(paint), block: { x: 0, z: 0, r: 0.45 }, seat: { name: 'chair', x: 0, z: 0, baseY: 0, top: 0.44, rot: 0, standOff: 0.9 } };
+  scene.add(c.g);
+  obstacles.push(c.block);
+  seats.push(c.seat);
+  chairs.push(c);
+}
+function setChair(c, x, z, baseY, rot) {
+  c.g.position.set(x, baseY, z);
+  c.g.rotation.y = rot;
+  c.block.x = x; c.block.z = z;
+  c.seat.x = x; c.seat.z = z; c.seat.baseY = baseY; c.seat.rot = rot;
 }
 
 export function buildChairs() {
-  const paints = ['#efe9dc', '#86aea6'];
+  ['#efe9dc', '#86aea6', '#d8a95e'].forEach(addChair);
+  placeChairs();
+  hooks.anchor.push(placeChairs);
+}
+function placeChairs() {
   chairSpots.forEach((p, i) => {
     const rot = Math.atan2(LAKE.x - p.x, LAKE.z - p.z) + (i ? -0.12 : 0.12);
-    placeChair(p.x, p.z, height(p.x, p.z) - 0.02, rot, paints[i]);
+    setChair(chairs[i], p.x, p.z, height(p.x, p.z) - 0.02, rot);
   });
   const s = DOCK_LEN - 1.9, w = -0.5;
-  placeChair(dockStart.x + dockDir.x * s + dockDir.z * w, dockStart.z + dockDir.z * s - dockDir.x * w, DOCK_Y + 0.04, Math.atan2(dockDir.x, dockDir.z) - 0.35, '#d8a95e');
+  setChair(chairs[2], dockStart.x + dockDir.x * s + dockDir.z * w, dockStart.z + dockDir.z * s - dockDir.x * w, DOCK_Y + 0.04, Math.atan2(dockDir.x, dockDir.z) - 0.35);
 }
 
 /** A classic park lamp: stepped base, slim fluted post, collar, and a glass lantern with a peaked roof. */
@@ -115,6 +143,10 @@ function lampGeos() {
 
 /** Where the lanterns hang (for the light they throw on the ground). */
 export const lampSpots = [];
+// The lamps stand round the lake's path, twelve to the circle less the one that would block the
+// jetty. Each remembers its place in that circle *relative to the jetty* (`off`), so when the
+// landmarks stand at another lake, turned another way, the lamps turn with them.
+const lamps = [];
 
 export function buildLamps() {
   const postMat = std('#22282a', { flatShading: false, roughness: 0.55, metalness: 0.3 });
@@ -123,17 +155,28 @@ export function buildLamps() {
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * TAU + 0.2;
     if (Math.abs(angDiff(a, DOCK_A)) < 0.2) continue;
-    const p = lakePoint(a, PATH_T + 0.085);
-    const y = height(p.x, p.z);
     const post = new THREE.Mesh(iron, postMat);
-    post.position.set(p.x, y, p.z); post.rotation.y = a; post.castShadow = true;
+    post.castShadow = true;
     const lamp = new THREE.Mesh(glass, lampMat);
-    lamp.position.copy(post.position); lamp.rotation.y = a;
     const glow = new THREE.Sprite(glowMat); // all lamps share one material: one opacity update per frame
-    glow.position.set(p.x, y + 2.44, p.z); glow.scale.set(2.4, 2.4, 1);
+    glow.scale.set(2.4, 2.4, 1);
     scene.add(post, lamp, glow);
+    const l = { post, lamp, glow, spot: new THREE.Vector3(), block: { x: 0, z: 0, r: 0.2 }, a, off: a - DOCK_A };
+    lamps.push(l);
     lampGlows.push(glow);
-    lampSpots.push(new THREE.Vector3(p.x, y + 2.44, p.z));
-    obstacles.push({ x: p.x, z: p.z, r: 0.2 });
+    lampSpots.push(l.spot);
+    obstacles.push(l.block);
+  }
+  placeLamps(true);
+  hooks.anchor.push(() => placeLamps(false));
+}
+function placeLamps(first) {
+  for (const l of lamps) {
+    const a = first ? l.a : DOCK_A + l.off, p = lakePoint(a, PATH_T + 0.085), y = height(p.x, p.z);
+    l.post.position.set(p.x, y, p.z); l.post.rotation.y = a;
+    l.lamp.position.copy(l.post.position); l.lamp.rotation.y = a;
+    l.glow.position.set(p.x, y + 2.44, p.z);
+    l.spot.set(p.x, y + 2.44, p.z);
+    l.block.x = p.x; l.block.z = p.z;
   }
 }

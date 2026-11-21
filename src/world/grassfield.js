@@ -30,6 +30,8 @@ function grassy(x, z, h) {
   const lake = lakeAt(x, z), b = Math.min(lake.beach, 1); // (grass begins where that lake's sand ends)
   return smooth(1.02 + 0.1 * b, 1.1 + 0.12 * b, lake.t(x, z)) * (1 - smooth(0.15, 0.5, lake.path(x, z))) * (1 - rockAmt(h, slopeAt(x, z)));
 }
+/** Work the whole map out again at the next update (the jetty, the fire or the bench has moved, and it remembers where they were). */
+export function resetGrassMap() { mapIx = null; }
 /** Keep the map round (cx, cz). Call once a frame; it only does work when the camera has moved on. */
 export function updateGrassMap(cx, cz) {
   if (!mapTex) return;

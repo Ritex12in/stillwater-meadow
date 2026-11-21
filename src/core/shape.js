@@ -135,9 +135,8 @@ export function lakeAt(x, z) {
 export const lakeT = (x, z) => lakeAt(x, z).t(x, z);
 /** How much a spot is on the path round its nearest lake. */
 export const pathAmt = (x, z) => lakeAt(x, z).path(x, z);
-// the single-lake names: the home lake
-export const LAKE = HOME;
-export const lakeR = HOME.r;
+// the single-lake names: the lake the landmarks stand at (the home lake, until anchorTo moves them)
+export let LAKE = HOME, lakeR = HOME.r;
 
 // ── Terrain ────────────────────────────────────────────────────
 /**
@@ -232,25 +231,29 @@ export function slopeAt(x, z) {
   return Math.hypot(heightAt(x + e, z) - heightAt(x - e, z), heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e);
 }
 
-export const lakePoint = HOME.point;
+export let lakePoint = HOME.point;
 
 // ── Places beside a lake ───────────────────────────────────────
-export const DOCK_A = Math.PI / 2 + 0.55, CHAIR_A = Math.PI / 2 - 0.95;
+export let DOCK_A = Math.PI / 2 + 0.55, CHAIR_A = Math.PI / 2 - 0.95; // (where round the lake the jetty and the lawn chairs are)
 export const DOCK_BACK = 1.6, DOCK_LEN = 9, DOCK_HALF = 1.05;
 /**
  * Where things stand round a lake: the starting spot on the path, the jetty (where it leaves the
  * shore, which way it runs, how high its deck is), the two lawn chairs, the campfire and the bench.
+ * The whole arrangement is turned round the lake by the lake's own `turn` (0 at home), so no two
+ * lakes are laid out facing the same way.
  */
 export function landmarksOf(lake) {
-  const start = lake.point(DOCK_A, 1.03);
+  const turn = lake.turn || 0, dockA = Math.PI / 2 + 0.55 + turn, chairA = Math.PI / 2 - 0.95 + turn;
+  const start = lake.point(dockA, 1.03);
   return {
-    spawn: lake.point(Math.PI / 2, PATH_T + 0.04),
+    dockA, chairA,
+    spawn: lake.point(Math.PI / 2 + turn, PATH_T + 0.04),
     dockStart: start,
-    dockDir: { x: -Math.cos(DOCK_A), z: -Math.sin(DOCK_A) },
+    dockDir: { x: -Math.cos(dockA), z: -Math.sin(dockA) },
     dockY: Math.max(0.5, height(start.x, start.z) + 0.1),
-    chairs: [lake.point(CHAIR_A, 1.17), lake.point(CHAIR_A + 0.05, 1.17)],
-    fire: lake.point(Math.PI / 2 + 0.34, 1.68),
-    bench: lake.point(Math.PI / 2 - 0.5, 1.5),
+    chairs: [lake.point(chairA, 1.17), lake.point(chairA + 0.05, 1.17)],
+    fire: lake.point(Math.PI / 2 + 0.34 + turn, 1.68),
+    bench: lake.point(Math.PI / 2 - 0.5 + turn, 1.5),
   };
 }
 const HOME_PLACES = landmarksOf(HOME);
@@ -259,7 +262,7 @@ export const SPAWN = HOME_PLACES.spawn;
 // ── Jetty ──────────────────────────────────────────────────────
 export const dockStart = HOME_PLACES.dockStart;
 export const dockDir = HOME_PLACES.dockDir;
-export const DOCK_Y = HOME_PLACES.dockY;
+export let DOCK_Y = HOME_PLACES.dockY;
 export function onDock(x, z) {
   const rx = x - dockStart.x, rz = z - dockStart.z;
   const s = rx * dockDir.x + rz * dockDir.z;
@@ -318,5 +321,24 @@ export function waterAhead(from, dir, dists = [4.5, 3.5, 6, 7.5, 2.5]) {
 export const chairSpots = HOME_PLACES.chairs;
 export const FIRE_SPOT = HOME_PLACES.fire;
 export const BENCH_SPOT = HOME_PLACES.bench;
+
+// ── Moving the landmarks to another lake ───────────────────────
+/** The lake the jetty, the fire and the bench stand at just now. */
+export let ANCHOR = HOME;
+/**
+ * Point the single-lake names at another lake: LAKE, lakeR and lakePoint become that lake, and
+ * the landmark spots (SPAWN, dockStart, dockDir, DOCK_Y, chairSpots, FIRE_SPOT, BENCH_SPOT) are
+ * worked out afresh round it. The spots are the same objects as before with new numbers in them,
+ * so whoever holds one sees it move. This moves only the *places*: the things standing on them
+ * are moved by whoever built them, through hooks.anchor (see core/state.js).
+ */
+export function anchorTo(lake) {
+  const m = landmarksOf(lake);
+  ANCHOR = LAKE = lake; lakeR = lake.r; lakePoint = lake.point;
+  DOCK_A = m.dockA; CHAIR_A = m.chairA; DOCK_Y = m.dockY;
+  Object.assign(SPAWN, m.spawn); Object.assign(dockStart, m.dockStart); Object.assign(dockDir, m.dockDir);
+  Object.assign(FIRE_SPOT, m.fire); Object.assign(BENCH_SPOT, m.bench);
+  chairSpots.forEach((c, i) => Object.assign(c, m.chairs[i]));
+}
 export const nearReserved = (x, z, r) => chairSpots.some((c) => Math.hypot(x - c.x, z - c.z) < r) || Math.hypot(x - FIRE_SPOT.x, z - FIRE_SPOT.z) < r + 1.6;
 

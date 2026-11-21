@@ -12,16 +12,16 @@
 // stand for whichever lake the landmarks are at (HOME, until they move).
 import { TAU, smooth, clamp, fbm, hash, mulberry32 } from './math.js';
 import { seasonState } from './state.js';
-import { query } from './env.js';
+import { worldSeed } from '../systems/save.js';
 
 export const PATH_T = 1.32;       // the path runs round a lake at this many lake-radii
 
 // ── The world's seed ───────────────────────────────────────────
-// One number decides the whole landscape (`?seed=7` in the address picks another). It shifts where
-// in the endless noise the land is read from. The first world, seed 1, reads from the start, which
-// leaves the meadow round the home lake as it was first made.
+// One number decides the whole landscape: the save picks it (systems/save.js: the address's
+// `?seed=`, else your last world, else a new one at random). It shifts where in the endless noise
+// the land is read from. The first world, seed 1, reads from the start.
 const DEFAULT_SEED = 1;
-export const WORLD = { seed: Math.max(1, Math.floor(Math.abs(Number(query.get('seed')) || DEFAULT_SEED))) };
+export const WORLD = { seed: worldSeed };
 const shift = mulberry32(WORLD.seed * 7919 + 101);
 const SX = WORLD.seed === DEFAULT_SEED ? 0 : Math.floor(shift() * 9000) + 0.37, SZ = WORLD.seed === DEFAULT_SEED ? 0 : Math.floor(shift() * 9000) + 0.61;
 
@@ -343,7 +343,10 @@ export function kitOf(lake) {
     // the home lake has everything; its arrangement faces the first of sixteen ways that gives the jetty deep water
     const first = hash(WORLD.seed * 13 + 5, 77) * TAU;
     lake.turn = first;
-    for (let k = 0; k < 16; k++) { const t = first + (k / 16) * TAU; if (jettyFits(lake, t)) { lake.turn = t; break; } }
+    let fits = false;
+    for (let k = 0; k < 16 && !fits; k++) { const t = first + (k / 16) * TAU; if (jettyFits(lake, t)) { lake.turn = t; fits = true; } }
+    // (none of those: try the ways between them; in the 42 worlds checked this was never needed)
+    for (let k = 0; k < 64 && !fits; k++) { const t = first + ((k + 0.5) / 64) * TAU; if (jettyFits(lake, t)) { lake.turn = t; fits = true; } }
     return (lake.kit = { dock: true, fire: true, bench: true });
   }
   if (!lake.settled) return (lake.kit = { dock: false, fire: false, bench: false });

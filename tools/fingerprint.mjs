@@ -16,7 +16,7 @@ import { writeFileSync } from 'node:fs';
 const b = await chromium.launch({ channel: 'chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ viewport: { width: 640, height: 400 } })).newPage();
 const errs = []; p.on('pageerror', (e) => errs.push(e.message));
-await p.goto('http://127.0.0.1:8080/?weather=clear&season=summer' + (process.env.MEADOW_SEED ? '&seed=' + process.env.MEADOW_SEED : '') + '#14');
+await p.goto('http://127.0.0.1:8080/?weather=clear&season=summer&seed=' + (process.env.MEADOW_SEED || 1) + '#14');
 await p.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 300000 });
 const fp = await p.evaluate(async () => {
   const m = window.__meadow;

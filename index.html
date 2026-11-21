@@ -95,6 +95,19 @@
       </div>
     </div>
     <div>
+      <h3>This world</h3>
+      <div class="world-seed">
+        <span class="seed-no">World <b id="seedNo">–</b></span>
+        <button type="button" class="btn" id="seedCopy" title="Copy a link to this world, to share it">Copy link</button>
+        <button type="button" class="btn" id="seedNew" title="Go to a new world, picked at random (this one is kept: come back with its number)">New world</button>
+      </div>
+      <form class="world-seed" id="seedForm">
+        <input id="seedInput" type="text" inputmode="numeric" maxlength="5" placeholder="World number" aria-label="World number" autocomplete="off">
+        <button type="submit" class="btn">Go</button>
+      </form>
+      <p class="note" id="seedNote" hidden></p>
+    </div>
+    <div>
       <h3>Places nearby</h3>
       <div class="places" id="places" role="group" aria-label="Places nearby: choose one to go there"></div>
     </div>
@@ -119,7 +132,7 @@
     </div>
     <div class="stack">
       <h3>Saved meadow</h3>
-      <p class="note">Names, bonds, your catch journal and settings are kept in this browser.</p>
+      <p class="note">Names, bonds, your catch journal, the worlds you have been to and settings are kept in this browser. Starting over forgets them all and begins in a new world.</p>
       <button type="button" class="btn danger" id="resetBtn">Start over</button>
       <div class="confirm" id="resetConfirm" hidden>
         <span>Forget every name, bond and catch, and start fresh?</span>

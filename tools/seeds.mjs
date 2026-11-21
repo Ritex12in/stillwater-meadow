@@ -1,15 +1,20 @@
 // A sweep over world seeds on the real GPU: does each world start well?
 //   node tools/seeds.mjs [first] [last]      (needs `npm run dev` running)
+//   node tools/seeds.mjs list 48213,907,...  (these seeds)
+//   node tools/seeds.mjs random 30           (thirty seeds picked at random, as a new player's would be)
 // For each seed: the game boots without errors; you start on dry, walkable ground beside the home
 // lake; the home lake has its jetty (root on land, end and mooring over water), fire and bench;
 // the country there is mild; flowers of at least three kinds grow within reach; and in winter
 // there are at least five pine cones to find (the skipper asks for them when no flowers grow).
 // Exits 1 if any seed fails.
 import { chromium } from 'playwright';
-const first = +(process.argv[2] || 1), last = +(process.argv[3] || 12);
+const mode = process.argv[2];
+const seeds = mode === 'list' ? process.argv[3].split(',').map(Number)
+  : mode === 'random' ? Array.from({ length: +(process.argv[3] || 30) }, () => 2 + Math.floor(Math.random() * 99998))
+  : (() => { const first = +(mode || 1), last = +(process.argv[3] || 12); return Array.from({ length: last - first + 1 }, (_, i) => first + i); })();
 const b = await chromium.launch({ channel: 'chrome', args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 let bad = 0;
-for (let seed = first; seed <= last; seed++) {
+for (const seed of seeds) {
   const row = { seed };
   for (const season of ['summer', 'winter']) {
     const ctx = await b.newContext({ viewport: { width: 960, height: 600 } });

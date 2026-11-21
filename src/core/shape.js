@@ -288,8 +288,8 @@ export function coldBase(x, z) {
   return smooth(0.575, 0.7, n) * mild(x, z);
 }
 /** How cold a spot is, 0 mild .. 1 frozen: the country's cold and the height (`h`, the ground's height there). */
-export function coldAt(x, z, h) {
-  return clamp(coldBase(x, z) + smooth(78, 132, h), 0, 1);
+export function coldAt(x, z, h, base = coldBase(x, z)) {
+  return clamp(base + smooth(78, 132, h), 0, 1);
 }
 
 // ── Treeline, rock and the way a slope faces ─────────────────
@@ -304,17 +304,39 @@ export const TREELINE = 64;
 export const TREE_COLD = 25;
 /** How much higher (m) a slope facing north feels, per unit of its rise (and lower for one facing south). */
 export const ASPECT = 14;
+const look = { north: 0, scree: 0 };
 /**
- * How much the land at a spot faces north (+) or south (-): its rise toward +z per metre, taken over
- * 16 m so it is the same whatever scale the ground is drawn at. 0 on low, mild ground, where it
- * would change nothing.
+ * How the land lies at a spot, measured over fixed distances (so it is the same at every scale the
+ * ground is drawn), from one shared set of samples:
+ *   north: how much it faces north (+) or south (-): its rise toward +z per metre, over 8 m (0 on
+ *     low, mild ground, where it would change nothing);
+ *   scree (0..1): loose rock fallen from a cliff, lying at its resting angle (about 33 to 37
+ *     degrees) at the cliff's foot: a slope of about 22 to 40 degrees with ground steeper than
+ *     about 42 between 9 and 15 m above it.
+ * The result is reused: copy what you need before the next call. A caller that already has the
+ * slope over about 8 m (`slope`: [rise per metre toward +x, toward +z]) may pass it.
  */
-export function northness(x, z, h) {
-  if (h < 18 && coldBase(x, z) < 0.25) return 0;
-  return clamp((height(x, z + 8) - height(x, z - 8)) / 16, -1.2, 1.2);
+export function slopeLook(x, z, h, base = coldBase(x, z), slope = null) {
+  look.north = 0; look.scree = 0;
+  const wantNorth = h >= 18 || base >= 0.25, wantScree = h >= 10;
+  if (!wantNorth && !wantScree) return look;
+  const gx = slope ? slope[0] : (height(x + 4, z) - height(x - 4, z)) / 8, gz = slope ? slope[1] : (height(x, z + 4) - height(x, z - 4)) / 8;
+  if (wantNorth) look.north = clamp(gz, -1.2, 1.2);
+  if (wantScree) {
+    const sl = Math.hypot(gx, gz);
+    if (sl >= 0.4 && sl <= 0.85) {
+      const ux = gx / sl, uz = gz / sl, cliff = (height(x + ux * 15, z + uz * 15) - height(x + ux * 9, z + uz * 9)) / 6; // (uphill)
+      look.scree = smooth(0.4, 0.55, sl) * (1 - smooth(0.72, 0.85, sl)) * smooth(0.9, 1.2, cliff);
+    }
+  }
+  return look;
 }
+/** How much the land at a spot faces north (+) or south (-): see slopeLook. */
+export const northness = (x, z, h, base) => slopeLook(x, z, h, base).north;
+/** How much a spot is scree (0..1): see slopeLook. */
+export const screeAt = (x, z, h) => slopeLook(x, z, h).scree;
 /** The height (m) a spot feels like: see above. `north` from northness(). */
-export const feltHeight = (x, z, h, north) => h + TREE_COLD * coldBase(x, z) + ASPECT * north;
+export const feltHeight = (x, z, h, north, base = coldBase(x, z)) => h + TREE_COLD * base + ASPECT * north;
 /** How far into the treeline band a spot is: 0 below it, 1 at the line and above (no trees). */
 export const aboveTrees = (felt) => smooth(TREELINE - 16, TREELINE, felt);
 /** How much rain a spot gets, 0 parched .. 1 soaked (0.5 in between, and in the valley). */

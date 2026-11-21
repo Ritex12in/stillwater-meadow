@@ -18,7 +18,7 @@
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
 // walk.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
-import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
+import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -82,6 +82,8 @@ export function growSquare(ix, iz) {
   return trees;
 }
 
+/** How many spots a square tries for scree stones (most squares have no scree, and take none). */
+const SCREE_TRIES = 40;
 const ROCK_COLS = ['#8f8d82', '#7d7c73', '#a09d90', '#6f6e68'].map(col);
 /** The boulders of one square: a few in the meadows, many where the ground turns to rock and scree. */
 export function growRocks(ix, iz) {
@@ -94,6 +96,17 @@ export function growRocks(ix, iz) {
     if (keep > 0.07 + rocky * 0.8 + smooth(30, 70, h) * 0.15 + dryOf(moistAt(x, z)) * 0.16 + snowOf(coldAt(x, z, h)) * 0.08) continue;
     const s = 0.4 + size * size * (1.1 + rocky * 1.3);
     rocks.push({ x, z, y: h - s * 0.25, s, sx: s * (0.9 + a * 0.6), sy: s * (0.55 + b * 0.35), sz: s * (0.9 + c * 0.4), ry: turn * TAU, rx: tilt * 0.4 - 0.2, color: ROCK_COLS[Math.floor(tint * ROCK_COLS.length)] });
+  }
+  // scree: many smaller stones heaped at the foot of a cliff (after the boulders, from the same
+  // stream, so they move none of them; small enough not to stand in your way)
+  for (let k = 0; k < SCREE_TRIES; k++) {
+    const x = x0 + R() * S, z = z0 + R() * S, size = R(), a = R(), b = R(), c = R(), turn = R(), tilt = R(), tint = R(), keep = R();
+    const h = height(x, z);
+    if (h < 10 || lakeT(x, z) < 1.15 || clearingAt(x, z)) continue;
+    const scree = screeAt(x, z, h);
+    if (keep > scree * 1.4) continue;
+    const s = 0.22 + size * 0.36;
+    rocks.push({ x, z, y: h - s * 0.3, s, sx: s * (0.9 + a * 0.6), sy: s * (0.5 + b * 0.3), sz: s * (0.9 + c * 0.4), ry: turn * TAU, rx: tilt * 0.6 - 0.3, color: ROCK_COLS[Math.floor(tint * ROCK_COLS.length)] });
   }
   return rocks;
 }

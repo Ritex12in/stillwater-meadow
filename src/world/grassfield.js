@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { smooth } from '../core/math.js';
-import { heightAt, slopeAt, lakeAt, nearReserved, onDock, BENCH_SPOT, SPAWN, coldAt, dryOf, northness, feltHeight, ASPECT, moistAt, snowCold, snowOf } from '../core/shape.js';
+import { heightAt, slopeAt, lakeAt, nearReserved, onDock, BENCH_SPOT, SPAWN, coldBase, coldAt, dryOf, slopeLook, feltHeight, ASPECT, moistAt, snowCold, snowOf } from '../core/shape.js';
 import { weatherize, bothSides, timeU, windU, camU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { onShrineGround } from './shrine.js';
@@ -25,10 +25,10 @@ const MAP_N = 144, MAP_STEP = 1.2, MAP_SHIFT = 6;
 const mapU = { origin: { value: new THREE.Vector2() } };
 let mapTex = null, mapData = new Float32Array(MAP_N * MAP_N * 4), mapNext = new Float32Array(MAP_N * MAP_N * 4), mapIx = null, mapIz = 0;
 /** How well grass grows at a spot (0..1): not in the water, on the path, on rock, or where something stands. */
-function grassy(x, z, h, north) {
+function grassy(x, z, h, north, base) {
   if (onDock(x, z) || nearReserved(x, z, 1.2) || Math.hypot(x - BENCH_SPOT.x, z - BENCH_SPOT.z) < 1.3 || onShrineGround(x, z)) return 0;
   const lake = lakeAt(x, z), b = Math.min(lake.beach, 1); // (grass begins where that lake's sand ends)
-  return smooth(1.02 + 0.1 * b, 1.1 + 0.12 * b, lake.t(x, z)) * (1 - smooth(0.15, 0.5, lake.path(x, z))) * (1 - rockAmt(h, slopeAt(x, z), feltHeight(x, z, h, north)));
+  return smooth(1.02 + 0.1 * b, 1.1 + 0.12 * b, lake.t(x, z)) * (1 - smooth(0.15, 0.5, lake.path(x, z))) * (1 - rockAmt(h, slopeAt(x, z), feltHeight(x, z, h, north, base)));
 }
 /** Work the whole map out again at the next update (the jetty, the fire or the bench has moved, and it remembers where they were). */
 export function resetGrassMap() { mapIx = null; }
@@ -43,10 +43,11 @@ export function updateGrassMap(cx, cz) {
     for (let i = 0; i < MAP_N; i++) {
       const o = (j * MAP_N + i) * 4, oi = i + dx, oj = j + dz;
       if (oi >= 0 && oi < MAP_N && oj >= 0 && oj < MAP_N) { const q = (oj * MAP_N + oi) * 4; mapNext[o] = mapData[q]; mapNext[o + 1] = mapData[q + 1]; mapNext[o + 2] = mapData[q + 2]; mapNext[o + 3] = mapData[q + 3]; }
-      else { const x = (ix + i) * MAP_STEP, z = (iz + j) * MAP_STEP, h = heightAt(x, z), north = northness(x, z, h), wet = moistAt(x, z), chill = coldAt(x, z, h + ASPECT * north), cold = snowCold(chill, wet);
+      else { const x = (ix + i) * MAP_STEP, z = (iz + j) * MAP_STEP, h = heightAt(x, z), base = coldBase(x, z), lie = slopeLook(x, z, h, base), north = lie.north, scree = lie.scree, wet = moistAt(x, z), chill = coldAt(x, z, h + ASPECT * north, base), cold = snowCold(chill, wet);
         // (on the tundra, cold country too dry for snow, the grass is sparse, low and tawny)
         const tundra = smooth(0.42, 0.65, chill) * (1 - snowOf(cold));
-        mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h, north) * (1 - 0.55 * tundra); mapNext[o + 2] = cold; mapNext[o + 3] = Math.max(dryOf(wet), tundra * 0.85);
+        // (and little grass on scree)
+        mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h, north, base) * (1 - 0.55 * tundra) * (1 - 0.85 * scree); mapNext[o + 2] = cold; mapNext[o + 3] = Math.max(dryOf(wet), tundra * 0.85);
       }
     }
   }

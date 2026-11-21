@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { smooth, fbm } from '../core/math.js';
-import { height, lakeAt, setGroundSampler, northness, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf } from '../core/shape.js';
+import { height, lakeAt, setGroundSampler, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -48,6 +48,7 @@ const EDGE_OF = [(k) => k, (k) => TILE_N * V + k, (k) => k * V, (k) => k * V + T
 let groundMat = null, textured = false;
 const g1 = col('#5c9040'), g2 = col('#86b44e'), g3 = col('#3d7034'), sand = col('#dcc895'), bed = col('#7a7856');
 const dirt = col('#c4ab7c'), moss = col('#5c7444'), rock = col('#8d8b7d'), heath = col('#b9a35c'), snowy = col('#eef2f8');
+const grad = [0, 0];
 const MOSS_TINT = new THREE.Color(0.8, 0.85, 0.7), TUNDRA_TINT = new THREE.Color(1.02, 0.86, 0.66), c = new THREE.Color();
 const tundra = col('#8c8458');
 
@@ -155,10 +156,13 @@ function* fill(t) {
       // sand round the nearest lake, as broad as that lake's beach; soil on its path, if it has one
       const lake = lakeAt(x, z), lt = lake.t(x, z);
       const wSand = (1 - smooth(1.02, 1.02 + 0.14 * lake.beach, lt)) * Math.min(1, lake.beach * 2), wBed = smooth(0.05, -0.8, h), wDirt = lt < 2.2 ? lake.path(x, z) * 0.9 : 0;
-      const north = northness(x, z, h), felt = feltHeight(x, z, h, north);
-      const wRock = rockAmt(h, slope, felt) * 0.85, wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6;
+      // (a tile drawn coarse enough already has the slope over about 8 m: its neighbours)
+      if (cs >= 3.6) { grad[0] = dx / (2 * cs); grad[1] = dz / (2 * cs); }
+      const base = coldBase(x, z), lie = slopeLook(x, z, h, base, cs >= 3.6 ? grad : null), north = lie.north, scree = lie.scree, felt = feltHeight(x, z, h, north, base);
+      // (bare rock on cliffs and high ground; grey scree at the foot of a cliff)
+      const wRock = Math.max(rockAmt(h, slope, felt) * 0.85, scree * 0.8), wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6;
       // the climate here: snow lies longer on slopes facing north, and not on cliffs; lush country is a deeper green
-      const rain = moistAt(x, z), dry = dryOf(rain), chill = coldAt(x, z, h + ASPECT * north), cold = snowCold(chill, rain) * (1 - smooth(0.9, 1.5, slope) * 0.55);
+      const rain = moistAt(x, z), dry = dryOf(rain), chill = coldAt(x, z, h + ASPECT * north, base), cold = snowCold(chill, rain) * (1 - smooth(0.9, 1.5, slope) * 0.55);
       // cold country where little snow lies (it is too dry) is tundra: low olive-brown moss and sedge
       const wTundra = smooth(0.42, 0.65, chill) * (1 - snowOf(cold));
       // (clime: cold, dry, and whether this is a lake seen from too far off to have its own sheet of water)

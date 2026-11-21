@@ -266,6 +266,36 @@ or dropped once a pack is chosen.
   shows only its dot. Shrine sites have names by rule from where they are (the home one is named
   after the home lake). Coming to a lake, or within 40 m of a shrine, shows its name.
 
+## How nature shapes the land (after milestone 4d, step 1)
+
+The owner asked for terrain, climate and plants that follow natural laws, and left the choice of
+rules to us ("pick whatever is good for our world"). Four, each a pure rule of (seed, x, z), from
+research into how it is done (a report on the methods was written for the owner; the chosen ideas
+were the cheapest with the most to show, plus Minecraft-style biomes the owner asked for):
+
+- **Worn mountains** (`land()` in core/shape.js, `EROSION`): the mountains' fine relief shrinks by
+  1 / (1 + EROSION * slope^2), the slope being that of the broad mountain shape beneath it (from
+  `fbmD`, noise with its slope, which gives the very same values as `fbm`). Steep flanks come out
+  smooth, ridges and flats keep their detail. Only the mountains change.
+- **One temperature: treeline, alpine meadow, rock, snow.** `feltHeight` is the height a spot feels:
+  its height, + `TREE_COLD` m times the country's cold (`coldBase`), + `ASPECT` m per unit of
+  north-facing rise (north is -z). Trees thin, shrink and turn to pines over the 16 m below
+  `TREELINE` (64 m felt) and stop there; grass runs on; bare rock from 6 to 34 m above it; snow by
+  `coldAt(x, z, h + ASPECT * north)`, so north faces hold snow far longer than south faces.
+- **Country from temperature and moisture** (as Minecraft and the Whittaker biome chart do):
+  `moistAt` is the rain, raised near a lake in dry country (never past middling); `snowCold`
+  lowers snow where it is dry, for snow needs moisture: cold and dry is tundra (tawny ground and
+  sparse grass, open pine woodland), cold and wet keeps deep snow and thick pines. Lakes still
+  freeze by temperature alone. Blossom groves keep to mild country by temperature.
+- **Scree**: `slopeLook` gives `scree` where a slope of about 22 to 40 degrees has a cliff 9 to
+  15 m above it; the ground there is grey gravel, grass is thin, and up to 40 small stones a
+  square (too small to block) are added after the boulders from the same stream.
+- **Same at every scale:** aspect and scree are measured over fixed distances (8 m; coarse tiles
+  reuse their own neighbours, about as far apart), so snow and scree do not jump as tiles refine.
+- **Cost:** building a mountain ground tile takes about 1.9 times what it did (about 5.5 ms against
+  3); tiles are built a little each frame, so this slows streaming in the mountains, not frames.
+- A test (`nature: trees give out...`) checks the treeline, north faces, tundra and water.
+
 ## How the shrine works (milestone 4c)
 
 - **Sites** come from the land (`core/shape.js`, "Shrines"). `homeShrineSite()` is the most

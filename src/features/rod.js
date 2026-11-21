@@ -5,15 +5,16 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, mulberry32 } from '../core/math.js';
-import { heightAt } from '../core/shape.js';
+import { heightAt, HOME } from '../core/shape.js';
 import { std } from '../core/materials.js';
 import { hooks, seasonState } from '../core/state.js';
 import { player, hero } from '../characters/player.js';
 import { ferry, sk, skipper } from '../characters/boat.js';
-import { treeSpots } from '../world/vegetation.js';
+
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
 import { store, saveSoon } from '../systems/save.js';
+import { growSquare } from '../world/wilds.js';
 import { toast } from '../ui/hud.js';
 
 export const BOUQUET_FULL = 12, BOUQUET_KINDS = 3, CONES_NEEDED = 5;
@@ -63,7 +64,15 @@ export function initRod() {
 
   // ── winter: pine cones under the pines, only while you still need them ──
   const r = mulberry32(7310);
-  const pines = treeSpots.filter((t) => t.type === 'pine' && Math.hypot(t.x, t.z) < 80);
+  // (the pines of the squares round the home lake, as the land grows them: the same whatever is loaded just now;
+  //  reaching further out where the lake stands in open meadow)
+  let pines = [];
+  for (let reach = 2; reach <= 6 && pines.length < 5; reach++) {
+    pines = [];
+    const cx = Math.floor(HOME.x / 57.6), cz = Math.floor(HOME.z / 57.6);
+    for (let dz = -reach; dz <= reach; dz++) for (let dx = -reach; dx <= reach; dx++) for (const t of growSquare(cx + dx, cz + dz)) if (t.type === 'pine') pines.push(t);
+  }
+  pines.sort((a, b) => Math.hypot(a.x - HOME.x, a.z - HOME.z) - Math.hypot(b.x - HOME.x, b.z - HOME.z)).splice(14);
   const coneGeo = new THREE.ConeGeometry(0.07, 0.17, 7).rotateZ(Math.PI / 2);
   const coneMat = std('#7a5232');
   const cones = [];

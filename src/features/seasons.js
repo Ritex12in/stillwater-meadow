@@ -32,9 +32,8 @@ let mode = 'auto', season = 'summer', blend = 1;
 let falling = null, particleAmt = 0, ready = false;
 
 // Every round tree has a crown colour for each season (`pal`) and the colour it is showing now
-// (`shown`, which drifts toward the season's when the season turns). The valley's trees drew
-// theirs from the runtime random stream when the game began; trees met later, out in the wilds,
-// take theirs from a hash of where they stand, so a tree is the same colour every time you pass.
+// (`shown`, which drifts toward the season's when the season turns). A tree takes its colours
+// from a hash of where it stands, so it is the same colour every time you pass.
 const SPRING_BLOSSOM = ['#f4c1d0', '#f7d6e0', '#ffffff', '#eeb0c4'], SPRING_GREEN = ['#86c25a', '#9ccd62', '#7ab84e'];
 const AUTUMN = { maple: ['#c4422a', '#d9582b', '#b8352c', '#e0722e'], birch: ['#e8c547', '#f0d35a', '#e3b03b'], other: ['#d9822b', '#e3a33b', '#c4542d', '#e8c547', '#b0452a', '#cf6a2c', '#9aa040'] };
 const WINTER = ['#7d7264', '#6f665a', '#857a6a'];
@@ -116,10 +115,6 @@ export function initSeasons() {
   const q = query.get('season');
   mode = ORDER.includes(q) ? q : store.season || 'auto';
   season = mode === 'auto' ? calendarSeason() : mode;
-  // the valley's trees: season by season, in the order (and with the draws) they have always had
-  const items = world.valleyRoundItems || world.roundItems || [];
-  const spring = items.map((it) => springOf(it, rnd)), autumn = items.map((it) => autumnOf(it, rnd)), winter = items.map(() => pickWith(rnd)(WINTER));
-  items.forEach((it, i) => { it.pal = { spring: spring[i], summer: it.color.clone(), autumn: autumn[i], winter: winter[i] }; it.shown = it.color.clone(); });
   ready = true;
   world.tintTree = tintTree;
   falling = makeFalling({ count: 500, box: [48, 14, 48], speed: [0.5, 1.0], size: 0.16, map: glowTex, sway: 0.8, colors: ['#ffffff'] });

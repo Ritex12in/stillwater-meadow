@@ -152,7 +152,11 @@ test('a lake with no jetty has none: no deck to stand on, no boat to board, and 
     let deck = 0, inClearing = 0;
     for (let x = L.x - 80; x <= L.x + 80; x += 2) for (let z = L.z - 80; z <= L.z + 80; z += 2) if (g.onDock(x, z)) deck++;
     const cx = Math.floor(L.x / S), cz = Math.floor(L.z / S);
-    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) for (const t of w.square(cx + dx, cz + dz)) if (g.lakeT(t.x, t.z) < 1.9) inClearing++;
+    // (a tree is in the way if it stands in the water or on the shore, on the fire, or on the bench)
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) for (const t of w.square(cx + dx, cz + dz)) {
+      const by = (p, reach) => Math.abs(p.x) < 1e5 && Math.hypot(t.x - p.x, t.z - p.z) < reach;
+      if (g.lakeT(t.x, t.z) < 1.2 || by(g.FIRE_SPOT, 5) || by(g.BENCH_SPOT, 3.5)) inClearing++;
+    }
     return { anchor: m.anchor(), kit: m.kit, deck, inClearing, boat: m.boatShown(), acts: m.actions().map((a) => a.id), far: Math.abs(m.BOARD_POINT.x) > 1e5 };
   }, bare);
   expect(look.anchor).toBe(bare.id);

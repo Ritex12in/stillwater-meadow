@@ -3,9 +3,9 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, lerp, damp, smooth, rnd } from '../core/math.js';
-import { lakeAt, lakeT, heightAt, walkable } from '../core/shape.js';
+import { lakeAt, lakeT, heightAt, walkable, HOME } from '../core/shape.js';
 import { std, enableShadows, glowTex } from '../core/materials.js';
-import { hooks, seasonState, world } from '../core/state.js';
+import { hooks, seasonState } from '../core/state.js';
 import { clock } from '../core/clock.js';
 import { player } from '../characters/player.js';
 import { boat } from '../characters/boat.js';
@@ -87,7 +87,7 @@ export function initWildlife() {
   let hootIn = 12, eyesT = 0;
 
   // frogs
-  const pads = (world.padItems || []).slice();
+  const pads = lifeOf(lifeLake).pads.slice();
   const frogs = [];
   for (let i = 0; i < Math.min(6, pads.length); i++) {
     const pad = pads.splice(Math.floor(rnd() * pads.length), 1)[0];
@@ -118,7 +118,7 @@ export function initWildlife() {
   // deer
   const deerSpots = [];
   for (let i = 0; i < 60 && deerSpots.length < 8; i++) {
-    const a = rnd() * TAU, r = rnd(72, 98), x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const a = rnd() * TAU, r = HOME.rmax * rnd(2.1, 3.2), x = HOME.x + Math.cos(a) * r, z = HOME.z + Math.sin(a) * r;
     if (walkable(x, z) && heightAt(x, z) < 14 && lakeT(x, z) > 1.5) deerSpots.push({ x, z });
   }
   const deer = (() => {

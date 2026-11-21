@@ -17,7 +17,7 @@ import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, bu
 import { loadKit, kit } from './core/assets.js';
 import { loadingStep, paint, loadingDone, initScreen } from './ui/loading.js';
 import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows, lampSpots } from './world/props.js';
-import { buildFences } from './world/kitprops.js';
+
 import { buildWildflowers } from './world/wildflowers.js';
 import { buildFarForest } from './world/farforest.js';
 import { chooseShrineSite, buildShrine } from './world/shrine.js';
@@ -83,7 +83,7 @@ renderer.domElement.addEventListener('webglcontextlost', (e) => {
 });
 loadingStarted(); // (cleared once the first frame is drawn: still set next time means this load crashed the tab)
 
-// ── Build the world. The order matters: it fixes where every tree and flower grows. ──
+// ── Build the world: the models and the things made once. What grows where is worked out as you walk. ──
 // (the loading screen's bar follows along; `paint` lets the browser draw it between the heavy steps)
 await loadKit((f) => loadingStep(0.05 + f * 0.5, 'Gathering trees and flowers…')); // nature models; the meadow falls back to hand-built shapes without them
 loadingStep(0.58, 'Raising the hills…'); await paint();
@@ -93,19 +93,18 @@ buildGround(SPAWN.x, SPAWN.z);
 buildWater();
 loadingStep(0.68, 'Planting the forest…'); await paint();
 buildTrees();
-chooseShrineSite(treeSpots);
+chooseShrineSite();
 buildRocks();
 buildGrass();
 buildFlowers();
 buildReedsAndPads();
-if (kit) buildUndergrowth(treeSpots);
+if (kit) buildUndergrowth();
 if (kit) buildWildflowers();
 if (kit) buildFarForest(renderer);
 loadingStep(0.8, 'Setting out the jetty…'); await paint();
 buildDockAndBench();
 buildChairs();
 buildLamps();
-buildFences();
 buildShrine(lampSpots);
 waterU.lampW.value = Array.from({ length: 12 }, (_, i) => lampSpots[i] || new THREE.Vector3(0, -1e4, 0));
 buildClouds();
@@ -127,7 +126,6 @@ buildBoat();
 buildEffects();
 buildWeather();
 registerPetting();
-// (after everything above, which is laid out once round the valley's own trees)
 settleWilds(player.x, player.z);
 // when the landmarks move to another lake: the grass keeps off them there, and the shadows are redrawn
 hooks.anchor.push(() => { resetGrassMap(); renderer.shadowMap.needsUpdate = true; });

@@ -104,10 +104,10 @@ test('every lake has its own reeds and lilies, and the ducks and the heron are a
   expect(lush.length).toBeGreaterThan(2);
   expect(heath.length).toBeGreaterThan(2);
   expect(mean(lush, 'reeds'), 'reed beds are thick in lush country, thin on the heath').toBeGreaterThan(mean(heath, 'reeds') * 1.5);
-  // the home lake keeps the reeds and lilies it has always had, drawn with the rest
+  // the home lake has its own like any other, drawn with the rest
   const home = await page.evaluate(() => { const m = window.__meadow; return { own: m.lakeLife('home'), drawn: m.life() }; });
-  expect(home.own.reeds).toBeGreaterThan(300);
-  expect(home.own.pads).toBe(54);
+  expect(home.own.reeds).toBeGreaterThan(120);
+  expect(home.own.pads).toBeGreaterThan(10);
   expect(home.drawn.lake).toBe('home');
   expect(home.drawn.reeds).toBeGreaterThanOrEqual(home.own.reeds);
   expect(home.drawn.dropped).toBe(0);

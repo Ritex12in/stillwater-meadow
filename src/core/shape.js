@@ -15,7 +15,6 @@ import { seasonState } from './state.js';
 import { query } from './env.js';
 
 export const PATH_T = 1.32;       // the path runs round a lake at this many lake-radii
-export const WORLD_LIMIT = 118;   // how far from the middle the valley's own trees and flowers are planted (you can walk on past it)
 
 // ── The world's seed ───────────────────────────────────────────
 // One number decides the whole landscape (`?seed=7` in the address picks another). It shifts where
@@ -316,8 +315,51 @@ export function kitOf(lake) {
   if (wantDock && !lake.frozen) for (let k = 0; k < 10 && !dock; k++) { const t = first + (k / 10) * TAU; if (jettyFits(lake, t)) { lake.turn = t; dock = true; } }
   return (lake.kit = { dock, fire: wantFire || (!dock && !wantBench), bench: wantBench });
 }
-/** Is a spot in the clearing kept round a settled lake's landmarks? (Trees and boulders keep out of it, whether or not the landmarks are there just now.) */
-export function clearingAt(x, z) { const L = lakeAt(x, z); return !!L.settled && L.t(x, z) < 1.95; }
+/** The landmark spots of a lake, wherever the landmarks themselves are just now (worked out once, kept on the lake). */
+const marksOf = (lake) => lake.marks || (lake.marks = landmarksOf(lake));
+/**
+ * Is a spot kept clear for something built? Trees, boulders and small plants keep off the path
+ * round a settled lake and out of the way of its jetty, fire, bench, chairs and lamps, and off
+ * the shrine's ground. The rule is the lake's own (its spots, not where the single set of
+ * landmarks happens to be), so a square of land always grows the same things.
+ */
+export function clearingAt(x, z) {
+  const s = shrineSite();
+  if ((x - s.x) ** 2 + (z - s.z) ** 2 < (s.r + 7) ** 2) return true;
+  const L = lakeAt(x, z);
+  if (!L.settled) return false;
+  const dx = x - L.x, dz = z - L.z, d = Math.hypot(dx, dz), r = L.r(Math.atan2(dz, dx));
+  if (d > r * 2.1) return false;
+  if (L.path(x, z) > 0.02 || Math.abs(d - r * (PATH_T + 0.085)) < 1.6) return true; // the path, and the lamps along it
+  const m = marksOf(L), near = (p, reach) => (x - p.x) ** 2 + (z - p.z) ** 2 < reach * reach;
+  return near(m.spawn, 8) || near(m.fire, 5.5) || near(m.bench, 4) || near(m.chairs[0], 3.5) || near(m.chairs[1], 3.5) || near(m.dockStart, 5.5);
+}
+// ── The shrine ─────────────────────────────────────────────────
+let shrine = null;
+/**
+ * Where the shrine grove stands, and which way it faces: a level place some way back from the
+ * home lake, away from where you arrive, the fire and the bench, looking toward the water. Fixed
+ * by the land (so by the seed), not by what happens to be planted: the woods keep clear of it.
+ * `{ x, z, fx, fz, r }`: its middle, the way it faces, the radius of its ring of cherries.
+ */
+export function shrineSite() {
+  if (shrine) return shrine;
+  const L = HOME, m = marksOf(L);
+  let best = null;
+  for (let a = 0; a < TAU; a += TAU / 72) {
+    for (let r = L.rmax * 2.2; r <= L.rmax * 3.4; r += 4) {
+      const x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r, h = height(x, z);
+      if (L.t(x, z) < 2.1 || h < 0.8 || h > 9 || lakeAt(x, z) !== L) continue;
+      if (Math.hypot(x - m.spawn.x, z - m.spawn.z) < 45 || Math.hypot(x - m.fire.x, z - m.fire.z) < 30 || Math.hypot(x - m.bench.x, z - m.bench.z) < 30) continue;
+      let slope = 0;
+      for (let k = 0; k < 8; k++) slope = Math.max(slope, Math.abs(height(x + Math.cos(k * TAU / 8) * 9, z + Math.sin(k * TAU / 8) * 9) - h));
+      if (!best || slope < best.slope) best = { x, z, slope };
+    }
+  }
+  if (!best) best = { x: L.x - L.rmax * 2.6, z: L.z };
+  const d = Math.hypot(L.x - best.x, L.z - best.z);
+  return (shrine = { x: best.x, z: best.z, fx: (L.x - best.x) / d, fz: (L.z - best.z) / d, r: 17 });
+}
 const HOME_PLACES = landmarksOf(HOME);
 export const SPAWN = HOME_PLACES.spawn;
 

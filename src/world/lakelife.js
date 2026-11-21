@@ -4,8 +4,7 @@
 // Reeds and lilies are worked out per lake from the lake itself (its seed, size and the country
 // it lies in: thick reed beds and many lilies in lush country, a few reeds on the heath, dry
 // stalks and no lilies round a frozen lake), so a lake always has the same ones. They are drawn
-// from fixed slots, refilled for the three lakes nearest the camera. The home lake keeps the
-// reeds and lilies it has always had (world/vegetation.js hands them over).
+// from fixed slots, refilled for the three lakes nearest the camera.
 //
 // "The lake you are at" (`lifeLake`) changes only when you have left the old one out of sight;
 // whoever keeps creatures there is told through `hooks.lake` (core/state.js) and moves them.
@@ -24,7 +23,7 @@ export function lifeOf(lake) {
   const c = lake.clime || { dry: 0, lush: 0, snow: 0 }, size = lake.R0 / 30, kit = kitOf(lake), jetty = Math.PI / 2 + 0.55 + (lake.turn || 0);
   const reeds = [], heads = [], pads = [], blooms = [];
   // reed beds: more of them round a bigger lake, a lusher one, one with little beach
-  const beds = Math.round(22 * size * (0.45 + c.lush * 1.1 - c.dry * 0.25 + Math.max(0, 1 - lake.beach) * 0.4));
+  const beds = Math.min(46, Math.round(22 * size * (0.75 + c.lush * 1.0 - c.dry * 0.45 + Math.max(0, 1 - lake.beach) * 0.3)));
   const cols = lake.frozen ? REED_STRAW : REED_GREENS;
   for (let b = 0; b < beds; b++) {
     const ca = R() * TAU, ct = r(0.93, 1.03), n = 10 + Math.floor(R() * 9), spread = 0.06 / Math.sqrt(size);

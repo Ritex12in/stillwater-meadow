@@ -92,9 +92,6 @@ export function buildPollen() {
 }
 
 export function buildClouds() {
-  // the old low-poly clouds drew from the layout stream; take the same draws so everything
-  // built after them stays where it was, and lay the new clouds out from their own stream
-  for (let i = 0; i < 16; i++) { const n = 4 + Math.floor(rng() * 4); for (let k = 0; k < n * 4 + 4; k++) rng(); }
   const R = mulberry32(5150), cr = (a, b) => a + (b - a) * R();
   const texs = [11, 23, 37, 41].map(puffTexture);
   for (let i = 0; i < 18; i++) {

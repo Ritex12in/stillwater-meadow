@@ -16,7 +16,7 @@ import { poseSnow, snowSpots, snowRoutine, snowContacts, SNOW_LENGTH, BLADE } fr
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
 import { moveInput } from '../systems/input.js';
-import { treeSpots } from '../world/vegetation.js';
+
 import { toast } from '../ui/hud.js';
 import { friend } from './friend.js';
 import { seasonNow } from './seasons.js';
@@ -132,9 +132,9 @@ function buildSnowman() {
 function snowmanSpot() {
   for (let i = 0; i < 24; i++) {
     const a = Math.PI / 2 - 0.16 - i * 0.03, p = lakePoint(a, 1.13);
+    // (by the water, where no tree or boulder grows: the spot depends on the lake alone, not on what is loaded round you)
     const clear = walkable(p.x, p.z) && heightAt(p.x, p.z) > 0.35 && !onDock(p.x, p.z) && !nearReserved(p.x, p.z, 1.5)
-      && !treeSpots.some((t) => Math.hypot(t.x - p.x, t.z - p.z) < 2) && !seats.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < 2)
-      && !obstacles.some((o) => Math.hypot(o.x - p.x, o.z - p.z) < o.r + 0.9);
+      && !seats.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < 2);
     if (clear) return p;
   }
   return null;

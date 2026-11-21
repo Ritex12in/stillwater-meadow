@@ -14,14 +14,14 @@
 // airy birches on the dry heath, pines and little else in the cold, and now and then a grove of
 // blossom trees over a carpet of flowers.
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
-// walk. The valley's own plants are not grown here: they keep the places they have always had.
+// walk.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
 import { height, lakeT, WORLD, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
 import { TILE_N, CELL, rockAmt } from './terrain.js';
-import { setWildTrees, valleyTrees, MODEL_FAR, TREE_COLOURS } from './vegetation.js';
+import { setWildTrees, MODEL_FAR, TREE_COLOURS } from './vegetation.js';
 import { setFarTrees } from './farforest.js';
 import { treeFamily } from './kitplants.js';
 
@@ -29,10 +29,9 @@ const S = TILE_N * CELL;
 /**
  * Distances, in metres from the camera to a square: when squares are grown (`load`) and forgotten
  * (`drop`), when their trees are real models and their boulders are out (`nearIn`/`nearOut`), and
- * when their small plants are (`closeIn`/`closeOut`). `valley` and `home` are how far from the
- * middle of the world the valley's own trees and its smaller plants reach.
+ * when their small plants are (`closeIn`/`closeOut`).
  */
-export const WILD = { load: 235, drop: 265, nearIn: MODEL_FAR + 8, nearOut: MODEL_FAR + 30, closeIn: 66, closeOut: 86, valley: 155, home: 122, tries: 96 };
+export const WILD = { load: 235, drop: 265, nearIn: MODEL_FAR + 8, nearOut: MODEL_FAR + 30, closeIn: 66, closeOut: 86, tries: 96 };
 const squares = new Map();
 let cards = 0, lost = 0, near = 0, stale = false, rockCount = 0, smallCount = 0, lostRocks = 0, lostSmall = 0, rockBlocks = [];
 /** The cards show each tree's season colour: ask for them to be redone when the season has turned. */
@@ -50,7 +49,7 @@ export function growSquare(ix, iz) {
   for (let k = 0; k < WILD.tries; k++) {
     // (every try takes the same draws, so turning one spot down never moves the trees after it)
     const x = x0 + R() * S, z = z0 + R() * S, roll = R(), size = R(), turn = R(), tint = R(), keep = R();
-    if (Math.hypot(x, z) < WILD.valley || lakeT(x, z) < 1.3 || clearingAt(x, z)) continue; // (not in the water, nor where a lake's jetty, fire and bench stand)
+    if (lakeT(x, z) < 1.22 || clearingAt(x, z)) continue; // (not in the water, nor where a lake's path, jetty, fire and bench are, nor on the shrine's ground)
     const h = height(x, z), cold = coldAt(x, z, h), rain = rainAt(x, z), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(cold), grove = groveAt(x, z) * (1 - snow);
     // woods in broad patches with open country between, and clumps and clearings inside a wood;
     // lush country is wooded nearly everywhere, the heath and the snowfields hardly at all
@@ -80,7 +79,7 @@ export function growRocks(ix, iz) {
   const R = seedOf(ix, iz, 0x51ED27), x0 = ix * S, z0 = iz * S, rocks = [];
   for (let k = 0; k < 16; k++) {
     const x = x0 + R() * S, z = z0 + R() * S, size = R(), a = R(), b = R(), c = R(), turn = R(), tilt = R(), tint = R(), keep = R();
-    if (Math.hypot(x, z) < WILD.home || lakeT(x, z) < 1.15 || clearingAt(x, z)) continue;
+    if (lakeT(x, z) < 1.15 || clearingAt(x, z)) continue;
     const h = height(x, z), rocky = rockAmt(h, slopeOf(x, z));
     // (more of them on the dry heath and in the cold, where little else stands)
     if (keep > 0.07 + rocky * 0.8 + smooth(30, 70, h) * 0.15 + dryOf(rainAt(x, z)) * 0.16 + snowOf(coldAt(x, z, h)) * 0.08) continue;
@@ -94,17 +93,23 @@ const BUSH_GREENS = ['#7aa84a', '#86b352', '#6b9a40', '#93bb5a'].map(col);
 /** The small plants of one square: bushes at the woods' edges, ferns under pines, mushrooms under broadleaf trees, drifts of wildflowers in the open. */
 export function growSmall(ix, iz, trees) {
   const R = seedOf(ix, iz, 0x2C1B3F), r = (a, b) => a + (b - a) * R(), x0 = ix * S, z0 = iz * S;
-  const out = { bushes: [], ferns: [], shrooms: [], flowers: [] };
+  const out = { bushes: [], ferns: [], shrooms: [], clover: [], flowers: [] };
   // (the land's own formula, not the drawn tiles: a square must come out the same whether or not its ground is loaded)
-  const fits = (x, z) => Math.hypot(x, z) > WILD.home && lakeT(x, z) > 1.2 && rockAmt(height(x, z), slopeOf(x, z)) < 0.2;
+  const fits = (x, z) => lakeT(x, z) > 1.16 && !clearingAt(x, z) && rockAmt(height(x, z), slopeOf(x, z)) < 0.2;
   // the climate, taken once at the square's middle (it changes over hundreds of metres)
   const mx = x0 + S / 2, mz = z0 + S / 2, mh = height(mx, mz), rain = rainAt(mx, mz), dry = dryOf(rain), lush = lushOf(rain), snow = snowOf(coldAt(mx, mz, mh));
   for (const t of trees) {
     const bush = R(), fern = R(), shroom = R(), a1 = R() * TAU, d1 = r(2.2, 3.6), a2 = R() * TAU, d2 = r(1.0, 2.2), a3 = R() * TAU;
     if (snow > 0.5) continue; // (under snow: nothing small)
-    if (bush < 0.16 * (1 - dry * 0.6)) { const x = t.x + Math.cos(a1) * d1, z = t.z + Math.sin(a1) * d1; if (fits(x, z)) out.bushes.push({ x, z, y: height(x, z) - 0.05, s: r(0.75, 1.3), ry: r(0, TAU), color: BUSH_GREENS[Math.floor(R() * BUSH_GREENS.length)] }); }
+    if (bush < 0.16 * (1 - dry * 0.6)) { const x = t.x + Math.cos(a1) * d1, z = t.z + Math.sin(a1) * d1; if (fits(x, z)) out.bushes.push({ x, z, y: height(x, z) - 0.05, s: r(0.75, 1.3), ry: r(0, TAU), color: BUSH_GREENS[Math.floor(R() * BUSH_GREENS.length)], flowers: R() < 0.3 }); } // (some bushes are in flower)
     if (t.type === 'pine' && fern < 0.3 + lush * 0.4) { const x = t.x + Math.cos(a2) * d2, z = t.z + Math.sin(a2) * d2; if (fits(x, z)) out.ferns.push({ x, z, y: height(x, z) - 0.03, s: r(0.8, 1.3), ry: r(0, TAU) }); }
-    if (t.type !== 'pine' && shroom < 0.16 + lush * 0.3) for (let k = 0; k < 2; k++) { const d = r(0.7, 1.4), x = t.x + Math.cos(a3 + k * 2.1) * d, z = t.z + Math.sin(a3 + k * 2.1) * d; if (fits(x, z)) out.shrooms.push({ x, z, y: height(x, z) - 0.02, s: r(0.7, 1.3), ry: r(0, TAU) }); }
+    if (t.type !== 'pine' && shroom < 0.12 + lush * 0.18) for (let k = 0; k < 2; k++) { const d = r(0.7, 1.4), x = t.x + Math.cos(a3 + k * 2.1) * d, z = t.z + Math.sin(a3 + k * 2.1) * d; if (fits(x, z)) out.shrooms.push({ x, z, y: height(x, z) - 0.02, s: r(0.7, 1.3), ry: r(0, TAU) }); }
+  }
+  // clover: low patches in the open, where a fine noise says so
+  for (let k = 0; k < 10; k++) {
+    const x = x0 + R() * S, z = z0 + R() * S, s = r(0.8, 1.4), ry = r(0, TAU);
+    if (snow > 0.4 || fbm(x * 0.08 - 13, z * 0.08 + 5) < 0.55 - lush * 0.1 + dry * 0.12 || !fits(x, z)) continue;
+    out.clover.push({ x, z, y: height(x, z) - 0.02, s, ry });
   }
   // wildflowers: drifts in the open meadow (where a broad patch of noise says so), each with a favourite kind
   const lupin = world.lupinColours || [];
@@ -156,7 +161,7 @@ export function updateWilds(cx, cz, all = false) {
   });
   if (cardsDirty || stale || cards === 0) {
     stale = false;
-    const list = valleyTrees().slice();
+    const list = [];
     squares.forEach((q) => { for (const t of q.trees) list.push(t); });
     cards = list.length;
     lost = setFarTrees(list);
@@ -178,9 +183,9 @@ export function updateWilds(cx, cz, all = false) {
     lostRocks = world.setWildRocks ? world.setWildRocks(rocks) : 0;
   }
   if (smallDirty) {
-    const all4 = { bushes: [], ferns: [], shrooms: [], flowers: [] };
+    const all4 = { bushes: [], ferns: [], shrooms: [], clover: [], flowers: [] };
     squares.forEach((q) => { if (q.close && q.small) for (const k in all4) for (const it of q.small[k]) all4[k].push(it); });
-    smallCount = all4.bushes.length + all4.ferns.length + all4.shrooms.length + all4.flowers.length;
+    smallCount = all4.bushes.length + all4.ferns.length + all4.shrooms.length + all4.clover.length + all4.flowers.length;
     lostSmall = (world.setWildUndergrowth ? world.setWildUndergrowth(all4) : 0) + (world.setWildFlowers ? world.setWildFlowers(all4.flowers) : 0);
   }
   return cardsDirty || modelsDirty || smallDirty;

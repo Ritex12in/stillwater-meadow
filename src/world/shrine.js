@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { TAU, mulberry32 } from '../core/math.js';
-import { height, heightAt, lakeT, pathAmt, LAKE, SPAWN, FIRE_SPOT, BENCH_SPOT, WORLD_LIMIT } from '../core/shape.js';
+import { heightAt, shrineSite } from '../core/shape.js';
 import { std, weatherize, addWind, cutoutDepth, glowTex, softEdges, neonAtNight } from '../core/materials.js';
 import { kit } from '../core/assets.js';
 import { cherryHero } from './proctrees.js';
@@ -22,25 +22,9 @@ const DETAIL = 75;         // beyond this it casts no shadows and no petals fall
 const GROVE_R = 17;        // the ring of cherry trees
 const PATH_LEN = 19;       // from the first torii to the shrine steps
 
-/** Pick the clearing (call after the trees are placed, before the grass is laid). */
-export function chooseShrineSite(treeSpots) {
-  let best = null;
-  for (let a = 0; a < TAU; a += TAU / 72) {
-    for (let r = 58; r <= 98; r += 4) {
-      const x = Math.cos(a) * r, z = Math.sin(a) * r, h = height(x, z);
-      if (lakeT(x, z) < 2.1 || pathAmt(x, z) > 0 || h < 0.8 || h > 8 || Math.hypot(x, z) > WORLD_LIMIT - 22) continue;
-      if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < 45 || Math.hypot(x - FIRE_SPOT.x, z - FIRE_SPOT.z) < 30 || Math.hypot(x - BENCH_SPOT.x, z - BENCH_SPOT.z) < 30) continue;
-      let slope = 0;
-      for (let k = 0; k < 8; k++) slope = Math.max(slope, Math.abs(height(x + Math.cos(k * TAU / 8) * 9, z + Math.sin(k * TAU / 8) * 9) - h));
-      const crowd = treeSpots.filter((t) => Math.hypot(t.x - x, t.z - z) < 13).length;
-      const score = slope + crowd * 1.5;
-      if (!best || score < best.score) best = { x, z, score };
-    }
-  }
-  if (!best) best = { x: -70, z: 40, score: 99 };
-  // the shrine looks back toward the lake; the path runs out from its front
-  const d = Math.hypot(LAKE.x - best.x, LAKE.z - best.z);
-  world.shrine = { x: best.x, z: best.z, fx: (LAKE.x - best.x) / d, fz: (LAKE.z - best.z) / d, r: GROVE_R };
+/** Mark the grove's place (core/shape.js works it out from the land; call before the grass is laid). */
+export function chooseShrineSite() {
+  world.shrine = shrineSite();
   return world.shrine;
 }
 /** True where grass shouldn't grow: under the hall and along the stone path. */

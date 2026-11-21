@@ -4,7 +4,6 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { GRADE_GLSL } from '../core/atmosphere.js';
-import { rng, rand } from '../core/math.js';
 
 export const skyU = {
   topColor: { value: new THREE.Color() },
@@ -117,10 +116,6 @@ export function buildSky() {
     skyU.uPA.value = 2 * Math.tan(THREE.MathUtils.degToRad(cam.fov / cam.zoom) / 2) / Math.max(px.y, 1);
   };
   scene.add(sky);
-  // The stars used to be point sprites placed with the shared layout random stream; they are drawn
-  // in the dome's shader now, but the stream still advances as it did (4 draws a star, 1500 stars)
-  // so everything placed after the sky lands exactly where it always has.
-  for (let i = 0; i < 1500; i++) { rng(); rng(); rand(0, 1); rng(); }
 }
 
 /** Moon phase for a date: 0 = new, 0.5 = full. */

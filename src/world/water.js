@@ -1,8 +1,8 @@
-// The lake: sky reflection with Fresnel, layered waves, rain rings, lacy shoreline foam, stars
+// The lakes' water: sky reflection with Fresnel, layered waves, rain rings, lacy shoreline foam, stars
 // glinting in it at night, and winter ice.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
-import { LAKE } from '../core/shape.js';
+import { LAKE, lakesNear } from '../core/shape.js';
 import { skyU } from './sky.js';
 import { GRADE_GLSL, HAZE_GLSL } from '../core/atmosphere.js';
 
@@ -22,6 +22,8 @@ export const waterU = {
   lakeC: { value: new THREE.Vector2(LAKE.x, LAKE.z) },
   lakeShape: { value: new THREE.Vector4(LAKE.R0, LAKE.A3, LAKE.A5, LAKE.A7) }, // the lake's outline (see makeLake in core/shape.js)
   lakePhase: { value: new THREE.Vector3(LAKE.P3, LAKE.P5, LAKE.P7) },
+  lakeStretch: { value: new THREE.Vector2(LAKE.E, LAKE.TH) },
+  lakeTint: { value: new THREE.Vector3(1, 1, 1) },   // the cast of this lake's water (turquoise on the heath, dark green in lush country)
   uRain: { value: 0 },
   uIce: { value: 0 },
   uIceLight: { value: 1 },
@@ -35,8 +37,8 @@ export const waterU = {
 export function buildWater() {
   const geo = new THREE.CircleGeometry(48, 160);
   geo.rotateX(-Math.PI / 2);
-  const water = new THREE.Mesh(geo, new THREE.ShaderMaterial({
-    uniforms: waterU,
+  const make = (uniforms) => new THREE.Mesh(geo, new THREE.ShaderMaterial({
+    uniforms,
     vertexShader: `
       varying vec3 vWP;
       void main() {
@@ -48,7 +50,7 @@ export function buildWater() {
       uniform float uTime; uniform float uRain; uniform float uIce; uniform float uIceLight; uniform float uSnowIce; uniform float uLight;
       uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyTop; uniform vec3 skyHorizon;
       uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun;
-      uniform float fogNear; uniform float fogFar; uniform vec2 lakeC; uniform vec4 lakeShape; uniform vec3 lakePhase;
+      uniform float fogNear; uniform float fogFar; uniform vec2 lakeC; uniform vec4 lakeShape; uniform vec3 lakePhase; uniform vec2 lakeStretch; uniform vec3 lakeTint;
       uniform vec3 lampW[12]; uniform float lampAmt; uniform float uStars;
       varying vec3 vWP;
       vec2 wave(vec2 p, vec2 d, float f, float s, float a) {
@@ -90,7 +92,7 @@ export function buildWater() {
       float lakeT(vec2 p) {
         vec2 d = p - lakeC;
         float a = atan(d.y, d.x);
-        float R = lakeShape.x + lakeShape.y * sin(3.0 * a + lakePhase.x) + lakeShape.z * cos(5.0 * a + lakePhase.y) + lakeShape.w * sin(7.0 * a + lakePhase.z);
+        float R = (lakeShape.x + lakeShape.y * sin(3.0 * a + lakePhase.x) + lakeShape.z * cos(5.0 * a + lakePhase.y) + lakeShape.w * sin(7.0 * a + lakePhase.z)) * (1.0 + lakeStretch.x * cos(2.0 * (a - lakeStretch.y)));
         return length(d) / R;
       }
       void main() {
@@ -105,7 +107,7 @@ export function buildWater() {
         vec3 r = reflect(-v, n);
         vec3 skyc = mix(skyHorizon, skyTop, pow(clamp(r.y, 0.0, 1.0), 0.5));
         float t = lakeT(p);
-        vec3 base = mix(deep, shallow, smoothstep(0.5, 0.95, t));
+        vec3 base = mix(deep, shallow, smoothstep(0.5, 0.95, t)) * lakeTint;
         vec3 c = mix(base, skyc, clamp(fres * 0.85 + 0.12, 0.0, 1.0));
         float sp = pow(max(dot(r, normalize(sunDir)), 0.0), 220.0);
         c += sunColor * sp * 1.8;
@@ -158,7 +160,37 @@ export function buildWater() {
         gl_FragColor = vec4(meadowGrade(c), 1.0);
       }`,
   }));
-  water.position.set(LAKE.x, 0.02, LAKE.z);
-  water.receiveShadow = false;
-  scene.add(water);
+  // A few sheets of water, lent to whichever lakes are nearest. Each has its own lake outline and
+  // ice (a lake in snow country is frozen whatever the season); everything else is shared.
+  for (let i = 0; i < SHEETS; i++) {
+    const u = Object.assign({}, waterU, { lakeC: { value: new THREE.Vector2() }, lakeShape: { value: new THREE.Vector4() }, lakePhase: { value: new THREE.Vector3() }, lakeStretch: { value: new THREE.Vector2() }, lakeTint: { value: new THREE.Vector3(1, 1, 1) }, uIce: { value: 0 } });
+    const mesh = make(u);
+    mesh.receiveShadow = false;
+    mesh.visible = false;
+    scene.add(mesh);
+    sheets.push({ mesh, u, lake: null });
+  }
+  updateWater(LAKE.x, LAKE.z);
 }
+
+const SHEETS = 4, WATER_REACH = 620, sheets = [];
+/** Once a frame: the sheets of water go to the lakes nearest (x, z). */
+export function updateWater(x, z) {
+  const near = lakesNear(x, z, WATER_REACH).slice(0, SHEETS);
+  for (const s of sheets) if (s.lake && !near.includes(s.lake)) s.lake = null;
+  for (const L of near) {
+    if (sheets.some((s) => s.lake === L)) continue;
+    const s = sheets.find((q) => !q.lake);
+    s.lake = L;
+    s.mesh.position.set(L.x, 0.02, L.z);
+    s.mesh.scale.set(L.rmax / 38, 1, L.rmax / 38); // (the sheet is cut for the home lake, whose shore reaches 38 m, with room to spare)
+    s.u.lakeC.value.set(L.x, L.z);
+    s.u.lakeShape.value.set(L.R0, L.A3, L.A5, L.A7);
+    s.u.lakePhase.value.set(L.P3, L.P5, L.P7);
+    s.u.lakeStretch.value.set(L.E, L.TH);
+    s.u.lakeTint.value.fromArray(L.tint);
+  }
+  for (const s of sheets) { s.mesh.visible = !!s.lake; if (s.lake) s.u.uIce.value = Math.max(waterU.uIce.value, s.lake.frozen ? 1 : 0); }
+}
+/** For tests: which lakes have water drawn just now. */
+export const waterLakes = () => sheets.filter((s) => s.lake).map((s) => s.lake.id);

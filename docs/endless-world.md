@@ -22,7 +22,9 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
 - **Milestone 4 choices (2026-11-21):** all four groups of extra places (glowing and ancient,
   high places, hot springs, places you make) and all four activities (frozen-lake play, fish by
   country, a flower journal, compass and named places). **Each place remembers its own state**:
-  not one bench or skipper shared by all. Trails, rivers and waterfalls, and islands are wanted
+  not one bench or skipper shared by all. The owner found the first generated lakes too alike, so
+  lakes vary in outline (round, long, deeply scalloped), size, beach, path and water colour by
+  the country they lie in; reeds, lilies and wildlife per lake come with 4b. Trails, rivers and waterfalls, and islands are wanted
   but not in milestone 4; the owner also asked to plan for an **ocean** and a **backpack**. The
   backpack is planned into 4d (things you place come out of it); the ocean, rivers, islands and
   trails are milestone 8.
@@ -40,7 +42,7 @@ Each one leaves the game playable and tested.
 | 2b | **Trees everywhere.** Each 57.6 m square beyond the valley grows its own trees from the seed; real models near the player, cards further off; the camera, walkers, animals and seasons treat them like the valley's. | A square regrows identically; no tree is dropped for want of a slot; repeated 2 km trips leave the scene's object count unchanged (`tests/world.spec.js`). | done |
 | 2c | **Small plants and rocks beyond the valley.** Boulders (with the tree models), and in the squares closest to the player bushes, ferns, mushrooms and drifts of daisies, lupins and tulips. The valley's own build-once plants stay until milestone 4 retires the valley. Picking flowers out there waits for milestone 4 too. | A square regrows identically; nothing dropped (`tests/world.spec.js`). | done |
 | 3 | **Kinds of country.** A climate (cold, rain) read from the seed: snowfields and pines in the cold, golden heath with a few birches where it is dry, thick dark-green woods where it is wet, mild meadow between, and rare blossom groves. The ground, grass, trees, boulders and flowers all follow it, and far tiles show it from a distance. | Each kind exists within 2.6 km and grows its own trees; the valley stays mild (`tests/world.spec.js`). | done |
-| 4a | **Places from the seed, lakes first.** A grid of places, each chosen from the land and climate round it. Lakes of varied size and shape, each in its own valley: water, reeds, lilies, ducks, jumping fish, fishing; frozen all year in snow country; seen from afar. The save holds seed and position; a list to jump to places. The home valley still stands. | Height is continuous between neighbouring lakes; a lake is the same every visit; water is drawn from a fixed pool. | next |
+| 4a | **Places from the seed, lakes first.** A grid of places, each chosen from the land and climate round it. Lakes of varied size and shape, each in its own valley: water, reeds, lilies, ducks, jumping fish, fishing; frozen all year in snow country; seen from afar. The save holds seed and position; a list to jump to places. The home valley still stands. | Height is continuous between neighbouring lakes; a lake is the same every visit; water is drawn from a fixed pool (`tests/lakes.spec.js`). | done |
 | 4b | **Landmarks that follow you.** Jetty with boat and skipper, campfire with logs, bench and lamp path at some lakes; the shrine in blossom groves. One of each object, moved to the nearest place of its kind while out of sight. Each place remembers its own state (its own bouquet, fire, trade). | Moving between two lakes re-anchors everything with nothing left behind; each place's state survives leaving and returning. | |
 | 4c | **The valley goes.** Start beside a generated lake with the full set. The fixed valley and its hand-placed plants are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
 | 4d | **More to discover, and a backpack.** Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
@@ -152,6 +154,26 @@ or dropped once a pack is chosen.
   show as pale shapes; fog, rain and snow push it back to full.
 - `world/grassfield.js` keeps a 144 x 144 map of height and "grass grows here" round the camera
   and shifts it as the camera moves.
+
+## How the lakes work (milestone 4a)
+
+- `core/shape.js`, "Lakes from the seed": the land is ruled into `LAKE_CELL` (420 m) squares;
+  `lakeOfCell` gives each one lake or none from the seed, kept to the middle 60% of its square and
+  scaled so its shore never reaches further than 47 m (`rmax`). That guarantees two things the
+  rest relies on: bowls (out to 1.7 x the shore) never overlap, and a lake's influence
+  (`reach2`, 7.5 x `rmax`) never passes the next square, so the eight squares round a spot are
+  all that need looking at (`lakesAround`, cached per square).
+- `height` multiplies every nearby lake's valley factor into the land and cuts only the nearest
+  bowl, so there is no seam where "the nearest lake" changes (checked at 506 such points).
+- A lake's character comes from the climate at its spot: `beach` (breadth of sand; the ground and
+  the grass map read it), `ring` (a path round it or not), `tint` (cast of the water), `frozen`
+  (snow country: ice all year; `onIce` honours it). `E`/`TH` stretch the outline.
+- `world/water.js` lends four sheets of water to the nearest lakes (`updateWater`); each sheet has
+  its own outline, tint and ice uniforms and shares the rest. Lakes further off are painted as
+  water on the coarse ground tiles (third component of the tiles' `clime` attribute).
+- The save holds `where` (seed, x, z); `?at=x,z` starts anywhere. The World popover lists the
+  lakes about (`initPlaces`), and `window.__meadow` has `lakes()`, `visitLake(id)`, `travelTo`.
+- HOME is the lake of the square the valley stands in, and the single-lake names still mean it.
 
 ## How the climate works (milestone 3)
 

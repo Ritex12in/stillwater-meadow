@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { smooth } from '../core/math.js';
-import { heightAt, slopeAt, lakeT, pathAmt, nearReserved, onDock, BENCH_SPOT, SPAWN, coldAt, rainAt, dryOf } from '../core/shape.js';
+import { heightAt, slopeAt, lakeAt, nearReserved, onDock, BENCH_SPOT, SPAWN, coldAt, rainAt, dryOf } from '../core/shape.js';
 import { weatherize, bothSides, timeU, windU, camU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { onShrineGround } from './shrine.js';
@@ -27,7 +27,8 @@ let mapTex = null, mapData = new Float32Array(MAP_N * MAP_N * 4), mapNext = new 
 /** How well grass grows at a spot (0..1): not in the water, on the path, on rock, or where something stands. */
 function grassy(x, z, h) {
   if (onDock(x, z) || nearReserved(x, z, 1.2) || Math.hypot(x - BENCH_SPOT.x, z - BENCH_SPOT.z) < 1.3 || onShrineGround(x, z)) return 0;
-  return smooth(1.12, 1.22, lakeT(x, z)) * (1 - smooth(0.15, 0.5, pathAmt(x, z))) * (1 - rockAmt(h, slopeAt(x, z)));
+  const lake = lakeAt(x, z), b = Math.min(lake.beach, 1); // (grass begins where that lake's sand ends)
+  return smooth(1.02 + 0.1 * b, 1.1 + 0.12 * b, lake.t(x, z)) * (1 - smooth(0.15, 0.5, lake.path(x, z))) * (1 - rockAmt(h, slopeAt(x, z)));
 }
 /** Keep the map round (cx, cz). Call once a frame; it only does work when the camera has moved on. */
 export function updateGrassMap(cx, cz) {

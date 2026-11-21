@@ -3,16 +3,16 @@ import './style.css';
 import { updateAtmosphere } from './core/atmosphere.js'; // patches the fog shader; keep first
 import * as THREE from 'three';
 import { clamp, smooth, rng } from './core/math.js';
-import { reduceMotion, debug } from './core/env.js';
+import { reduceMotion, debug, query } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU, updateDetail, neonU } from './core/materials.js';
-import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, heightAt, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt } from './core/shape.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, heightAt, coldAt, rainAt, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt } from './core/shape.js';
 import { hooks, seasonState, seats, world } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU } from './world/sky.js';
 import { buildLights, hemi, ambient, sun, placeSun } from './world/lights.js';
 import { buildGround, updateGround, pumpGround, settleGround, groundStats, groundU } from './world/terrain.js';
-import { buildWater, waterU } from './world/water.js';
+import { buildWater, updateWater, waterLakes, waterU } from './world/water.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots, TREE_REACH, MODEL_FAR } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
 import { loadingStep, paint, loadingDone, initScreen } from './ui/loading.js';
@@ -41,7 +41,7 @@ import { updateWilds, settleWilds, wildStats, growSquare, growRocks, growSmall }
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
 import { store, onSave, flush } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
-import { initWorldPanel } from './ui/world-panel.js';
+import { initWorldPanel, initPlaces } from './ui/world-panel.js';
 import { initSettings } from './ui/settings.js';
 import { initPetVoices } from './features/voices.js';
 import { initDucks, duckState } from './features/ducks.js';
@@ -113,19 +113,47 @@ buildPollen();
 buildBirds();
 loadingStep(0.9, 'Waking the animals…'); await paint();
 buildPlayer();
+// Where you begin: where you last were in this world (the save remembers), or `?at=x,z` in the
+// address, or by the home lake.
+{
+  const at = (query.get('at') || '').split(',').map(Number);
+  const from = at.length === 2 && at.every(Number.isFinite) ? { x: at[0], z: at[1] } : store.where && store.where.seed === WORLD.seed ? store.where : null;
+  if (from && Number.isFinite(from.x) && Number.isFinite(from.z) && walkable(from.x, from.z)) { player.x = from.x; player.z = from.z; player.y = groundAt(from.x, from.z); }
+}
 buildAnimals();
 buildBoat();
 buildEffects();
 buildWeather();
 registerPetting();
 // (after everything above, which is laid out once round the valley's own trees)
-settleWilds(SPAWN.x, SPAWN.z);
+settleWilds(player.x, player.z);
 
 // ── Interface and systems ──
 initHud();
 initPointer();
 initSettings();
 initWorldPanel();
+/** Go to a spot at once (the Places list): the ground and what grows there are made ready first. */
+function travelTo(x, z, faceX, faceZ) {
+  player.x = x; player.z = z; player.slide = null; player.y = groundAt(x, z);
+  if (faceX !== undefined) { player.rot = Math.atan2(faceX - x, faceZ - z); camState.yaw = Math.atan2(x - faceX, z - faceZ); }
+  settleGround(x, z); settleWilds(x, z); updateWater(x, z);
+  flush();
+}
+/** The lakes within reach, for the Places list and the tests. */
+const lakesAbout = (r = 1500) => lakesNear(player.x, player.z, r).map((L) => ({ id: L.id, name: L.name, x: L.x, z: L.z, r: L.R0, rmax: L.rmax, long: L.E, beach: L.beach, ring: L.ring, frozen: L.frozen, far: Math.round(Math.max(0, Math.hypot(L.x - player.x, L.z - player.z) - L.R0)) }));
+/** Stand on a lake's shore, on the side you came from, facing the water. */
+function visitLake(id) {
+  const L = lakesNear(player.x, player.z, 6000).find((q) => q.id === id);
+  if (!L) return false;
+  const a = Math.atan2(player.z - L.z, player.x - L.x);
+  for (let k = 0; k < 24; k++) {
+    const p = L.point(a + (k % 2 ? -1 : 1) * Math.ceil(k / 2) * 0.26, 1.24);
+    if (walkable(p.x, p.z)) { travelTo(p.x, p.z, L.x, L.z); return true; }
+  }
+  return false;
+}
+initPlaces({ list: () => lakesAbout(1500).slice(0, 7), go: visitLake });
 initScreen();
 const resizers = [];
 const resize = () => {
@@ -171,6 +199,7 @@ restoreWeather(store.weather);
 onSave((s) => {
   s.time = { live: timeCtl.live, hour: timeCtl.target };
   s.weather = { auto: wx.auto, type: wx.type };
+  s.where = { seed: WORLD.seed, x: +player.x.toFixed(2), z: +player.z.toFixed(2) };
 });
 
 // ── Apply the time-of-day palette to the scene ──
@@ -286,6 +315,7 @@ function frame(now) {
   updateGround(camera.position.x, camera.position.z);
   pumpGround(3);
   updateWilds(camera.position.x, camera.position.z);
+  updateWater(camera.position.x, camera.position.z);
   renderNow();
   requestAnimationFrame(frame);
 }
@@ -311,6 +341,8 @@ window.__meadow = {
   fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, pets: petsView, fetch: fetchView, friend: friendView, get friendSt() { return friend && friend.st; }, dance: danceView, snowman: snowmanView, wardrobe: wardrobeNow, emote: playEmote, emoteState, toast,
   geo: { lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') },
   seed: WORLD.seed,
+  /** Lakes: those about you, the ones with water drawn just now, and a way to go to one or to any spot. */
+  lakes: lakesAbout, waterLakes, visitLake, travelTo,
   /** The climate at a spot: how much snow lies, how parched, how lush, how much of a blossom grove (each 0..1). */
   climate: (x, z) => { const rain = rainAt(x, z); return { snow: snowOf(coldAt(x, z, height(x, z))), dry: dryOf(rain), lush: lushOf(rain), grove: groveAt(x, z) }; },
   // the ground's tiles: what is loaded, and ways to bring it up to date without waiting for frames

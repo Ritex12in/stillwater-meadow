@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { smooth, fbm } from '../core/math.js';
-import { height, lakeT, pathAmt, setGroundSampler, coldAt, rainAt, dryOf, lushOf, snowOf } from '../core/shape.js';
+import { height, lakeAt, setGroundSampler, coldAt, rainAt, dryOf, lushOf, snowOf } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -108,11 +108,11 @@ function takePart() {
   if (p) return p;
   partsMade++;
   const geo = new THREE.BufferGeometry();
-  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, clm: new Float32Array(VERTS * 2), h: new Float32Array(GRID) };
+  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, clm: new Float32Array(VERTS * 3), h: new Float32Array(GRID) };
   geo.setAttribute('position', new THREE.BufferAttribute(part.pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(part.nrm, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(part.col, 3));
-  geo.setAttribute('clime', new THREE.BufferAttribute(part.clm, 2));
+  geo.setAttribute('clime', new THREE.BufferAttribute(part.clm, 3));
   if (textured) geo.setAttribute('splat', new THREE.BufferAttribute(part.spl, 4));
   geo.setIndex(tileIndex);
   geo.boundingSphere = new THREE.Sphere();
@@ -147,12 +147,16 @@ function* fill(t) {
       if (h > hi) hi = h;
       c.copy(g1).lerp(g2, smooth(0.35, 0.7, fbm(x * 0.05 + 11, z * 0.05 - 3)));
       c.lerp(g3, smooth(0.5, 0.75, fbm(x * 0.11 - 5, z * 0.11 + 8)) * 0.6);
-      const lt = lakeT(x, z);
-      const wSand = 1 - smooth(1.02, 1.16, lt), wBed = smooth(0.05, -0.8, h), wDirt = lt < 2.2 ? pathAmt(x, z) * 0.9 : 0;
+      // sand round the nearest lake, as broad as that lake's beach; soil on its path, if it has one
+      const lake = lakeAt(x, z), lt = lake.t(x, z);
+      const wSand = (1 - smooth(1.02, 1.02 + 0.14 * lake.beach, lt)) * Math.min(1, lake.beach * 2), wBed = smooth(0.05, -0.8, h), wDirt = lt < 2.2 ? lake.path(x, z) * 0.9 : 0;
       const wRock = rockAmt(h, slope) * 0.85, wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6;
       // the climate here: snow does not lie on cliffs; lush country is a deeper green
       const rain = rainAt(x, z), dry = dryOf(rain), cold = coldAt(x, z, h) * (1 - smooth(0.9, 1.5, slope) * 0.55);
-      clm[k * 2] = cold; clm[k * 2 + 1] = dry;
+      // (clime: cold, dry, and whether this is a lake seen from too far off to have its own sheet of water)
+      const pond = t.lv > 0 && h < 0.02 ? 1 : 0;
+      if (pond) { pos[k * 3 + 1] = 0.02; nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }
+      clm[k * 3] = cold; clm[k * 3 + 1] = dry; clm[k * 3 + 2] = pond;
       c.multiplyScalar(1 - lushOf(rain) * 0.16);
       if (textured) {
         // the grass patches become a tint around 1 (the texture brings the colour); weights go apart
@@ -175,7 +179,7 @@ function* fill(t) {
       for (let q = 0; q < 3; q++) { pos[to * 3 + q] = pos[from * 3 + q]; nrm[to * 3 + q] = nrm[from * 3 + q]; cols[to * 3 + q] = cols[from * 3 + q]; }
       pos[to * 3 + 1] -= drop;
       if (spl) for (let q = 0; q < 4; q++) spl[to * 4 + q] = spl[from * 4 + q];
-      clm[to * 2] = clm[from * 2]; clm[to * 2 + 1] = clm[from * 2 + 1];
+      for (let q = 0; q < 3; q++) clm[to * 3 + q] = clm[from * 3 + q];
     }
   }
   const { geo, mesh } = part;
@@ -299,11 +303,11 @@ function groundDetail(mat, textured) {
         tLeaves: { value: kit.tex.leaves_litter }, uAutumn: groundU.autumn,
       });
     }
-    sh.vertexShader = 'varying vec3 vGround;\nattribute vec2 clime;\nvarying vec2 vClime;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+    sh.vertexShader = 'varying vec3 vGround;\nattribute vec3 clime;\nvarying vec3 vClime;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
       vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;
       vClime = clime;
       ${textured ? 'vSplat = splat;' : ''}`);
-    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec2 vClime;\nuniform vec3 uCam;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
+    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nuniform vec3 uCam;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
       // (wrapped first: far from the middle of the world the numbers get too big for sin() to scatter)
       float gHash(vec2 p) { return fract(sin(dot(mod(p, 1024.0), vec2(127.1, 311.7))) * 43758.5453); }
       float gNoise(vec2 p) {
@@ -369,6 +373,8 @@ function groundDetail(mat, textured) {
         diffuseColor.rgb += vec3(0.025, 0.02, -0.02) * (broad - 0.5) * 2.0 * diffuseColor.g;
         ${textured ? `// the climate: parched heath turns the grass gold (clumps of it paler, patches greener)
         diffuseColor.rgb *= mix(vec3(1.0), vec3(1.3, 1.07, 0.64) * (0.92 + 0.16 * mid), vClime.y);` : ''}
+        // a lake a long way off: no sheet of water is spared for it, so its bed is painted the colour of water
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.42, 0.58), smoothstep(0.3, 0.7, vClime.z));
         // in the cold, snow lies in ragged drifts that close up into snowfields (and on the high peaks all year)
         float snowIn = vClime.x + (broad - 0.5) * 0.3 + (mid - 0.5) * 0.14;
         vec3 snowCol = mix(vec3(0.78, 0.85, 0.96), vec3(0.95, 0.97, 1.0), smoothstep(0.3, 0.75, broad));

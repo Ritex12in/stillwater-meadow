@@ -18,11 +18,11 @@ const again = async (page, address) => {
 };
 const world = (page) => page.evaluate(() => ({ seed: window.__meadow.seed, shown: document.getElementById('seedNo').textContent, bench: window.__meadow.store.benchBouquet || null }));
 
-test('a new player gets a world of their own, kept in the save; each world keeps its own places, and an old save is world 1', async ({ page }) => {
+test('a new player gets a world of their own, kept in the save; any text is a seed; each world keeps its own places, and an old save is world 1', async ({ page }) => {
   const errors = await visit(page, '/?weather=clear&season=summer#11');
   const mine = await world(page);
   expect(mine.seed, 'a world picked at random, not the first one').toBeGreaterThan(1);
-  expect(mine.seed).toBeLessThanOrEqual(99999);
+  expect(mine.seed).toBeLessThanOrEqual(4294967295);
   expect(mine.shown, 'its number is shown').toBe(String(mine.seed));
   // leave a bouquet on the home bench in this world
   await step(page, 1.5);
@@ -50,9 +50,24 @@ test('a new player gets a world of their own, kept in the save; each world keeps
   const home = await world(page);
   expect(home.seed).toBe(mine.seed);
   expect(home.bench).toEqual(back.bench);
-  // a number that is no world is ignored: you stay in the world you were in
-  await again(page, '/?weather=clear&seed=abc#11');
+  // an empty seed is ignored: you stay in the world you were in
+  await again(page, '/?weather=clear&seed=%20#11');
   expect((await world(page)).seed).toBe(mine.seed);
+  // any text is a seed, as in Minecraft: the same text, the same world; other text, another world
+  await again(page, '/?weather=clear&seed=' + encodeURIComponent('Cherry valley') + '#11');
+  const text = await world(page);
+  expect(text.shown).toBe('Cherry valley');
+  const land = () => page.evaluate(() => { const m = window.__meadow; return [m.home.x, m.home.z, m.geo.height(m.home.x + 300, m.home.z - 200)].map((v) => v.toFixed(3)).join(','); });
+  const cherry = await land();
+  await again(page, '/?weather=clear&seed=' + encodeURIComponent('Cherry valley') + '#11');
+  expect((await world(page)).seed).toBe(text.seed);
+  expect(await land(), 'the same text, the same land').toBe(cherry);
+  await again(page, '/?weather=clear&seed=' + encodeURIComponent('Cherry valley!') + '#11');
+  expect((await world(page)).seed).not.toBe(text.seed);
+  expect(await land(), 'other text, other land').not.toBe(cherry);
+  // a number with leading zeros is that number
+  await again(page, '/?weather=clear&seed=007#11');
+  expect(await world(page)).toEqual({ seed: 7, shown: '7', bench: null });
   // a save from before worlds had numbers is world 1, with its places
   await page.evaluate(() => {
     localStorage.setItem('stillwater-meadow', JSON.stringify({ version: 2, lastVisit: Date.now() - 1000, settings: {}, journal: {}, benchBouquet: ['#ffffff:0', '#f6d65a:1', '#f19cb7:2'] }));

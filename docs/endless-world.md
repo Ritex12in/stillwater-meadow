@@ -225,13 +225,18 @@ or dropped once a pack is chosen.
 
 - **Which world.** `systems/save.js` picks the seed as the save loads: the address's `?seed=`,
   else the world last played (`store.seed`), else world 1 for a save from before worlds had
-  numbers, else (someone new) one at random from 2 to 99999. `core/shape.js` reads it from there.
+  numbers, else (someone new) one at random from 2 to 4294967295. As in Minecraft a seed can be any text
+  (up to 64 characters): a whole number is that seed, other text is turned into one (FNV-1a), the
+  same text always the same world; the text is what is shown and shared (`store.seedText`), the
+  number is what the land is made from (`store.seed`, the key of `store.worlds`). The land is made
+  with 32-bit arithmetic, so every seed up to 4294967295 is a world of its own. `core/shape.js`
+  reads it from there.
   A shared link switches your world: nothing is lost, because what belongs to a place is kept per
   world: `where`, `places`, `anchor`, `benchBouquet` and `boatBouquet` are put away in
   `store.worlds[seed]` when you leave a world and brought out when you come back. What you carry,
   your pets, bonds and journal go with you. "Start over" forgets everything and begins in a new
-  world. The World panel shows the world's number, copies a link to it, goes to a world by
-  number, or to a new one at random.
+  world. The World panel shows the world's seed, copies a link to it, goes to a world by any seed
+  typed in, or to a new one at random.
 - **Tests and tools** play world 1 unless they ask for another (`tests/helpers.js` adds `seed=1`;
   `tools/fingerprint.mjs` too). `tools/seeds.mjs random 30` checks thirty worlds a new player
   could get; 42 worlds so far (1 to 12 and 30 at random) all start well. If none of the home

@@ -98,12 +98,12 @@
     <div>
       <h3>This world</h3>
       <div class="world-seed">
-        <span class="seed-no">World <b id="seedNo">–</b></span>
+        <span class="seed-no">Seed <b id="seedNo">–</b></span>
         <button type="button" class="btn" id="seedCopy" title="Copy a link to this world, to share it">Copy link</button>
-        <button type="button" class="btn" id="seedNew" title="Go to a new world, picked at random (this one is kept: come back with its number)">New world</button>
+        <button type="button" class="btn" id="seedNew" title="Go to a new world, picked at random (this one is kept: come back with its seed)">New world</button>
       </div>
       <form class="world-seed" id="seedForm">
-        <input id="seedInput" type="text" inputmode="numeric" maxlength="5" placeholder="World number" aria-label="World number" autocomplete="off">
+        <input id="seedInput" type="text" maxlength="64" placeholder="Any word, phrase or number" aria-label="Seed" autocomplete="off" spellcheck="false">
         <button type="submit" class="btn">Go</button>
       </form>
       <p class="note" id="seedNote" hidden></p>

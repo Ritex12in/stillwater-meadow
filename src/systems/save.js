@@ -2,7 +2,9 @@
 // blocked storage); everything is read defensively and written a few seconds after changes.
 //
 // The save also decides which world you are in (its seed): the one in the address (`?seed=`), or
-// else the one you last played, or else, for someone new, one picked at random. What you carry and
+// else the one you last played, or else, for someone new, one picked at random. As in Minecraft, a
+// seed can be any text: a whole number is used as it is, any other text is turned into a number,
+// so the same text always gives the same world. What you carry and
 // your bonds go with you from world to world; what belongs to a place in one world (where you
 // stood, the landmarks' lake, each place's bouquets and fire) is kept per world, in `worlds`.
 import { query } from '../core/env.js';
@@ -40,14 +42,26 @@ function load() {
 
 export const store = load();
 
-/** The highest seed: world numbers are kept to five digits, easy to read out and type. */
-export const MAX_SEED = 99999;
-/** A seed as given (address, typed in, saved), as a whole number from 1 to MAX_SEED, or null if it is not one. */
+/** The highest seed. The land is made with 32-bit arithmetic, so every seed up to here is a world of its own. */
+export const MAX_SEED = 4294967295;
+/** How long a seed's text may be. */
+export const SEED_TEXT_MAX = 64;
+/**
+ * A seed as given (in the address, typed in, saved): `{ seed, text }`, or null if there is no text.
+ * A whole number from 1 to MAX_SEED is that seed (written without leading zeros); any other text
+ * is turned into one (FNV-1a over its characters), the same text always to the same seed.
+ */
 export function seedOf(v) {
-  if (v === null || v === undefined || v === '') return null;
-  const n = Math.floor(Math.abs(Number(v)));
-  return Number.isFinite(n) && n >= 1 && n <= MAX_SEED ? n : null;
+  if (v === null || v === undefined) return null;
+  const text = String(v).trim().slice(0, SEED_TEXT_MAX);
+  if (!text) return null;
+  if (/^\d+$/.test(text)) { const n = Number(text); if (n >= 1 && n <= MAX_SEED) return { seed: n, text: String(n) }; }
+  let h = 0x811C9DC5;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return { seed: (h >>> 0) || 1, text };
 }
+/** A new world's seed, at random (never 1, the first world). */
+export const randomSeed = () => 2 + Math.floor(Math.random() * (MAX_SEED - 1));
 /** What belongs to one world rather than to you. */
 const WORLD_KEYS = ['where', 'places', 'anchor', 'benchBouquet', 'boatBouquet'];
 /**
@@ -55,9 +69,9 @@ const WORLD_KEYS = ['where', 'places', 'anchor', 'benchBouquet', 'boatBouquet'];
  * worlds had numbers was world 1; someone new gets a world of their own, at random (never 1).
  */
 function chooseWorld() {
-  const asked = seedOf(query.get('seed')), saved = seedOf(store.seed);
-  const seed = asked || saved || (store.lastVisit ? 1 : 2 + Math.floor(Math.random() * (MAX_SEED - 1)));
-  const was = saved || (store.lastVisit ? 1 : null);
+  const asked = seedOf(query.get('seed')), saved = typeof store.seed === 'number' && store.seed >= 1 ? { seed: store.seed, text: store.seedText || String(store.seed) } : null;
+  const chosen = asked || saved || (store.lastVisit ? { seed: 1, text: '1' } : (() => { const n = randomSeed(); return { seed: n, text: String(n) }; })());
+  const seed = chosen.seed, was = saved ? saved.seed : store.lastVisit ? 1 : null;
   if (was !== seed) {
     // put the old world's places away, and bring out this one's (if you have been here before)
     const worlds = store.worlds || (store.worlds = {});
@@ -67,8 +81,12 @@ function chooseWorld() {
     delete worlds[seed];
   }
   store.seed = seed;
+  store.seedText = chosen.text;
+  worldSeedText = chosen.text;
   return seed;
 }
+/** The world's seed as it was given (what is shown and shared). */
+export let worldSeedText = '';
 /** The world's seed for this visit (core/shape.js builds the land from it). */
 export const worldSeed = chooseWorld();
 const returning = !!store.lastVisit;

@@ -30,6 +30,18 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
   trails are milestone 8.
 - **Testing:** run only new or affected tests after a change; full runs when asked, at 4c, and
   before merging to `main`.
+- **Planning round (2026-11-21, second):**
+  - **Goals:** journals to complete (fish, flowers and places, a page per kind of country) and
+    postcards (an album filled by finding kinds of place, taken with photo mode).
+  - **Main story:** the owner wants one main story, and a long one (a dozen chapters or more,
+    reaching far into the world). Its premise and how it is told are to be decided later; three
+    directions were offered (relighting dark lanterns from lake to lake; the girl's postcards
+    home; waking a shrine grove in each kind of country) and none chosen. Whatever it is, its
+    places must be found by rule from the seed, since every player's world differs.
+  - **Seed:** a new player gets a random world, saved with their game; the seed is shown and can
+    be shared or entered. (Today the seed comes only from `?seed=` in the address, default 1.)
+  - **Release:** the endless world replaces the old valley on the live site only after the new
+    characters are in (milestone 6). Until then `main` stays as it is.
 
 ## Milestones
 
@@ -45,12 +57,13 @@ Each one leaves the game playable and tested.
 | 4a | **Places from the seed, lakes first.** A grid of places, each chosen from the land and climate round it. Lakes of varied size and shape, each in its own valley: water, reeds, lilies, ducks, jumping fish, fishing; frozen all year in snow country; seen from afar. The save holds seed and position; a list to jump to places. The home valley still stands. | Height is continuous between neighbouring lakes; a lake is the same every visit; water is drawn from a fixed pool (`tests/lakes.spec.js`). | done |
 | 4b-1 | **Landmarks that follow you.** Settled lakes (each outranking its eight neighbours, so at least half a kilometre apart) have a kit worked out from the seed and checked against the land: a jetty with the boat and skipper where the shore allows, a campfire with logs, a bench with lawn chairs and path lamps; each turned its own way. One of each object, moved to the nearest settled lake when the old one is well behind. Each place keeps its own state (bench bouquet, boat bouquet, fire). | Home is bit-for-bit unchanged; there and back leaves seats, obstacles and scene objects as they were; a bouquet stays at its own bench across a reload (`tests/places.spec.js`). | done |
 | 4b-2 | **Lake life at every lake.** Reeds and lily pads per lake, worked out from the lake and its country and drawn from fixed slots for the three nearest; the ducks, the heron, the frogs and the mist are at the lake you are at (not ducks on ice). | Each lake's are the same every visit; none undrawn; a tour of lakes leaves the scene as it was (`tests/lakes.spec.js`). | done |
-| 4c | **The valley goes.** (next) Start beside a generated lake with the full set. The shrine is rebuilt in blossom groves (its geometry is baked to the ground it stands on, so it is rebuilt, not moved). The fixed valley and its hand-placed plants, fences and pebbles are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
-| 4d | **More to discover, and a backpack.** Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
+| 4c | **The valley goes.** (In three parts: the hand-placed valley removed and the start lake generated from the seed, done; flowers picked anywhere; the shrine in blossom groves.) Start beside a generated lake with the full set. The shrine is rebuilt in blossom groves (its geometry is baked to the ground it stands on, so it is rebuilt, not moved). The fixed valley and its hand-placed plants, fences and pebbles are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
+| 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed; (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | |
-| 8 | **Water and ways** (planned, not started; each needs new terrain work): an ocean with coasts and beaches; rivers running between lakes and to the sea, with waterfalls; islands in big lakes reached by boat; worn trails between places with signposts. | |
+| 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | |
+| 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
 
@@ -131,6 +144,26 @@ Found while preparing milestone 1; each line is work for the milestone named.
 **Tests (milestones 2 to 4)**
 - The specs teleport to valley spots through `window.__meadow.geo`. They need a fixed `?seed=`
   and spots found by query ("the nearest jetty").
+
+## Character and animal models (checked 2026-11-21, for milestone 6)
+
+- Quaternius (the author of the nature models, all CC0) publishes the **Universal Animation
+  Library**: animations on one shared humanoid rig, in glTF among other formats. Library 1 has
+  120+ (walking in eight directions, jog, sprint, crawl, swim, sitting). Library 2 (January 2026)
+  has 130+ more, including fishing and farming; its free "standard" version is about 70% of the
+  set, and whether fishing is in the free part was not confirmed. Character bodies come from his
+  separate CC0 character packs on that rig.
+  https://quaternius.com/packs/universalanimationlibrary.html ,
+  https://quaternius.com/packs/universalanimationlibrary2.html
+- KayKit's Adventurers characters (CC0, glTF, 75 animations) are an alternative; no sit or
+  fishing animation was confirmed in them. https://kaylousberg.itch.io/kaykit-adventurers
+- No pack found covers the waltz, the skating dance, holding hands or petting: those are rebuilt
+  by blending pack animations with hand adjustments, or simplified.
+- Animals: a CC0 Quaternius set has an animated wolf, dog, cat and eagle
+  (https://opengameart.org/content/animated-animales-low-poly). No CC0 deer or fox was confirmed
+  (the ones found are paid).
+- The owner will probably have to download the packs (itch.io or quaternius.com). First step is
+  unchanged: one imported character walking in the world, shown before anything is rewired.
 
 ## What the children do today (the list a new model must cover, milestone 6)
 

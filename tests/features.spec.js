@@ -200,17 +200,22 @@ test('an untamed cat runs from you, but eats a thrown fish if you keep still at 
   const errors = await open(page, 'weather=clear&season=summer');
   await step(page, 0.5);
   await page.evaluate(() => { window.__meadow.store.creel = [{ id: 'minnow', cm: 8 }]; });
-  const cat = await page.evaluate(() => { const a = window.__meadow.animals[3]; return { x: a.x, z: a.z }; });
+  // (a spot 5 m from the cat on the land side, away from the lake, and the way from there to the cat)
+  const landward = () => page.evaluate(() => {
+    const m = window.__meadow, a = m.animals[3], h = m.home, d = Math.hypot(a.x - h.x, a.z - h.z), ux = (a.x - h.x) / d, uz = (a.z - h.z) / d;
+    return { x: a.x + ux * 5, z: a.z + uz * 5, fx: -ux, fz: -uz };
+  });
+  const cat = await landward();
   // walk straight at it: it bolts
-  await teleport(page, cat.x + 5, cat.z, -1, 0);
+  await teleport(page, cat.x, cat.z, cat.fx, cat.fz);
   await page.keyboard.down('KeyW'); await step(page, 0.8); await page.keyboard.up('KeyW');
   await step(page, 0.4);
   const fled = await page.evaluate(() => window.__meadow.pets()[3]);
   expect(['flee', 'wary', 'cornered']).toContain(fled.state);
   // from a few metres off, throw it the fish, then keep still
   await step(page, 4);
-  const c2 = await page.evaluate(() => { const a = window.__meadow.animals[3]; return { x: a.x, z: a.z }; });
-  await teleport(page, c2.x + 5, c2.z, -1, 0);
+  const c2 = await landward();
+  await teleport(page, c2.x, c2.z, c2.fx, c2.fz);
   await step(page, 0.2);
   const throwIt = (await actions(page)).find((a) => a.id === 'feed');
   expect(throwIt && throwIt.label).toContain('Throw');

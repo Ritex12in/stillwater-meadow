@@ -57,7 +57,7 @@ Each one leaves the game playable and tested.
 | 4a | **Places from the seed, lakes first.** A grid of places, each chosen from the land and climate round it. Lakes of varied size and shape, each in its own valley: water, reeds, lilies, ducks, jumping fish, fishing; frozen all year in snow country; seen from afar. The save holds seed and position; a list to jump to places. The home valley still stands. | Height is continuous between neighbouring lakes; a lake is the same every visit; water is drawn from a fixed pool (`tests/lakes.spec.js`). | done |
 | 4b-1 | **Landmarks that follow you.** Settled lakes (each outranking its eight neighbours, so at least half a kilometre apart) have a kit worked out from the seed and checked against the land: a jetty with the boat and skipper where the shore allows, a campfire with logs, a bench with lawn chairs and path lamps; each turned its own way. One of each object, moved to the nearest settled lake when the old one is well behind. Each place keeps its own state (bench bouquet, boat bouquet, fire). | Home is bit-for-bit unchanged; there and back leaves seats, obstacles and scene objects as they were; a bouquet stays at its own bench across a reload (`tests/places.spec.js`). | done |
 | 4b-2 | **Lake life at every lake.** Reeds and lily pads per lake, worked out from the lake and its country and drawn from fixed slots for the three nearest; the ducks, the heron, the frogs and the mist are at the lake you are at (not ducks on ice). | Each lake's are the same every visit; none undrawn; a tour of lakes leaves the scene as it was (`tests/lakes.spec.js`). | done |
-| 4c | **The valley goes.** (In three parts: the hand-placed valley removed and the start lake generated from the seed, done; flowers picked anywhere, done; the shrine in blossom groves.) Start beside a generated lake with the full set. The shrine is rebuilt in blossom groves (its geometry is baked to the ground it stands on, so it is rebuilt, not moved). The fixed valley and its hand-placed plants, fences and pebbles are removed; flowers can be picked anywhere; tests rewritten round a fixed seed and places found by query. | One full run of the suite. | |
+| 4c | **The valley goes.** Start beside a lake generated from the seed, with the full set of landmarks. The hand-placed valley, its plants, fences and pebbles are removed. Flowers to pick grow everywhere. Shrine sites are fixed by the seed (one back from the home lake, others in blossom groves); the ground under each is levelled, and the one shrine stands at the site nearest you. Tests go by places found by query. | One full run of the suite. | done (full run 2026-11-22: 42 of 43 passed; the one failure, the untamed cat, was the test assuming the old valley's shore, fixed) |
 | 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed; (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | |
@@ -109,6 +109,9 @@ Each one leaves the game playable and tested.
 ## What still assumes one valley
 
 Found while preparing milestone 1; each line is work for the milestone named.
+
+(All of the list below up to "Far from the origin" was dealt with by the end of milestone 4c;
+it is kept as a record of what the change touched.)
 
 **Centred on the origin (milestones 2c and 4)**
 - `world/vegetation.js`: the valley's trees (within 155 m of the origin, denser further out), its
@@ -215,9 +218,33 @@ or dropped once a pack is chosen.
   bouquets and fire while the landmarks are elsewhere; `store.benchBouquet`/`boatBouquet` are
   always the current place's, named by `store.anchor` (so old saves and features work unchanged).
 - A lake's bowl is wider, in radii, for small lakes (`lake.bowl`), or they lie in a pit.
-- Still at the home lake only: the shrine (last part of 4c), the pine cones and the deer. The
-  animals' homes, the girl's and the snowman's spot are given from the jetty, so they turn with
-  the lake's arrangement.
+- Still at the home lake only: the pine cones and the deer. The animals' homes, the girl's and
+  the snowman's spot are given from the jetty, so they turn with the lake's arrangement.
+
+## How the shrine works (milestone 4c)
+
+- **Sites** come from the land (`core/shape.js`, "Shrines"). `homeShrineSite()` is the most
+  level place back from the home lake, facing the water: about 100 m from the lake's middle in
+  gentle country, and as far as it takes where the home lake lies among steep hills (seeds 3 and
+  7: 485 m and 328 m). The rest of the land is ruled into 640 m squares; a square has a site if
+  one of 14 tries in its middle half is a blossom grove (`groveAt` at least 0.6) on low, snowless
+  ground that rises or falls less than 5 m round it, clear of every lake. About one square in
+  ten: over seeds 1 to 12, three to twelve sites within 3 km of home (usually six to eight), the
+  nearest grove site about a kilometre or two away. No two sites are nearer than 320 m. A grove site faces the lowest ground about, so its path climbs to it.
+- **Level ground.** `height()` is `rawHeight()` (the land as the seed gives it) with the ground
+  under each site made flat for 25 m and eased back into the land by 46 m. Sites are chosen from
+  `rawHeight` only, and never where the levelled ground would touch a lake's own (its bowl, shore
+  and path): there `height` and `rawHeight` are the same, which a test checks.
+- **Clear ground.** `clearingAt` keeps trees, boulders, small plants and flowers off every site
+  (24 m); `onShrineGround` keeps grass off the hall and the stone path of every site. Both go by
+  the land's sites, not by where the shrine stands.
+- **One shrine** (`world/shrine.js`): built once on flat ground at the origin, then set down
+  whole (`setDown`): the group's place and facing, its blockers (the same objects, moved), its
+  lantern light, its falling petals. `shrineNear(x, z)` puts it at the nearest site within 900 m:
+  at once at load and on arriving by the Places list; while walking, only when the place it
+  stands is more than 145 m away (it is not drawn beyond 115 m, so it is never seen to move).
+- The shrine keeps no state of its own. Naming shrine places and listing them comes with the
+  places journal (4d).
 
 ## How the flowers you pick work (milestone 4c)
 

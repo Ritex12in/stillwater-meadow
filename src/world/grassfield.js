@@ -119,7 +119,8 @@ function grassMaterial(map, tex) {
           float tall = mix(0.15, 0.42, h3 * 0.5 + drift * 0.5) * uScale * k;
           float ang = h1 * 6.2832;
           vec3 p = position;
-          p.xz *= mix(0.8, 1.3, h2) * uScale * (1.0 + smoothstep(uFade.x, uFade.y, d) * 0.8);
+          // (thinned-away tufts shrink to nothing sideways too: flat, they would stick out of a slope)
+          p.xz *= mix(0.8, 1.3, h2) * uScale * (1.0 + smoothstep(uFade.x, uFade.y, d) * 0.8) * smoothstep(0.0, 0.2, k);
           p.y *= tall;
           p.xz = vec2(cos(ang) * p.x - sin(ang) * p.z, sin(ang) * p.x + cos(ang) * p.z);
           // wind: the same sway and rolling gusts as the other plants

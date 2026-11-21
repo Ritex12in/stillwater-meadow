@@ -17,6 +17,8 @@ export const treeSpots = [];
 // how far from the camera things keep their full detail (metres)
 export const TREE_NEAR = 55;          // trees switch to a thinned-out copy and stop casting shadows
 export const MODEL_FAR = 118;         // beyond this a tree is drawn as a flat card instead (world/farforest.js)
+/** How far tree models are drawn just now: MODEL_FAR while the cards are showing, any distance when they are not. */
+export const TREE_REACH = { value: MODEL_FAR };
 const TREE_SLOTS = 512;               // how many trees of one shape can be drawn at once
 /** Summer leaf colours by kind of tree (the valley's trees and the wild ones share them). */
 export const TREE_COLOURS = {
@@ -25,8 +27,8 @@ export const TREE_COLOURS = {
   blossom: ['#f2b8c6', '#eaa3b8', '#f7cdd8'].map(col),
 };
 let valley = null, wildBlocks = [];
-/** The valley's own trees (the first entries of treeSpots; wild trees near you follow them). */
-export const valleyTrees = () => (valley ? treeSpots.slice(0, valley.n) : treeSpots);
+/** The valley's own trees, each with its colour (for the far cards). */
+export const valleyTrees = () => (valley ? valley.pineItems.concat(valley.roundItems) : []);
 /**
  * Swap in the wild trees standing near you (see world/wilds.js): they are drawn by the same tree
  * sets as the valley's, and the camera, walkers and animals treat them as trees like any other.
@@ -86,7 +88,7 @@ export function buildTrees() {
   const pineKind = (t) => variantAt(t.x, t.z, pg.length, 3), crownKind = (t) => variantAt(t.x, t.z, cg.length, 8);
   // detailed (and shadow-casting) near the camera, a cheaper version further out
   // (slots, not exact counts: wild trees join these sets as you walk; past MODEL_FAR a card stands in)
-  const lod = { cast: true, near: TREE_NEAR, lift: 2.8, radius: 3.6, capacity: TREE_SLOTS, maxDist: MODEL_FAR };
+  const lod = { cast: true, near: TREE_NEAR, lift: 2.8, radius: 3.6, capacity: TREE_SLOTS, maxDist: TREE_REACH };
   valley = { n: treeSpots.length, pines, pineItems, rounds, roundItems: world.roundItems };
   world.valleyRoundItems = world.roundItems;
   if (kit) world.roundTop = kitTrees({ pines, pineItems, rounds, roundItems: world.roundItems }, lod);

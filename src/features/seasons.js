@@ -79,6 +79,7 @@ function apply(next, instant) {
   if (instant) {
     roundTrees().forEach(tintTree);
     writeTrees();
+    if (world.refreshFarTrees) world.refreshFarTrees();
     st.ice = P[season].ice; st.coverFloor = P[season].cover; st.bugs = P[season].bugs;
     world.grassMat.color.setRGB(...P[season].grass);
     if (world.grassKitMat) world.grassKitMat.color.setRGB(...P[season].grass);
@@ -135,6 +136,7 @@ export function initSeasons() {
       const k = clamp(dt * 1.5, 0, 1);
       roundTrees().forEach((it) => { if (!it.shown) tintTree(it); else if (blend >= 1) it.shown.copy(palOf(it)[season]); else it.shown.lerp(palOf(it)[season], k); });
       writeTrees();
+      if (blend >= 1 && world.refreshFarTrees) world.refreshFarTrees();
     }
     // the lake only freezes while the boat is safely moored
     const iceTarget = ferry.state === 'docked' ? p.ice : Math.min(p.ice, 0.2);

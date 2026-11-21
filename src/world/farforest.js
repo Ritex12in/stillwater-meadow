@@ -8,6 +8,7 @@ import { scene } from '../core/render.js';
 import { hash } from '../core/math.js';
 import { weatherize, camU, softEdges } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
+import { world } from '../core/state.js';
 import { TREE_HEIGHT } from './kitplants.js';
 import { groundU, farHaze } from './terrain.js';
 
@@ -148,11 +149,16 @@ export function setFarTrees(trees) {
     const t = trees[i], c = t.card || (t.card = cardOf(t));
     a.aPos[i * 3] = t.x; a.aPos[i * 3 + 1] = t.y - 0.25; a.aPos[i * 3 + 2] = t.z;
     a.aSize[i * 2] = c.w; a.aSize[i * 2 + 1] = c.h;
-    a.aCell[i] = c.cell; a.aRand[i] = c.r; a.aLeafy[i] = c.leafy;
-    a.color[i * 3] = c.c[0]; a.color[i * 3 + 1] = c.c[1]; a.color[i * 3 + 2] = c.c[2];
+    a.aCell[i] = c.cell; a.aRand[i] = c.r;
+    // broadleaf and blossom trees wear the colour the season gives that very tree (so it does not
+    // change as you walk up and its card gives way to the real thing); pines keep their card's green
+    if (t.type !== 'pine' && world.tintTree) world.tintTree(t);
+    const season = t.type !== 'pine' && t.shown;
+    a.aLeafy[i] = season ? 0 : c.leafy;
+    a.color[i * 3] = season ? t.shown.r : c.c[0]; a.color[i * 3 + 1] = season ? t.shown.g : c.c[1]; a.color[i * 3 + 2] = season ? t.shown.b : c.c[2];
   }
-  for (const k in SIZES) set.geo.attributes[k].needsUpdate = true;
   set.geo.instanceCount = n;
+  if (n) for (const k in SIZES) { const at = set.geo.attributes[k]; at.updateRange.offset = 0; at.updateRange.count = n * SIZES[k]; at.needsUpdate = true; }
   return trees.length - n;
 }
 

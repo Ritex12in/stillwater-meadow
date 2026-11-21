@@ -20,7 +20,9 @@ const S = TILE_N * CELL;
 /** Distances (metres from the camera to a square): when squares are grown and forgotten, and when their trees are real models. */
 export const WILD = { load: 235, drop: 265, nearIn: MODEL_FAR + 8, nearOut: MODEL_FAR + 30, valley: 155, tries: 96 };
 const squares = new Map();
-let cards = 0, lost = 0, near = 0;
+let cards = 0, lost = 0, near = 0, stale = false;
+/** The cards show each tree's season colour: ask for them to be redone when the season has turned. */
+world.refreshFarTrees = () => { stale = true; };
 
 /** The trees of one square. The same answer every time. */
 export function growSquare(ix, iz) {
@@ -76,7 +78,8 @@ export function updateWilds(cx, cz, all = false) {
     const isNear = q.near ? d < WILD.nearOut : d < WILD.nearIn;
     if (isNear !== q.near) { q.near = isNear; if (q.trees.length) modelsDirty = true; }
   });
-  if (cardsDirty || cards === 0) {
+  if (cardsDirty || stale || cards === 0) {
+    stale = false;
     const list = valleyTrees().slice();
     squares.forEach((q) => { for (const t of q.trees) list.push(t); });
     cards = list.length;

@@ -280,12 +280,13 @@ export function lodFade(mat, band) {
  * The items can be swapped for another list at any time (`setItems`): trees come and go as you
  * walk. For that, give `opts.capacity` (slots per shape; nothing is ever reallocated, and items
  * past it are counted in `dropped`) and say whether the items carry colours (`opts.colored`).
- * `opts.maxDist` stops drawing the far shape beyond that distance (something cheaper takes over).
+ * `opts.maxDist` stops drawing the far shape beyond that distance (something cheaper takes over);
+ * give it as `{ value }` to change it while running.
  */
 export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
   const band = opts.band || [(opts.near || 55) - 10, (opts.near || 55) + 5];
   const in2 = band[0] ** 2, out2 = band[1] ** 2, lift = opts.lift || 3, radius = opts.radius || 3.5;
-  const max2 = (opts.maxDist || Infinity) ** 2;
+  const reach = typeof opts.maxDist === 'object' ? opts.maxDist : { value: opts.maxDist || Infinity };
   let n = 0, kind = [], mats = new Float32Array(0), colors = [], state = new Uint8Array(0), dirty = true, dropped = 0;
   const load = (list) => {
     items = list; n = list.length; kind = list.map(variantOf);
@@ -333,6 +334,7 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
     material: mat,
     update(cam) {
       let changed = dirty;
+      const max2 = reach.value ** 2;
       for (let i = 0; i < n; i++) {
         const it = items[i], dx = it.x - cam.x, dz = it.z - cam.z, d2 = dx * dx + dz * dz, sc = it.s || 1;
         let st = 0;
@@ -359,8 +361,11 @@ export function lodSet(nearGeos, farGeos, mat, items, variantOf, opts = {}) {
       [nearM, farM].forEach((list, f) => list.forEach((m, v) => {
         m.count = fill[v * 2 + f];
         m.visible = m.count > 0;
+        if (!m.count) return;
+        // (send the graphics card only the slots in use, not the whole of a buffer sized for a forest)
+        m.instanceMatrix.updateRange.offset = 0; m.instanceMatrix.updateRange.count = m.count * 16;
         m.instanceMatrix.needsUpdate = true;
-        if (m.instanceColor) m.instanceColor.needsUpdate = true;
+        if (m.instanceColor) { m.instanceColor.updateRange.offset = 0; m.instanceColor.updateRange.count = m.count * 3; m.instanceColor.needsUpdate = true; }
       }));
     },
     setColorAt(i, c) { if (colors[i]) { colors[i].copy(c); dirty = true; } },

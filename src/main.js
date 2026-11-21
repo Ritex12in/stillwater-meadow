@@ -13,7 +13,7 @@ import { buildSky, sky, skyU } from './world/sky.js';
 import { buildLights, hemi, ambient, sun, placeSun } from './world/lights.js';
 import { buildGround, updateGround, pumpGround, settleGround, groundStats, groundU } from './world/terrain.js';
 import { buildWater, waterU } from './world/water.js';
-import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots } from './world/vegetation.js';
+import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots, TREE_REACH, MODEL_FAR } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
 import { loadingStep, paint, loadingDone, initScreen } from './ui/loading.js';
 import { buildDockAndBench, buildChairs, buildLamps, lampMat, lampGlows, lampSpots } from './world/props.js';
@@ -142,6 +142,7 @@ initQuality(renderer, resize, store.settings.quality || 'auto', store.settings.g
 onQualityChange((o) => {
   grassU.density.value = o.grass;
   farForest.forEach((m) => { m.visible = o.forest; });
+  TREE_REACH.value = o.forest && farForest.length ? MODEL_FAR : Infinity; // (no cards to take over: keep the tree models at any distance)
   world.wildAllowed = o.flowers; world.wildOn = null; // re-applied with the season below
 });
 window.addEventListener('resize', resize);

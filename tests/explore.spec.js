@@ -134,33 +134,12 @@ test('the flower journal keeps each kind you pick, and where; the view distance 
   noErrors(errors);
 });
 
-test('the characters: you and your friend are VRoid characters, posed as you move; any of the seven can be chosen in Settings, or the classic figures', async ({ page }) => {
+test('the characters: you and your friend are the sculpted children; there is no character picker', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer', '#12');
-  await page.waitForFunction(() => { const c = window.__meadow.characters(); return c.you && c.friend; }, null, { timeout: 90000 });
-  let c = await page.evaluate(() => window.__meadow.characters());
-  expect(c.you).toBe('fumiriya');
-  expect(c.friend).toBe('e');
-  expect(c.youBones, 'the bones it is posed by').toBe(17);
-  expect(c.heroShown, 'the old figure is hidden under it').toBe(false);
-  // walking moves the legs
-  const legs = () => page.evaluate(() => window.__meadow.characters().legX);
-  const still = await legs();
-  await page.keyboard.down('KeyW'); await step(page, 0.6);
-  const moving = await legs();
-  await page.keyboard.up('KeyW');
-  expect(Math.abs(moving - still), 'the legs stride').toBeGreaterThan(0.1);
-  // another, chosen in Settings, and kept
+  await page.waitForFunction(() => window.__meadow.characters().friendShown, null, { timeout: 60000 });
+  expect((await page.evaluate(() => window.__meadow.characters())).heroShown).toBe(true);
   await page.locator('[data-panel="settingsPanel"]').click();
-  expect(await page.locator('#charYou option').count(), 'seven, and the classic figure').toBe(8);
-  await page.locator('#charYou').selectOption('g');
-  await page.waitForFunction(() => window.__meadow.characters().you === 'g', null, { timeout: 60000 });
-  expect(await page.evaluate(() => window.__meadow.store.settings.you)).toBe('g');
-  // the classic figure
-  await page.locator('#charYou').selectOption('classic');
-  await page.waitForFunction(() => window.__meadow.characters().you === null, null, { timeout: 10000 });
-  await step(page, 0.2);
-  c = await page.evaluate(() => window.__meadow.characters());
-  expect(c.heroShown).toBe(true);
+  expect(await page.locator('#charYou').count(), 'no character list in Settings').toBe(0);
   noErrors(errors);
 });
 

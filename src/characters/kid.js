@@ -74,7 +74,7 @@ KIDS.girlWinter = Object.assign({}, KIDS.girl, { winter: true, coat: '#c4323a', 
 
 // sizes, in metres (the figure stands about 1.6 m to the top of its hair)
 // (proportions after the owner's character sheets: the head about a third of the height, longer legs)
-const HIP = 0.63, THIGH = 0.3, SHIN = 0.33, SHOULDER = 1.04, UPPER = 0.23, FORE = 0.215, HAND = 0.045, NECK = 1.11, HEAD = 0.92;
+const HIP = 0.63, THIGH = 0.3, SHIN = 0.33, SHOULDER = 1.04, UPPER = 0.23, FORE = 0.215, HAND = 0.045, NECK = 1.19, HEAD = 0.92;
 export const KID_DIMS = { hip: HIP, thigh: THIGH, shin: SHIN, shoulder: SHOULDER, arm: UPPER + FORE + HAND, handY: -(FORE + HAND), eye: NECK + 0.25, top: NECK + 0.56 * HEAD };
 
 // ───────────── the face ─────────────
@@ -193,20 +193,17 @@ function part(parent, layers, box, n, k = 0.02) {
 }
 
 /**
- * The head's skin. (Since the owner's character sheets: round, full cheeks low on the face and a
- * short blunt chin, in place of the taper to a small chin described next.) Shaped at first as the
- * VRoid characters' faces are (measured from their meshes,
- * tools/face-profile.mjs): an oval cranium; below it a lower face narrower than the cranium, set a
- * little forward, that tapers smoothly to a small soft chin, so the face is widest just below the
- * eyes and narrows to the chin (no cheeks bulging out at the sides, no wide jaw); a fairly flat
- * front for the eyes to sit on; ears at the eyes' height.
+ * The head's skin: oval (the owner asked for the oval back after the round, full-cheeked head made
+ * from the character sheets). An oval cranium, as tall as it is wide; below it a lower face narrower
+ * than the cranium, longer, set a little forward, that tapers smoothly to a small soft chin, so the
+ * face is widest just below the eyes and narrows to the chin (no cheeks bulging out at the sides, no
+ * wide jaw); a fairly flat front for the eyes to sit on; ears at the eyes' height.
  */
-const headField = () => blend(0.018, blend(0.085,
-  ellipsoid(0, 0.29, -0.012, 0.272, 0.262, 0.266),                // the cranium
-  ellipsoid(0, 0.165, 0.045, 0.236, 0.158, 0.2),                   // the lower face, nearly as wide
-  mirror(ellipsoid(0.116, 0.128, 0.075, 0.108, 0.09, 0.118)),      // round cheeks, low on the face
-  ellipsoid(0, 0.056, 0.084, 0.082, 0.058, 0.088)),                // a short, soft chin
-  mirror(ellipsoid(0.278, 0.19, -0.012, 0.036, 0.06, 0.05)));      // ears, round and showing, at the eyes' height
+const headField = () => blend(0.018, blend(0.075,
+  ellipsoid(0, 0.29, -0.012, 0.268, 0.268, 0.266),                // the cranium: an oval, as tall as it is wide
+  ellipsoid(0, 0.158, 0.05, 0.2, 0.165, 0.2),                      // the lower face: narrower, longer, set forward
+  ellipsoid(0, 0.05, 0.088, 0.078, 0.06, 0.086)),                  // a small, soft chin, a little lower
+  mirror(ellipsoid(0.268, 0.19, -0.012, 0.036, 0.06, 0.05)));      // ears, round and showing, at the eyes' height
 
 // Hair is drawn the way the reference draws it: big flat locks shaped like leaves (wide in the
 // middle, pointed at the tip), layered over one another and radiating from the crown. Each lock is
@@ -513,10 +510,10 @@ export function makeKid(spec = KIDS.boy) {
     T.push({ f: rbox(0, 0.115, 0.15, 0.09, 0.048, 0.03, 0.03), color: shade(C.top, 0.95) });                          // pouch pocket
     if (C.motif === 'cat') T.push({ f: union(ellipsoid(0, 0.3, 0.158, 0.034, 0.026, 0.012), capsule([-0.022, 0.318, 0.158], [-0.028, 0.34, 0.156], 0.012, 0.004), capsule([0.022, 0.318, 0.158], [0.028, 0.34, 0.156], 0.012, 0.004)), color: '#9a8f8a' });
   }
-  if (!C.winter) T.push({ f: blend(0.03, ring(0, 0.455, 0.0, 0.108, 0.058), ellipsoid(0, 0.43, -0.135, 0.17, 0.11, 0.1)), color: C.top });  // hood: a roll round the neck, the hood hanging behind
+  if (!C.winter) T.push({ f: blend(0.03, ring(0, 0.432, 0.0, 0.108, 0.048), ellipsoid(0, 0.43, -0.135, 0.17, 0.11, 0.1)), color: C.top });  // hood: a roll round the neck, the hood hanging behind
   if (!C.winter) T.push({ f: union(capsule([-0.035, 0.42, 0.15], [-0.04, 0.31, 0.162], 0.008), capsule([0.035, 0.42, 0.15], [0.04, 0.33, 0.162], 0.008)), color: C.scrunchie || '#f6f1e6' }); // drawstrings
   if (!C.winter) T.push({ f: both(grow(trunk, 0.032), (x, y) => y - 0.05, 0.012), color: shade(outer, C.jacket ? 0.82 : 0.9) });                      // hem band
-  T.push({ f: capsule([0, 0.44, 0], [0, 0.5, 0], 0.058), color: C.skin });                                               // neck
+  T.push({ f: capsule([0, 0.44, 0], [0, 0.6, 0], 0.047), color: C.skin });                                               // neck
   // straps: from the top of the pack, over the shoulder, down the chest and back under the arm
   if (!C.winter) T.push({ f: mirror(union(strand([0.11, 0.4, -0.14], [0.115, 0.5, 0.0], [0.115, 0.36, 0.14], 0.026, 0.026), strand([0.115, 0.36, 0.14], [0.13, 0.2, 0.175], [0.175, 0.1, 0.02], 0.026, 0.026))), color: C.packTrim });
   part(chest, T, [-0.3, -0.07, -0.25, 0.3, 0.55, 0.23], 64, 0.012);
@@ -568,7 +565,7 @@ export function makeKid(spec = KIDS.boy) {
   const skin = part(head, [{ f: skull, color: C.skin }], [-0.36, -0.02, -0.29, 0.36, 0.56, 0.3], 44);
   const face = makeFace(head, C, (x, y) => frontOf(skull, x, y) || 0.25);
   blushPaint(skin.material, face.blushU, 0.152, 0.132);
-  lump(head, tone(C.skin, 0.84), [-1, 1].map((sd) => ball(0.02, sd * 0.288, 0.19, 0.033, { s: [0.9, 1.3, 0.35] })), true); // the ears' hollows
+  lump(head, tone(C.skin, 0.84), [-1, 1].map((sd) => ball(0.02, sd * 0.278, 0.19, 0.033, { s: [0.9, 1.3, 0.35] })), true); // the ears' hollows
   const hairU = { uSway: { value: new THREE.Vector3() }, uHairT: { value: 0 }, uHairWind: { value: 0 } };
   const hair = pivot(head, 0, 0, 0), hairMat = () => swaying(painted({ side: THREE.DoubleSide, roughness: 0.8 }), hairU);
   const addLocks = (parent, build) => { const L = new Locks(C.hair); build(L); const m = new THREE.Mesh(L.geometry(), hairMat()); m.castShadow = true; m.receiveShadow = false; parent.add(m); return m; };

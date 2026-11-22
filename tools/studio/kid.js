@@ -133,6 +133,14 @@ if (view === 'body') {
     if (st.sitAmt) { const seat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.44, 0.5), new THREE.MeshLambertMaterial({ color: '#b08a62' })); seat.position.set(k.root.position.x - 0.12, 0.22, -0.12); seat.rotation.y = 1.0; scene.add(seat); }
   });
   cam.position.set(0, 1.5, 8.6); cam.lookAt(0, 0.75, 0);
+} else if (view === 'hair') {
+  // the hair's physics: head upright, tipped back, tipped to the side, and caught in the middle of a quick turn
+  [[0, 0, -1.65], [-0.6, 0, -0.55], [0, 0.55, 0.55], [0, 0, 1.65]].forEach(([rx, rz, x], i) => {
+    const k = makeKid(KIDS[who]); k.root.position.x = x; k.root.rotation.y = 0.5; scene.add(k.root); kids.push(k);
+    k.head.rotation.set(rx, 0, rz); k.root.updateMatrixWorld(true);
+    for (let n = 0; n < 90; n++) { if (i === 3 && n >= 84) { k.root.rotation.y += 0.25; k.root.updateMatrixWorld(true); } k.sway(1 / 60, n / 60, 0); }
+  });
+  cam.position.set(0, 1.35, 4.4); cam.lookAt(0, 1.22, 0);
 } else if (view === 'head') {
   [[0, -0.75], [0.75, 0], [Math.PI / 2, 0.75], [Math.PI, 1.5]].forEach(([ry, x]) => { const k = makeKid(KIDS[who]); k.root.position.x = x - 0.38; k.root.rotation.y = ry; scene.add(k.root); kids.push(k); });
   cam.position.set(0, 1.42, 3.6); cam.lookAt(0, 1.3, 0);

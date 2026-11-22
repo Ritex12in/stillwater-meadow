@@ -323,8 +323,9 @@ const HC = [0, 0.285, -0.014], HR = [0.304, 0.298, 0.296]; // a size up from the
 /** A point on the hair's surface at azimuth az (0 = front, + = the figure's left), elevation el, pushed out by k. */
 const onHead = (az, el, k = 1) => { const ce = Math.cos(el); return new THREE.Vector3(HC[0] + Math.sin(az) * ce * HR[0] * k, HC[1] + Math.sin(el) * HR[1] * k, HC[2] + Math.cos(az) * ce * HR[2] * k); };
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const MAXL = 72; // how many locks of one head can swing on their own (a shader's list of offsets is this long)
 class Locks {
-  constructor(color) { this.p = []; this.c = []; this.i = []; this.k = []; this.h = []; this.t = []; this.n = 0; this.base = new THREE.Color(color); }
+  constructor(color, free = []) { this.p = []; this.c = []; this.i = []; this.k = []; this.h = []; this.t = []; this.d = []; this.n = 0; this.base = new THREE.Color(color); this.free = free; } // (`free`: the locks with a loose end, shared by a head's meshes: see the kid's `sway`)
   /**
    * One lock through control points `pts` (smoothed), `W` wide at its broadest, arched `thick` high.
    * `centre` is what "outward" is measured from. `shape` is 'leaf' (pointed tip) or 'band' (even width).
@@ -334,6 +335,8 @@ class Locks {
     const P = new THREE.Vector3(), T = new THREE.Vector3(), N = new THREE.Vector3(), S = new THREE.Vector3(), V = new THREE.Vector3();
     const tone = o.tone || 1, base = this.p.length / 3, col = new THREE.Color(), tp = o.taper || 0.45;
     const len = o.still ? 0 : curve.getLength(), phase = (this.n++ * 0.6180339) % 1; // for the sway: see swaying()
+    // a lock with a loose end is its own weight on a spring (its number goes to every vertex; 0: none)
+    const id = o.free && !o.still && this.free.length < MAXL - 1 ? this.free.push({ tip: pts[pts.length - 1].clone(), len, thick }) : 0;
     for (let side = 0; side < 2; side++) for (let i = 0; i <= seg; i++) {
       const t = i / seg; curve.getPoint(t, P); curve.getTangent(t, T);
       N.subVectors(P, centre).normalize(); S.crossVectors(T, N).normalize(); N.crossVectors(S, T).normalize();
@@ -343,7 +346,7 @@ class Locks {
         const arch = (1 - u * u) * thick * (o.shape === 'spike' ? Math.min(1, w / W) : 0.4 + 0.6 * Math.min(1, w / W)) * (1 + groove * crest * (1 - u * u));
         V.copy(P).addScaledVector(S, u * w / 2).addScaledVector(N, side === 0 ? arch : -arch * 0.3);
         this.p.push(V.x, V.y, V.z);
-        this.k.push(o.still ? 0 : t, phase, len);
+        this.k.push(o.still ? 0 : t, phase, len); this.d.push(id);
         this.h.push(u * w / 2, u); this.t.push(T.x, T.y, T.z); // (for the strands and their shine: see strands)
         // darker at the root and along the edges, a lighter streak down the middle, a soft tip
         // (fine grooves between strands: the crests lighter, the grooves darker; the tips a little sunlit)
@@ -369,7 +372,7 @@ class Locks {
       q.y += up * f;
       pts.push(q);
     }
-    this.add(pts, W, o.thick || 0.03, o);
+    this.add(pts, W, o.thick || 0.03, Object.assign({ free: true }, o));
   }
   /**
    * A chunky, curving clump (the owner's sheets; the owner asked for curves in the spikes): from
@@ -396,13 +399,14 @@ class Locks {
       const rc = o.rc || 0.045, m = 7;
       for (let j = 1; j <= m; j++) { const a = (spiral * j) / m, rr = rc * (1 - (0.4 * j) / m); pts.push(P0.clone().addScaledVector(T0, rr * Math.sin(a)).addScaledVector(D, rr * (1 - Math.cos(a)))); }
     }
-    this.add(pts, W, o.thick || 0.06, Object.assign({ seg: spiral ? 30 : 20 }, o));
+    this.add(pts, W, o.thick || 0.06, Object.assign({ seg: spiral ? 30 : 20, free: true }, o));
   }
   geometry() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
     g.setAttribute('aLock', new THREE.Float32BufferAttribute(this.k, 3));
+    g.setAttribute('aLockId', new THREE.Float32BufferAttribute(this.d, 1));
     g.setAttribute('aHair', new THREE.Float32BufferAttribute(this.h, 2));
     g.setAttribute('aTan', new THREE.Float32BufferAttribute(this.t, 3));
     g.setIndex(this.i); g.computeVertexNormals(); g.computeBoundingSphere();
@@ -419,10 +423,11 @@ function swaying(mat, u) {
   mat.onBeforeCompile = (sh, r) => {
     prev.call(mat, sh, r);
     Object.assign(sh.uniforms, u);
-    sh.vertexShader = 'attribute vec3 aLock;\nuniform vec3 uSway;\nuniform float uHairT;\nuniform float uHairWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    sh.vertexShader = 'attribute vec3 aLock;\nattribute float aLockId;\nuniform vec3 uSway;\nuniform vec3 uLockOff[' + MAXL + '];\nuniform float uHairT;\nuniform float uHairWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       {
         float hk = aLock.x * aLock.x * (0.45 + aLock.z * 2.4);                  // 0 at the root; more at the tip, more on a long lock
-        transformed += uSway * hk;
+        int li = int(aLockId + 0.5);
+        if (li > 0) transformed += uLockOff[li] * (aLock.x * aLock.x); else transformed += uSway * hk; // (a free lock: its own tip's offset, from the root out)
         float fl = 0.25 + uHairWind;
         transformed.x += sin(uHairT * 2.3 + aLock.y * 6.283) * 0.011 * hk * fl;
         transformed.z += cos(uHairT * 1.7 + aLock.y * 9.1) * 0.008 * hk * fl;
@@ -702,9 +707,10 @@ export function makeKid(spec = KIDS.boy) {
   const face = makeFace(head, C, (x, y) => frontOf(skull, x, y) || 0.25);
   blushPaint(skin.material, face.blushU, 0.152, 0.132);
   lump(head, tone(C.skin, 0.84), [-1, 1].map((sd) => ball(0.02, sd * 0.278, 0.19, 0.033, { s: [0.9, 1.3, 0.35] })), true); // the ears' hollows
-  const hairU = { uSway: { value: new THREE.Vector3() }, uHairT: { value: 0 }, uHairWind: { value: 0 } };
+  const hairU = { uSway: { value: new THREE.Vector3() }, uHairT: { value: 0 }, uHairWind: { value: 0 }, uLockOff: { value: Array.from({ length: MAXL }, () => new THREE.Vector3()) } };
+  const freeLocks = [];
   const hair = pivot(head, 0, 0, 0), hairMat = () => strands(swaying(painted({ side: THREE.DoubleSide, roughness: 0.8 }), hairU));
-  const addLocks = (parent, build) => { const L = new Locks(C.hair); build(L); const m = new THREE.Mesh(L.geometry(), hairMat()); m.castShadow = true; m.receiveShadow = false; parent.add(m); return m; };
+  const addLocks = (parent, build) => { const L = new Locks(C.hair, freeLocks); build(L); const m = new THREE.Mesh(L.geometry(), hairMat()); m.castShadow = true; m.receiveShadow = false; parent.add(m); return m; };
   // the cap under the locks, darker so the gaps between locks read as depth
   const fluffy = C.hairStyle === 'fluffy';
   part(hair, [{ f: capField((x, z) => (fluffy ? 0.31 : 0.3) + (z > 0 ? 0.7 : 0.6) * z - 0.1 * Math.abs(x) * (z > 0 ? 1 : 0)), color: shade(C.hair, 0.72) }], [-0.37, 0.0, -0.36, 0.37, 0.62, 0.36], 36);
@@ -732,14 +738,54 @@ export function makeKid(spec = KIDS.boy) {
   const anchor = new THREE.Vector3(), vel = new THREE.Vector3(), at = new THREE.Vector3(), lag = new THREE.Vector3(), q = new THREE.Quaternion();
   let started = false;
   const bunRest = bun ? bun.rotation.clone() : null;
+  // Every lock with a loose end is a weight on its own spring (the owner asked for physics, with collision):
+  // its tip chases the place it rests, in the world, so it lags when the head moves or turns (a tip far from
+  // the neck is thrown furthest), long thin locks slowly and far, short thick spikes quick and stiff; it hangs
+  // toward the ground when the head tilts; and it cannot pass into the head, the shoulders or the hood: it
+  // stops on them and slides. The offset of each tip goes to the hair's shader, which bends the lock from its root.
+  const locks = (() => {
+  const HCv = new THREE.Vector3(HC[0], HC[1], HC[2]), HRv = new THREE.Vector3(HR[0], HR[1], HR[2]);
+  const sims = freeLocks.map((f) => {
+    const w = TAU * Math.min(6, 1.1 / (f.len + 0.12)) * (0.8 + 4 * f.thick), rq = f.tip.clone().sub(HCv).divide(HRv).length();
+    return { tip: f.tip, max: 0.45 * f.len, k: w * w, c: 0.56 * w, p: new THREE.Vector3(), v: new THREE.Vector3(), th: Math.min(rq - 0.01, 1.02) };
+  });
+  const inv = new THREE.Matrix4(), qW = new THREE.Quaternion(), hq = new THREE.Quaternion(), gW = new THREE.Vector3(), W = new THREE.Vector3(), l = new THREE.Vector3(), e = new THREE.Vector3();
+  const cA = new THREE.Vector3(), cB = new THREE.Vector3(), cH = new THREE.Vector3(), seg = new THREE.Vector3(), cp = new THREE.Vector3();
+  const inHead = (v3, x, y, z) => v3.set(x, y, z).sub(head.position).applyQuaternion(hq).divideScalar(HEAD); // a point of the chest, in the head's frame
+  const ball = (c, R) => { const d = e.subVectors(l, c).length(); if (d >= R) return false; l.copy(c).addScaledVector(e, R / (d || 1e-6)); return true; };
+  return (dt, fresh) => {
+    head.updateWorldMatrix(true, false); inv.copy(head.matrixWorld).invert();
+    head.getWorldQuaternion(qW); gW.set(0, -1, 0).applyQuaternion(qW).multiplyScalar(-9.8).add(e.set(0, -9.8, 0)); // gravity, less the pull the hair was shaped under
+    hq.copy(head.quaternion).invert();
+    inHead(cA, -0.2, SHOULDER - HIP - 0.02, 0); inHead(cB, 0.2, SHOULDER - HIP - 0.02, 0); inHead(cH, 0, 0.44, -0.06); seg.subVectors(cB, cA);
+    const steps = Math.max(1, Math.ceil(dt / 0.012)), h = Math.min(dt, 0.05) / steps, off = hairU.uLockOff.value;
+    for (let j = 0; j < sims.length; j++) {
+      const s = sims[j];
+      W.copy(s.tip).applyMatrix4(head.matrixWorld);
+      if (fresh) { s.p.copy(W); s.v.set(0, 0, 0); }
+      for (let i = 0; i < steps; i++) { s.v.addScaledVector(e.subVectors(W, s.p), s.k * h).addScaledVector(gW, h).multiplyScalar(Math.max(0, 1 - s.c * h)); s.p.addScaledVector(s.v, h); }
+      l.copy(s.p).applyMatrix4(inv);
+      let hit = false;
+      e.subVectors(l, s.tip); if (e.length() > s.max) { l.copy(s.tip).addScaledVector(e.setLength(s.max), 1); hit = true; }    // (a lock is only so long)
+      e.subVectors(l, HCv).divide(HRv); const ql = e.length(); if (ql < s.th) { l.copy(e.multiplyScalar(s.th / (ql || 1e-6)).multiply(HRv)).add(HCv); hit = true; } // the head
+      cp.copy(cA).addScaledVector(seg, Math.min(1, Math.max(0, e.subVectors(l, cA).dot(seg) / seg.lengthSq())));
+      if (ball(cp, 0.105 / HEAD)) hit = true;                                                                                   // the shoulders
+      if (ball(cH, 0.14 / HEAD)) hit = true;                                                                                    // the hood
+      if (hit) { s.p.copy(l).applyMatrix4(head.matrixWorld); s.v.multiplyScalar(0.5); }
+      off[j + 1].subVectors(l, s.tip);
+    }
+  };
+  })();
   function sway(dt, t, wind = 0) {
     head.getWorldPosition(at);
-    if (!started || anchor.distanceToSquared(at) > 4) { anchor.copy(at); vel.set(0, 0, 0); started = true; } // (teleports don't whip the hair)
+    const fresh = !started || anchor.distanceToSquared(at) > 4;
+    if (fresh) { anchor.copy(at); vel.set(0, 0, 0); started = true; } // (teleports don't whip the hair)
     const steps = Math.max(1, Math.ceil(dt / 0.012)), h = Math.min(dt, 0.05) / steps;
     for (let i = 0; i < steps; i++) { vel.addScaledVector(lag.subVectors(at, anchor), 150 * h).multiplyScalar(Math.max(0, 1 - 11 * h)); anchor.addScaledVector(vel, h); }
     lag.subVectors(anchor, at).applyQuaternion(head.getWorldQuaternion(q).invert());   // into the head's own frame
     if (lag.length() > 0.085) lag.setLength(0.085);
     hairU.uSway.value.copy(lag); hairU.uHairT.value = t; hairU.uHairWind.value = wind;
+    locks(dt, fresh);
     if (bun) bun.rotation.set(bunRest.x + lag.z * 4, bunRest.y, bunRest.z - lag.x * 4);
     pack.rotation.x = lag.z * 1.6 - lag.y * 1.2;
     if (skirt) skirt.rotation.set(lag.z * 2.6 - lag.y, 0, -lag.x * 2.6);   // the skirt flares and swings out after a turn

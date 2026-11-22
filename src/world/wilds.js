@@ -52,7 +52,7 @@ export function growSquare(ix, iz) {
   const R = seedOf(ix, iz, 0);
   const x0 = ix * S, z0 = iz * S, trees = [];
   // the biome at the square's middle: no woods in the desert, thick old woods in the enchanted wood
-  const B = biomesAt(x0 + S / 2, z0 + S / 2, height(x0 + S / 2, z0 + S / 2)), biomeWood = (1 - B.desert * 0.97) * (1 - B.volcanic * 0.9);
+  const B = biomesAt(x0 + S / 2, z0 + S / 2, height(x0 + S / 2, z0 + S / 2)), biomeWood = (1 - B.desert * 0.97) * (1 - B.volcanic * 0.9) * (1 - B.plains * 0.85);
   for (let k = 0; k < WILD.tries; k++) {
     // (every try takes the same draws, so turning one spot down never moves the trees after it)
     const x = x0 + R() * S, z = z0 + R() * S, roll = R(), size = R(), turn = R(), tint = R(), keep = R();

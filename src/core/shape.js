@@ -210,7 +210,8 @@ function land(x, z, open) {
   const meadow = 0.6 + fbm(u * 0.018 + 3.1, v * 0.018 - 7.4) * 7.5;
   if (open <= 0) return meadow;
   const range = rangeAt(x, z);
-  if (range <= 0) { const hills = fbm(u * 0.0055 - 9.2, v * 0.0055 + 23.6); return meadow + open * hills * hills * 46; }
+  const steps = cliffsAt(x, z) * open; // (the windy cliffs: below)
+  if (range <= 0) { const hills = fbm(u * 0.0055 - 9.2, v * 0.0055 + 23.6); return stepped(meadow + open * hills * hills * 46 * (1 - 0.8 * plainsAt(x, z)), hills, steps); }
   // the mountains: broad hills and ridged crests (with their slopes, in metres per metre)...
   fbmD(u * 0.0055 - 9.2, v * 0.0055 + 23.6, gH);
   fbmD(u * 0.0038 + 71.1, v * 0.0038 + 5.5, gC);
@@ -221,7 +222,27 @@ function land(x, z, open) {
   // ...and their fine relief, worn off where that broad shape is steep
   const wear = 1 / (1 + EROSION * (kx * kx + kz * kz) * open * open);
   const detail = 0.5 + (fbm(u * 0.021 - 3.3, v * 0.021 + 8.8) - 0.5) * wear;
-  return meadow + open * (hills * hills * 46 + range * (28 + crest * crest * 205 + detail * 24 * range));
+  const flat = range < 0.18 ? 1 - 0.8 * plainsAt(x, z) : 1;
+  const h0 = meadow + open * (hills * hills * 46 * flat + range * (28 + crest * crest * 205 + detail * 24 * range));
+  return stepped(h0, hills, steps);
+}
+/** In the windy cliffs the hills rise higher and step into plateaus. */
+function stepped(h, hills, steps) {
+  if (steps < 0.01) return h;
+  const up = h + steps * hills * hills * 40 * (1 - smooth(40, 80, h));
+  return up + (terrace(up) - up) * steps;
+}
+/** The windy cliffs' field (0..1): hilly, mild-to-dry country stepped into high plateaus. */
+let CSX = null;
+export function cliffsAt(x, z) {
+  if (CSX === null) CSX = hash(WORLD.seed, 107) * 9000;
+  const f = smooth(0.64, 0.7, fbm((x + CSX) * 0.0009 - 3.7, (z - CSX) * 0.0009 + 1.9)) * smooth(400, 800, Math.hypot(x - HOME.x, z - HOME.z));
+  return f > 0 ? f * (1 - smooth(0.08, 0.3, rangeAt(x, z))) * (1 - smooth(0.15, 0.3, Math.abs(coldBase(x, z)))) : 0;
+}
+/** Land stepped into flat plateaus, each about 16 m above the last, with steep risers between. */
+function terrace(h) {
+  const S = 16, k = h / S, i = Math.floor(k), f = k - i;
+  return (i + smooth(0.72, 0.95, f)) * S;
 }
 /** How much a spot is in the mountains (0 none .. 1 the heart of a range). */
 export function rangeAt(x, z) { return smooth(0.5, 0.72, fbm((x + SX * 31) * 0.0014 + 41.3, (z + SZ * 31) * 0.0014 - 17.9)); }
@@ -591,6 +612,12 @@ export function wonderAt(x, z) {
   const w = smooth(0.66, 0.74, n) * awayFromHome(x, z);
   return { a: w * smooth(0.45, 0.55, k), b: w * (1 - smooth(0.45, 0.55, k)) };
 }
+/** The plains (0..1): broad, low, mild country, neither wet nor dry, out of the hills; the land there lies flatter (land()). */
+export function plainsAt(x, z, base = coldBase(x, z), rain = rainAt(x, z)) {
+  if (BSX === null) wonderAt(0, 0);
+  const f = smooth(0.5, 0.58, fbm((x + BSZ) * 0.0007 + 2.2, (z - BSX) * 0.0007 - 9.4)) * awayFromHome(x, z);
+  return f > 0 ? f * (1 - smooth(0.06, 0.18, rangeAt(x, z))) * (1 - smooth(0.12, 0.25, Math.abs(base))) * (1 - smooth(0.08, 0.14, Math.abs(rain - 0.5))) : 0;
+}
 /** The biomes' weights at a spot (0..1 each): desert, swamp, enchanted, volcanic. `base` and `rain` may be passed when known. */
 export function biomesAt(x, z, h, base = coldBase(x, z), rain = rainAt(x, z)) {
   const away = awayFromHome(x, z), wonder = wonderAt(x, z), range = rangeAt(x, z);
@@ -599,6 +626,8 @@ export function biomesAt(x, z, h, base = coldBase(x, z), rain = rainAt(x, z)) {
     swamp: smooth(0.6, 0.68, rain) * (1 - smooth(8, 22, h)) * (1 - range) * (1 - smooth(0.2, 0.4, base)) * away,
     enchanted: wonder.a * smooth(0.5, 0.58, rain) * (1 - smooth(0.3, 0.5, base)),
     volcanic: wonder.b * smooth(0.2, 0.5, range),
+    // open grassland with lone trees: flat, mild, neither wet nor dry, in broad stretches
+    plains: plainsAt(x, z, base, rain),
   };
 }
 /** The strongest biome at a spot and its weight, or null in ordinary country. */
@@ -624,7 +653,7 @@ const SITE_KINDS = {
   // a hut on stilts in the swamp (no levelled ground: it stands over the water)
   hut: { cell: 420, flat: 0, out: 0, salt: 0x4D7, tries: 12, rule: (x, z, h) => h < 4 && biomesAt(x, z, h).swamp > 0.5 },
   // a windmill on an open, windy rise
-  windmill: { cell: 980, flat: 6, out: 12, salt: 0x3111, tries: 12, chance: 0.7, rule: (x, z, h) => h > 14 && h < 70 && rangeAt(x, z) < 0.35 && Math.abs(coldBase(x, z)) < 0.3 && hilltop(x, z, h) > 3 },
+  windmill: { cell: 980, flat: 6, out: 12, salt: 0x3111, tries: 12, chance: 0.7, rule: (x, z, h) => h > 14 && h < 140 && rangeAt(x, z) < 0.5 && Math.abs(coldBase(x, z)) < 0.3 && (hilltop(x, z, h) > 3 || cliffsAt(x, z) > 0.5) },
   // places to find: a ring of standing stones on a hilltop; a cairn on a summit; a hot spring in the snow
   circle: { cell: 1250, flat: 9, out: 15, salt: 0x51C1E, tries: 14, chance: 0.75, rule: (x, z, h) => h > 10 && h < 90 && hilltop(x, z, h) > 7 },
   cairn: { cell: 1100, flat: 3, out: 6, relief: 60, salt: 0xCA12, tries: 20, chance: 0.4, rule: (x, z, h) => h > 90 && hilltop(x, z, h) > 22 },

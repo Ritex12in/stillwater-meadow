@@ -50,6 +50,7 @@ import { initFoundPlaces, foundView } from './features/places.js';
 import { initCamp } from './features/camp.js';
 import { initLandmarks, landmarksView, landmarkBlocks, landmarkSeats } from './world/landmarks.js';
 import { initSignposts, signsNear, signBlocks } from './world/signposts.js';
+import { initCloudSea } from './world/cloudsea.js';
 import * as pack from './systems/pack.js';
 import { initCompass, compassView } from './ui/compass.js';
 import { updateAnchor, moveAnchor, anchorId, settledAbout } from './systems/anchor.js';
@@ -198,7 +199,7 @@ onQualityChange((o) => {
 window.addEventListener('resize', resize);
 
 // ── Features, each isolated so one failing can't take down the rest ──
-const features = { initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initWardrobe, initIceDance, initDanceCam, initDanceMusic, initFoley };
+const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initWardrobe, initIceDance, initDanceCam, initDanceMusic, initFoley };
 for (const [name, init] of Object.entries(features)) {
   try {
     const r = init();

@@ -461,7 +461,8 @@ function boyHair(L, r) {
   // the back and sides: eight, evenly round, longest at the nape
   for (let i = 0; i < 8; i++) {
     const az = 1.25 + (i / 7) * (TAU - 2.5), back = 1 - Math.min(1, Math.abs(Math.PI - az) / 1.7);
-    clump(az, 1.15, 0.08 - 0.36 * back, 0.38, { fa: 0.3, vol: 0.14, curl: 0.07 * SW, flick: 0.22 + 0.12 * back, layer: i % 2 ? 0.08 : 0.03, thick: 0.07, // (radiating from the crown, only the tips bending: bent hard sideways they read as scales)
+    clump(az, 1.15, 0.08 - 0.36 * back, 0.38, { fa: 0.3, vol: 0.14 * (0.45 + 0.55 * back), curl: 0.07 * SW, flick: 0.08 + 0.26 * back, // (by the ears they fall, not stick out like a ring)
+      layer: i % 2 ? 0.08 : 0.03, thick: 0.07, // (radiating from the crown, only the tips bending: bent hard sideways they read as scales)
       tone: v() * 0.9, ...C3 }); // (broad from near the root, to cover the head; not fewer and wider: a wide flat piece does not wrap the head)
   }
   // the nape: five short flames under the back ones, their points hanging below and flicking out (the hem was a straight line)
@@ -473,19 +474,20 @@ function boyHair(L, r) {
   [-1, 1].forEach((sd) => clump(sd * 0.98, 0.95, -0.02, 0.17, { vol: 0.06, curl: -sd * 0.14, flick: 0.06, layer: 0.04, thick: 0.045, tone: v() * 0.95, ...C3 }));
   // over them, over their gaps: six, standing off the head, their points out past the outline
   for (let i = 0; i < 6; i++) {
-    const az = 1.0 + ((i + 0.5) / 6) * (TAU - 2.0), side = Math.min(1, Math.max(0, (Math.abs(Math.PI - az) - 1.6) / 0.5)); // (1 beside the face)
-    clump(az, 1.45, 0.4, 0.42, { fa: 0.35, vol: 0.2, curl: 0.09 * SW * (1 - side), flick: 0.3 * (1 - 0.6 * side) + 0.05, layer: i % 2 ? 0.17 : 0.12, thick: 0.08, tone: v(), ...C3 });
+    const az = 1.0 + ((i + 0.5) / 6) * (TAU - 2.0), side = Math.min(1, Math.max(0, (Math.abs(Math.PI - az) - 1.3) / 0.5)); // (the ones nearest the face count as beside it) // (1 beside the face)
+    clump(az, 1.45, 0.4, 0.42, { fa: 0.35, vol: 0.2 * (1 - 0.55 * side), curl: 0.09 * SW * (1 - side), // (closer to the head by the face: there it flared like a brim)
+      flick: 0.3 * (1 - 0.85 * side) + 0.03, layer: i % 2 ? 0.17 : 0.12, thick: 0.08, tone: v(), ...C3 });
   }
   // on the crown: three cowlicks, evenly round the whorl, each rising off the head in an arc and leaning the whorl's way
-  [0.9, 3.0, 5.1].forEach((az) => {
+  [[0.3, 1.0], [2.3, 0.62], [4.2, 0.8]].forEach(([az, k]) => { // (uneven: two the same size read as cat ears)
     const up = (q, y) => { q.y += y; return q; }, c = 0.5 * SW;
-    L.add([onHead(az, 1.42, 1.03), onHead(az + c * 0.15, 1.18, 1.2), up(onHead(az + c * 0.4, 1.02, 1.39), 0.08), up(onHead(az + c * 0.9, 0.95, 1.53), 0.17)],
-      0.29, 0.045, { ...C3, skew: 0.35 * sign(c), seg: 20, free: true, tone: v() * 1.06 });
+    L.add([onHead(az, 1.42, 1.03), onHead(az + c * 0.15, 1.18, 1.03 + 0.17 * k), up(onHead(az + c * 0.4, 1.02, 1.03 + 0.36 * k), 0.08 * k), up(onHead(az + c * 0.9, 0.95, 1.03 + 0.5 * k), 0.17 * k)],
+      0.29 * (0.8 + 0.2 * k), 0.045, { ...C3, skew: 0.35 * sign(c), seg: 20, free: true, tone: v() * 1.06 });
   });
   // the fringe: from a parting over his left brow, three swept across the forehead to just above the brows, one the other way
   const part = 0.45;
-  [[-0.86, 0.22, 0.3, -0.3, 0.07], [-0.36, 0.2, 0.32, -0.28, 0.12], [0.12, 0.3, 0.28, -0.24, 0.07], [0.9, 0.26, 0.26, 0.3, 0.11]].forEach(([az, e1, W, curl, layer]) => {
-    const a0 = part + (az - part) * 0.35;
+  [[-0.9, 0.24, 0.2, -0.3, 0.07], [-0.52, 0.14, 0.21, -0.26, 0.1], [-0.14, 0.2, 0.2, -0.22, 0.07], [0.24, 0.3, 0.18, -0.18, 0.1], [0.88, 0.28, 0.2, 0.3, 0.08]].forEach(([az, e1, W, curl, layer]) => { // (five separate points hanging to the brows, the forehead showing between: one solid sweep before)
+    const a0 = part + (az - part) * 0.55;
     clump(a0, 1.36, e1, W, { sweep: az - a0, vol: 0.11, curl: curl * 0.5, flick: 0.06, layer, thick: 0.065, tone: v() * 1.04, ...C3 });
   });
 }

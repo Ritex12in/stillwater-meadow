@@ -63,6 +63,8 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
 - **Worlds and carrying (2026-11-22):** seeds as in Minecraft: any text is a seed, the same text
   the same world, a new player gets a random one. The backpack is a real inventory of slots
   (flowers, later tools and other things); bouquets are tied from flowers in it.
+- **No winter clothes (2026-11-22):** the owner had the winter costumes removed: the children wear
+  their usual clothes all year. (The skating dance now asks for cold country, not winter clothes.)
 - **Testing:** run only new or affected tests after a change; full runs when asked, at 4c, and
   before merging to `main`.
 - **Planning round (2026-11-21, second):**

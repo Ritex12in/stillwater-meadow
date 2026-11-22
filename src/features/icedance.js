@@ -20,7 +20,6 @@ import { moveInput } from '../systems/input.js';
 import { toast } from '../ui/hud.js';
 import { friend } from './friend.js';
 
-import { wardrobeNow } from './wardrobe.js';
 
 const START_IN = 1.4;   // seconds over which you both move from where you were onto the dance's first spots
 const lerpAngle = (a, b, w) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * w;
@@ -78,7 +77,7 @@ function room() {
   }
   return roomFrame;
 }
-const canAsk = () => activity.free && friend && friend.st.together && wardrobeNow() === 'winter' && lakeIce(lakeAt(player.x, player.z)) > 0.85
+const canAsk = () => activity.free && friend && friend.st.together && seasonState.winterHere && lakeIce(lakeAt(player.x, player.z)) > 0.85
   && onIce(player.x, player.z) && onIce(friend.st.x, friend.st.z) && Math.hypot(friend.st.x - player.x, friend.st.z - player.z) < 2.5;
 
 // ───────────── starting and ending ─────────────

@@ -5,7 +5,8 @@ import { poseKid } from '/src/characters/kidpose.js';
 import { poseCouple, handGaps, routine, DANCE_LENGTH, BAR } from '/src/characters/couple.js';
 import { poseSnow, snowContacts, SNOW_LENGTH, LOOP_R } from '/src/characters/skatedance.js';
 const q = new URLSearchParams(location.search), who = (q.get('who') || 'boy') + (q.get('winter') ? 'Winter' : ''), view = q.get('view') || 'turn';
-const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; document.body.appendChild(renderer.domElement);
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(+(q.get('pr') || 1)); renderer.setSize(innerWidth, innerHeight); // (?pr=3: three pixels to one, for close looks at detail)
+ renderer.shadowMap.enabled = true; document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene(); scene.background = new THREE.Color('#f6ebe2');
 scene.add(new THREE.HemisphereLight('#fff6ec', '#a89888', 0.7));
 const sun = new THREE.DirectionalLight('#fff1dc', 0.75); sun.position.set(-3, 6, 5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5 }); scene.add(sun);

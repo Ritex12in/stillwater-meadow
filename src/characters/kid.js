@@ -117,7 +117,7 @@ function browGeo(sd) {
 }
 function makeFace(head, C, surfAt) {
   const uLid = { value: 1 }, uGaze = { value: 0 }, uNone = { value: 0 };
-  const dark = lidded(smooth(C.eye, { roughness: 0.6 }), uLid, uNone), white = lidded(smooth('#ffffff', { roughness: 0.5, emissive: '#ffffff', emissiveIntensity: 0.25 }), uLid, uGaze);
+  const dark = irisPaint(lidded(smooth(C.eye, { roughness: 0.6 }), uLid, uNone)), white = lidded(smooth('#ffffff', { roughness: 0.5, emissive: '#ffffff', emissiveIntensity: 0.25 }), uLid, uGaze);
   const pupil = lidded(smooth('#1f120c', { roughness: 0.5 }), uLid, uGaze), lower = tone(C.skin, 0.72), teeth = smooth('#fff6ee');
   const hairMat = smooth(C.hair), browMat = tone(C.hair, 0.8), lip = smooth('#9a5244'), inside = smooth('#8a4038'), tongue = smooth('#f0a09a');
   const blushU = { uBlush: { value: 0.5 }, uSmile: { value: 0 } }; // (painted on the skin, and the skin's stretch with a smile: see blushPaint)
@@ -201,10 +201,102 @@ function makeFace(head, C, surfAt) {
 }
 
 // ───────────── sculpted parts ─────────────
-const painted = (extra) => soft(new THREE.MeshStandardMaterial(Object.assign({ vertexColors: true, roughness: 0.92, metalness: 0 }, extra || {})));
+/** Put `code` into a shader's text after (or, with `instead`, in place of) `at`: an error if `at` is not there (a replace that finds nothing fails silently). */
+function inject(src, at, code, instead = false) {
+  if (!src.includes(at)) throw new Error('shader: no "' + at + '"');
+  return src.replace(at, instead ? code : at + '\n' + code);
+}
+/** A height's bump on the shading normal, from how the height changes across the screen (no map, no UVs). */
+const BUMP = `
+  vec3 kdx = dFdx(-vViewPosition), kdy = dFdy(-vViewPosition), kr1 = cross(kdy, normal), kr2 = cross(normal, kdx);
+  float kdet = dot(kdx, kr1);
+  normal = normalize(abs(kdet) * normal - sign(kdet) * (dFdx(kh) * kr1 + dFdy(kh) * kr2));`;
+/**
+ * Cloth that reads as cloth close up: a fine relief worked into the shading and, faintly, the colour,
+ * by the vertex's kind (see sculpt: 0 smooth, as skin and rubber; 1 a plain weave; 2 knitted ribs
+ * round the part's own upright; 3 a twill's diagonal). It fades out as the threads get smaller than
+ * a few pixels, so at play distance nothing shimmers. (The idea of relief made in the shader and
+ * faded by its size on screen is from the film at github.com/ChetasLua/crimson-loong; the code is ours.)
+ */
+function cloth(m) {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.vertexShader = 'attribute float aKind;\nvarying float vKind;\nvarying vec3 vObjP;\nvarying vec3 vObjN;\n' + inject(sh.vertexShader, '#include <begin_vertex>', '  vKind = aKind; vObjP = position; vObjN = normal;');
+    sh.fragmentShader = 'varying float vKind;\nvarying vec3 vObjP;\nvarying vec3 vObjN;\n' + inject(sh.fragmentShader, '#include <normal_fragment_maps>', `
+  if (vKind > 0.5) {
+    vec3 kp = vObjP, kw = pow(abs(normalize(vObjN)), vec3(4.0)); kw /= kw.x + kw.y + kw.z;
+    float kpx = length(fwidth(kp)), kh, kcyc, kamp;
+    if (vKind > 2.5) { float F = 900.0; kh = kw.z * sin((kp.x + kp.y) * F) + kw.x * sin((kp.z + kp.y) * F) + kw.y * sin((kp.x + kp.z) * F); kcyc = kpx * F / 6.283; kamp = 0.0003; }
+    else if (vKind > 1.5) { float a = atan(kp.x, kp.z) * 30.0; kh = sin(a); kcyc = fwidth(a) / 6.283; kamp = 0.0011; }
+    else { float F = 800.0; kh = kw.z * sin(kp.x * F) * sin(kp.y * F) + kw.x * sin(kp.z * F) * sin(kp.y * F) + kw.y * sin(kp.x * F) * sin(kp.z * F); kcyc = kpx * F / 6.283; kamp = 0.00034; }
+    float kfade = 1.0 - smoothstep(0.2, 0.44, kcyc);
+    diffuseColor.rgb *= 1.0 + 0.07 * kh * kfade;
+    kh *= kamp * kfade;${BUMP}
+  }`);
+  };
+  m.extensions = { derivatives: true };
+  m.customProgramCacheKey = () => 'kidcloth';
+  return m;
+}
+/**
+ * Hair that reads as strands: each lock is striped across its width into strands of slightly
+ * different brown with a dark line between them (fading out when a strand is under a pixel), and
+ * the sun draws a soft band of light across the strands, broken strand by strand, that slides over
+ * the hair as the head turns (the highlight follows the strands' direction, not the surface's).
+ */
+function strands(m) {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.vertexShader = 'attribute vec2 aHair;\nattribute vec3 aTan;\nvarying vec2 vHair;\nvarying float vLockPh;\nvarying vec3 vHairT;\n' + inject(sh.vertexShader, '#include <begin_vertex>', '  vHair = aHair; vLockPh = aLock.y; vHairT = (modelViewMatrix * vec4(aTan, 0.0)).xyz;');
+    let f = 'varying vec2 vHair;\nvarying float vLockPh;\nvarying vec3 vHairT;\n' + inject(sh.fragmentShader, '#include <normal_fragment_maps>', `
+  float hs = vHair.x * 170.0 + vLockPh * 53.0, hr = fract(sin(floor(hs) * 12.9898) * 43758.5453);
+  float hfade = 1.0 - smoothstep(0.2, 0.45, fwidth(hs));
+  diffuseColor.rgb *= 1.0 + hfade * ((hr - 0.5) * 0.28 - 0.18 * smoothstep(0.7, 1.0, abs(fract(hs) - 0.5) * 2.0));`);
+    f = inject(f, 'gl_FragColor = vec4( outgoingLight, diffuseColor.a );', `
+  #if NUM_DIR_LIGHTS > 0
+  {
+    vec3 hL = directionalLights[0].direction, hV = normalize(vViewPosition), hH = normalize(hL + hV);
+    vec3 hT = normalize(normalize(vHairT) + normal * ((hr - 0.5) * 0.3 * hfade - 0.1));
+    float hth = dot(hT, hH), hsp = pow(max(0.0, 1.0 - hth * hth), 36.0) * smoothstep(-0.2, 0.4, dot(normal, hL));
+    outgoingLight += directionalLights[0].color * (diffuseColor.rgb * 1.5 + vec3(0.09, 0.06, 0.035)) * hsp * 0.42;
+  }
+  #endif
+  gl_FragColor = vec4( outgoingLight, diffuseColor.a );`, true);
+    sh.fragmentShader = f;
+  };
+  m.extensions = { derivatives: true };
+  m.customProgramCacheKey = () => 'kidstrands';
+  return m;
+}
+/** The iris drawn into the eye's dark oval: fine fibres running out from the pupil, a darker ring at the rim, the lower half lighter. */
+function irisPaint(m) {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.vertexShader = 'varying vec2 vEyeP;\n' + inject(sh.vertexShader, '#include <begin_vertex>', '  vEyeP = position.xy / vec2(0.056, 0.075);');
+    sh.fragmentShader = 'varying vec2 vEyeP;\n' + inject(sh.fragmentShader, '#include <color_fragment>', `
+  {
+    float er = length(vEyeP), ea = atan(vEyeP.y, vEyeP.x);
+    float fib = 0.5 + 0.5 * sin(ea * 40.0 + 1.5 * sin(ea * 9.0));
+    vec3 ec = diffuseColor.rgb;
+    ec = mix(ec, ec * 1.7 + vec3(0.07, 0.035, 0.01), 0.55 * smoothstep(0.35, -0.85, vEyeP.y));   // lighter low in the eye
+    ec *= 1.0 + 0.3 * (fib - 0.35) * smoothstep(0.3, 0.55, er) * (1.0 - smoothstep(0.78, 0.92, er)); // the fibres
+    ec *= 1.0 - 0.5 * smoothstep(0.8, 0.98, er);                                                     // the dark rim
+    diffuseColor.rgb = ec;
+  }`);
+  };
+  m.customProgramCacheKey = () => 'kidiris';
+  return m;
+}
+const painted = (extra) => cloth(soft(new THREE.MeshStandardMaterial(Object.assign({ vertexColors: true, roughness: 0.92, metalness: 0 }, extra || {}))));
+/** Which kind of surface a colour is (see cloth), for layers that do not say: filled in by makeKid from the figure's colours. */
+const KIND = new Map();
 const shade = (hex, k) => '#' + new THREE.Color(hex).multiplyScalar(k).getHexString();
-function part(parent, layers, box, n, k = 0.02) {
-  const m = new THREE.Mesh(sculpt(layers, box, n, k), painted());
+function part(parent, layers, box, n, k = 0.02, o = {}) {
+  const L = layers.map((l) => Object.assign({}, l, { kind: o.plain ? 0 : l.kind !== undefined ? l.kind : typeof l.color === 'string' && KIND.has(l.color) ? KIND.get(l.color) : 1 }));
+  const m = new THREE.Mesh(sculpt(L, box, n, k, { ao: o.ao === undefined ? 0.32 : o.ao }), painted());
   m.castShadow = m.receiveShadow = true;
   parent.add(m);
   return m;
@@ -232,7 +324,7 @@ const HC = [0, 0.285, -0.014], HR = [0.304, 0.298, 0.296]; // a size up from the
 const onHead = (az, el, k = 1) => { const ce = Math.cos(el); return new THREE.Vector3(HC[0] + Math.sin(az) * ce * HR[0] * k, HC[1] + Math.sin(el) * HR[1] * k, HC[2] + Math.cos(az) * ce * HR[2] * k); };
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 class Locks {
-  constructor(color) { this.p = []; this.c = []; this.i = []; this.k = []; this.n = 0; this.base = new THREE.Color(color); }
+  constructor(color) { this.p = []; this.c = []; this.i = []; this.k = []; this.h = []; this.t = []; this.n = 0; this.base = new THREE.Color(color); }
   /**
    * One lock through control points `pts` (smoothed), `W` wide at its broadest, arched `thick` high.
    * `centre` is what "outward" is measured from. `shape` is 'leaf' (pointed tip) or 'band' (even width).
@@ -252,6 +344,7 @@ class Locks {
         V.copy(P).addScaledVector(S, u * w / 2).addScaledVector(N, side === 0 ? arch : -arch * 0.3);
         this.p.push(V.x, V.y, V.z);
         this.k.push(o.still ? 0 : t, phase, len);
+        this.h.push(u * w / 2, u); this.t.push(T.x, T.y, T.z); // (for the strands and their shine: see strands)
         // darker at the root and along the edges, a lighter streak down the middle, a soft tip
         // (fine grooves between strands: the crests lighter, the grooves darker; the tips a little sunlit)
         let k = tone * (0.74 + 0.3 * Math.sin(Math.min(1, t * 1.3) * Math.PI * 0.6)) * (0.86 + 0.2 * (1 - u * u)) * (1 + (0.1 + 0.3 * groove) * crest) * (1 + 0.1 * smoothstep(0.65, 1, t));
@@ -310,6 +403,8 @@ class Locks {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
     g.setAttribute('aLock', new THREE.Float32BufferAttribute(this.k, 3));
+    g.setAttribute('aHair', new THREE.Float32BufferAttribute(this.h, 2));
+    g.setAttribute('aTan', new THREE.Float32BufferAttribute(this.t, 3));
     g.setIndex(this.i); g.computeVertexNormals(); g.computeBoundingSphere();
     return g;
   }
@@ -484,6 +579,7 @@ export function makeKid(spec = KIDS.boy) {
   let seed = C.hairStyle === 'bun' ? 71 : 37;
   const r = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  KIND.clear(); [C.skin, '#f6f1e6', '#d8b25a', C.badge, shade(C.hair, 0.72)].forEach((c) => c && KIND.set(c, 0)); [C.pants, C.cuff, shade(C.pants, 0.92)].forEach((c) => c && KIND.set(c, 3)); // (skin, rubber and metal smooth; the trousers a twill)
   const dims = Object.assign({}, KID_DIMS), outer = C.coat || C.jacket || C.top, wide = C.wideLegs ? 1.3 : 1.14; // (baggy trousers, as the sheets draw them)
 
   // legs: baggy trousers with a rolled cuff, a sock, and a chunky sneaker
@@ -542,7 +638,7 @@ export function makeKid(spec = KIDS.boy) {
   }
   if (!C.winter) T.push({ f: blend(0.03, ring(0, 0.432, 0.0, 0.108, 0.048), ellipsoid(0, 0.43, -0.135, 0.17, 0.11, 0.1)), color: C.top });  // hood: a roll round the neck, the hood hanging behind
   if (!C.winter) T.push({ f: union(capsule([-0.035, 0.42, 0.15], [-0.04, 0.31, 0.162], 0.008), capsule([0.035, 0.42, 0.15], [0.04, 0.33, 0.162], 0.008)), color: C.scrunchie || '#f6f1e6' }); // drawstrings
-  if (!C.winter) T.push({ f: both(grow(trunk, 0.032), (x, y) => y - 0.05, 0.012), color: shade(outer, C.jacket ? 0.82 : 0.9) });                      // hem band
+  if (!C.winter) T.push({ f: both(grow(trunk, 0.032), (x, y) => y - 0.05, 0.012), kind: 2, color: shade(outer, C.jacket ? 0.82 : 0.9) });                      // hem band
   T.push({ f: capsule([0, 0.44, 0], [0, 0.6, 0], 0.047), color: C.skin });                                               // neck
   // straps: from the top of the pack, over the shoulder, down the chest and back under the arm
   if (!C.winter) T.push({ f: mirror(union(strand([0.11, 0.4, -0.14], [0.115, 0.5, 0.0], [0.115, 0.36, 0.14], 0.026, 0.026), strand([0.115, 0.36, 0.14], [0.13, 0.2, 0.175], [0.175, 0.1, 0.02], 0.026, 0.026))), color: C.packTrim });
@@ -568,7 +664,7 @@ export function makeKid(spec = KIDS.boy) {
     const el = pivot(sh, 0, -UPPER, 0);
     part(el, [
       { f: capsule([0, 0, 0], [0, -FORE + 0.045, 0], 0.07, 0.078), color: outer },
-      { f: ring(0, -FORE + 0.035, 0, 0.056, 0.03), color: C.winter ? C.coatTrim : C.jacket ? shade(C.jacket, 0.82) : shade(C.top, 0.9) }, // cuff: ribbed, the garment's own colour
+      { f: ring(0, -FORE + 0.035, 0, 0.056, 0.03), kind: 2, color: C.winter ? C.coatTrim : C.jacket ? shade(C.jacket, 0.82) : shade(C.top, 0.9) }, // cuff: ribbed, the garment's own colour
       { f: blend(0.025, ellipsoid(0, -FORE - HAND + 0.008, 0, 0.058, 0.066, 0.05), ellipsoid(0, -FORE - HAND - 0.035, 0.014, 0.046, 0.036, 0.04), capsule([-sd * 0.04, -FORE - HAND + 0.03, 0.03], [-sd * 0.05, -FORE - HAND - 0.01, 0.045], 0.024, 0.02)), color: C.skin }, // hand and thumb
     ], [-0.12, -0.36, -0.11, 0.12, 0.1, 0.11], 38, 0.01);
     const hand = pivot(el, 0, -(FORE + HAND), 0);
@@ -592,12 +688,12 @@ export function makeKid(spec = KIDS.boy) {
   // head: the sculpted skull, the face on its surface, and hair that sways after it
   const head = pivot(chest, 0, NECK - HIP, 0); head.scale.setScalar(HEAD);
   const skull = headField();
-  const skin = part(head, [{ f: skull, color: C.skin }], [-0.36, -0.02, -0.29, 0.36, 0.56, 0.3], 44);
+  const skin = part(head, [{ f: skull, color: C.skin }], [-0.36, -0.02, -0.29, 0.36, 0.56, 0.3], 44, 0.02, { plain: true, ao: 0.18 });
   const face = makeFace(head, C, (x, y) => frontOf(skull, x, y) || 0.25);
   blushPaint(skin.material, face.blushU, 0.152, 0.132);
   lump(head, tone(C.skin, 0.84), [-1, 1].map((sd) => ball(0.02, sd * 0.278, 0.19, 0.033, { s: [0.9, 1.3, 0.35] })), true); // the ears' hollows
   const hairU = { uSway: { value: new THREE.Vector3() }, uHairT: { value: 0 }, uHairWind: { value: 0 } };
-  const hair = pivot(head, 0, 0, 0), hairMat = () => swaying(painted({ side: THREE.DoubleSide, roughness: 0.8 }), hairU);
+  const hair = pivot(head, 0, 0, 0), hairMat = () => strands(swaying(painted({ side: THREE.DoubleSide, roughness: 0.8 }), hairU));
   const addLocks = (parent, build) => { const L = new Locks(C.hair); build(L); const m = new THREE.Mesh(L.geometry(), hairMat()); m.castShadow = true; m.receiveShadow = false; parent.add(m); return m; };
   // the cap under the locks, darker so the gaps between locks read as depth
   const fluffy = C.hairStyle === 'fluffy';

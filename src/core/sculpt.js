@@ -97,8 +97,10 @@ export function frontOf(f, x, y, z0 = 0.6, zMin = -0.2) {
  * Mesh a sculpture. `layers` is a list of { f, color } (colour as '#rrggbb' or a function of the
  * point returning one); the surface is their union, blended over `k`, and each vertex takes the
  * colour of its nearest layer. `box` is [x0, y0, z0, x1, y1, z1]; `n` cells span its longest side.
+ * A layer's `kind` (a number, 1 if not given) goes to every vertex as `aKind`, for a material to tell
+ * cloth from skin; `o.ao` (0..1) darkens the colours in creases (see creases).
  */
-export function sculpt(layers, box, n = 40, k = 0.02) {
+export function sculpt(layers, box, n = 40, k = 0.02, o = {}) {
   const fs = layers.map((l) => l.f);
   const f = fs.length === 1 ? fs[0] : (k > 0 ? blend(k, ...fs) : union(...fs));
   // (a margin of two cells all round: a surface within a cell of the box's edge would otherwise be left open)
@@ -148,14 +150,16 @@ export function sculpt(layers, box, n = 40, k = 0.02) {
     const c = colors[best]; if (typeof c === 'function') C.set(c(x, y, z)); else C.copy(c);
     col[q] = C.r; col[q + 1] = C.g; col[q + 2] = C.b;
   }
-  if (fs.length > 1) return crispColours({ f, fs, colors, pos, nor, lab, I, h });
+  const kinds = layers.map((l) => (l.kind === undefined ? 1 : l.kind));
+  if (fs.length > 1) return creases(crispColours({ f, fs, colors, kinds, pos, nor, lab, I, h }), f, o.ao);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('aKind', new THREE.BufferAttribute(Float32Array.from(lab, (L) => kinds[L]), 1));
   geo.setIndex(new THREE.BufferAttribute(new Uint32Array(I), 1));
   geo.computeBoundingBox(); geo.computeBoundingSphere();
-  return geo;
+  return creases(geo, f, o.ao);
 }
 
 /**
@@ -164,10 +168,10 @@ export function sculpt(layers, box, n = 40, k = 0.02) {
  * colour, so a sleeve ends at its cuff on a clean line instead of fading into it across a triangle.
  * (Corners of three layers: the triangle takes its middle's.)
  */
-function crispColours({ f, fs, colors, pos, nor, lab, I, h }) {
-  const P = [], N = [], Cc = [], C = new THREE.Color(), e = h * 0.5;
+function crispColours({ f, fs, colors, kinds, pos, nor, lab, I, h }) {
+  const P = [], N = [], Cc = [], K = [], C = new THREE.Color(), e = h * 0.5;
   const colourOf = (L, x, y, z) => { const c = colors[L]; if (typeof c === 'function') C.set(c(x, y, z)); else C.copy(c); return C; };
-  const put = (x, y, z, nx, ny, nz, L) => { P.push(x, y, z); N.push(nx, ny, nz); const c = colourOf(L, x, y, z); Cc.push(c.r, c.g, c.b); };
+  const put = (x, y, z, nx, ny, nz, L) => { P.push(x, y, z); N.push(nx, ny, nz); const c = colourOf(L, x, y, z); Cc.push(c.r, c.g, c.b); K.push(kinds[L]); };
   const corner = (i, L) => put(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], nor[i * 3], nor[i * 3 + 1], nor[i * 3 + 2], L);
   // the point on edge i->j where layers A and B are equally near, laid on the surface: [x, y, z, nx, ny, nz]
   const meet = (i, j, A, B) => {
@@ -204,8 +208,26 @@ function crispColours({ f, fs, colors, pos, nor, lab, I, h }) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(Cc, 3));
+  geo.setAttribute('aKind', new THREE.Float32BufferAttribute(K, 1));
   const n = P.length / 3, idx = new Uint32Array(n); for (let i = 0; i < n; i++) idx[i] = i;
   geo.setIndex(new THREE.BufferAttribute(idx, 1));
   geo.computeBoundingBox(); geo.computeBoundingSphere();
+  return geo;
+}
+
+/**
+ * Shade the creases into a sculpture's colours: a vertex is darkened by how much surface crowds in
+ * front of it (the field, sampled a little way out along the normal, is nearer than open air would
+ * be), so folds, the seam under a collar or a pocket's edge are darker without any light. `amt`: how dark.
+ */
+function creases(geo, f, amt = 0) {
+  if (!(amt > 0)) return geo;
+  const P = geo.attributes.position.array, N = geo.attributes.normal.array, C = geo.attributes.color.array, S = [0.012, 0.03, 0.06];
+  for (let q = 0; q < P.length; q += 3) {
+    let a = 0;
+    for (let i = 0; i < 3; i++) a += min(1, max(0, f(P[q] + N[q] * S[i], P[q + 1] + N[q + 1] * S[i], P[q + 2] + N[q + 2] * S[i]) / S[i]));
+    const m = 1 - amt * (1 - a / 3);
+    C[q] *= m; C[q + 1] *= m; C[q + 2] *= m;
+  }
   return geo;
 }

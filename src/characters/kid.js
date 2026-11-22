@@ -190,7 +190,7 @@ class Locks {
    * `centre` is what "outward" is measured from. `shape` is 'leaf' (pointed tip) or 'band' (even width).
    */
   add(pts, W, thick, o = {}) {
-    const curve = new THREE.CatmullRomCurve3(pts), seg = o.seg || 14, nu = o.strands ? 14 : 6, ridges = o.strands || 0, centre = o.centre || new THREE.Vector3(HC[0], HC[1], HC[2]);
+    const curve = new THREE.CatmullRomCurve3(pts), seg = o.seg || 16, ridges = (o.strands || 0) * 2, nu = ridges ? Math.max(16, ridges * 5) : 6, centre = o.centre || new THREE.Vector3(HC[0], HC[1], HC[2]);
     const P = new THREE.Vector3(), T = new THREE.Vector3(), N = new THREE.Vector3(), S = new THREE.Vector3(), V = new THREE.Vector3();
     const tone = o.tone || 1, base = this.p.length / 3, col = new THREE.Color();
     const len = o.still ? 0 : curve.getLength(), phase = (this.n++ * 0.6180339) % 1; // for the sway: see swaying()
@@ -205,9 +205,10 @@ class Locks {
         this.p.push(V.x, V.y, V.z);
         this.k.push(o.still ? 0 : t, phase, len);
         // darker at the root and along the edges, a lighter streak down the middle, a soft tip
-        let k = tone * (0.74 + 0.3 * Math.sin(Math.min(1, t * 1.3) * Math.PI * 0.6)) * (0.86 + 0.2 * (1 - u * u)) * (1 + 0.09 * crest);
+        // (fine grooves between strands: the crests lighter, the grooves darker; the tips a little sunlit)
+        let k = tone * (0.74 + 0.3 * Math.sin(Math.min(1, t * 1.3) * Math.PI * 0.6)) * (0.86 + 0.2 * (1 - u * u)) * (1 + 0.14 * crest) * (1 + 0.1 * smoothstep(0.65, 1, t));
         // the halo (as anime hair, and the VRoid characters', is drawn): a band of light across the crown, its edges broken into points
-        if (side === 0 && o.halo !== false) { const dx = V.x - HC[0], dy = V.y - HC[1], dz = V.z - HC[2], ny = dy / Math.hypot(dx, dy, dz) + 0.035 * Math.sin(Math.atan2(dx, dz) * 15); k *= 1 + 0.34 * smoothstep(0.42, 0.5, ny) * (1 - smoothstep(0.66, 0.74, ny)); }
+        if (side === 0 && o.halo !== false) { const dx = V.x - HC[0], dy = V.y - HC[1], dz = V.z - HC[2], ny = dy / Math.hypot(dx, dy, dz) + 0.035 * Math.sin(Math.atan2(dx, dz) * 15); k *= 1 + 0.42 * smoothstep(0.42, 0.5, ny) * (1 - smoothstep(0.66, 0.74, ny)) + 0.18 * smoothstep(0.69, 0.71, ny) * (1 - smoothstep(0.71, 0.74, ny)); }
         col.copy(this.base).multiplyScalar(side === 0 ? k : k * 0.7);
         this.c.push(col.r, col.g, col.b);
       }
@@ -294,10 +295,15 @@ function boyHair(L, r) {
   };
   tuft(0.2, 0.085, 0.13, 0.1); // (one small cowlick, as anime hair has)
   // finer locks lying over the big ones, slightly off their line: the hair reads as many strands, not a few slabs
-  for (let i = 0; i < 16; i++) {
-    const az = (i / 16) * TAU + r() * 0.3;
+  for (let i = 0; i < 30; i++) {
+    const az = (i / 30) * TAU + r() * 0.25;
     if (Math.cos(az) > 0.2) continue; // the fringe keeps its clean points
     L.over(az, 1.38, -0.4 + 0.3 * r(), 0.1 + 0.04 * r(), { sweep: 0.25 + 0.35 * r(), lift: 0.03, flick: 0.03 + 0.02 * r(), up: 0.0, layer: 0.035 + 0.015 * r(), thick: 0.026, tone: 1.02 + 0.12 * r() });
+  }
+  // wisps splitting off the back and sides: thin strands, each its own way
+  for (let i = 0; i < 12; i++) {
+    const az = 1.3 + (i / 11) * (TAU - 2.6) + (r() - 0.5) * 0.15;
+    L.over(az, 0.9, -0.5 + 0.2 * r(), 0.05 + 0.025 * r(), { sweep: (r() - 0.5) * 0.4, lift: 0.035, flick: 0.04 + 0.03 * r(), up: 0.0, layer: 0.045, thick: 0.016, tone: 1.0 + 0.14 * r() });
   }
   // thin slivers splitting off beside the wings: forked tips
   [-1, 1].forEach((sd) => { L.over(sd * 1.38, 1.1, -0.38, 0.09, { sweep: sd * 0.14, lift: 0.03, flick: 0.05, up: 0.01, layer: 0.03, thick: 0.022, tone: 1.06 }); L.over(sd * 1.6, 1.1, -0.52, 0.09, { sweep: sd * 0.1, lift: 0.025, flick: 0.05, up: 0.01, layer: 0.025, thick: 0.022, tone: 1.0 }); });
@@ -313,6 +319,14 @@ function girlHair(L, r, bunAt) {
     const pts = [0, 0.3, 0.62].map((t) => onHead(az + sw * (1 - t), e0 + (1.2 - e0) * t, 1.02 + over + 0.02 * Math.sin(t * 3))).concat([bunAt.clone().add(new THREE.Vector3(0, -0.02, 0))]);
     L.add(pts, 0.36, 0.045, { shape: 'tress', tone: v() * (i % 2 ? 1.05 : 0.95) });
   }
+  // thin strands running up the sweep over the tresses, so it reads as hair, not slabs
+  for (let i = 0; i < 16; i++) {
+    const az = 0.85 + (i / 15) * (TAU - 1.7) + (r() - 0.5) * 0.12, back = Math.abs(Math.PI - az) / Math.PI, e0 = -0.4 + 0.6 * back + (r() - 0.5) * 0.1;
+    const pts = [0, 0.35, 0.68].map((t) => onHead(az + (r() - 0.5) * 0.06, e0 + (1.2 - e0) * t, 1.045 + 0.02 * Math.sin(t * 3))).concat([bunAt.clone().add(new THREE.Vector3((r() - 0.5) * 0.04, -0.03, 0))]);
+    L.add(pts, 0.05 + 0.03 * r(), 0.014, { shape: 'band', tone: v() * (1.04 + 0.08 * r()) });
+  }
+  // baby hairs at the temples
+  [-1, 1].forEach((sd) => [0, 1, 2].forEach((j) => L.over(sd * (0.98 + 0.07 * j), 0.62, 0.22 - 0.07 * j, 0.035, { sweep: sd * 0.05, lift: 0.012, flick: 0.02, layer: 0.008, thick: 0.008, tone: v() * 1.06 })));
   // the fringe: parted on one side, a big bang sweeping across the forehead, a smaller one the other way
   [[-0.22, 0.95, 0.02, 0.3], [-0.2, 0.6, 0.1, 0.28], [-0.16, 0.25, 0.3, 0.2]].forEach(([a0, sw, e1, W]) => L.over(a0, 1.3, e1, W, { sweep: sw, lift: 0.03, flick: 0.01, layer: 0.024, thick: 0.045, tone: v() }));
   [[-0.36, -0.75, 0.05, 0.26], [-0.34, -0.4, 0.28, 0.2]].forEach(([a0, sw, e1, W]) => L.over(a0, 1.3, e1, W, { sweep: sw, lift: 0.03, flick: 0.01, layer: 0.024, thick: 0.045, tone: v() }));
@@ -333,8 +347,8 @@ function girlHair(L, r, bunAt) {
 function bunHair(L, r) {
   const c = new THREE.Vector3(0, 0.175, 0), R = 0.15;
   // fat locks wound round the ball from its base to its top, each a little off the last, so it reads as coiled hair
-  for (let i = 0; i < 8; i++) {
-    const a0 = (i / 8) * TAU + r() * 0.2, pts = [];
+  for (let i = 0; i < 12; i++) {
+    const a0 = (i / 12) * TAU + r() * 0.2, pts = [];
     for (let k = 0; k <= 6; k++) {
       const a = a0 + (k / 6) * 2.9, e = -0.85 + (k / 6) * 2.2;
       pts.push(new THREE.Vector3(c.x + Math.sin(a) * Math.cos(e) * R, c.y + Math.sin(e) * R * 0.92, c.z + Math.cos(a) * Math.cos(e) * R));

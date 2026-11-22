@@ -67,6 +67,7 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
   their usual clothes all year. (The skating dance now asks for cold country, not winter clothes.)
 - **Testing:** run only new or affected tests after a change; full runs when asked, at 4c, and
   before merging to `main`.
+  Last full run: 2026-11-22, after the sculpted children were redrawn and VRoid removed: 60 passed, 0 failed.
 - **Planning round (2026-11-21, second):**
   - **Goals:** journals to complete (fish, flowers and places, a page per kind of country) and
     postcards (an album filled by finding kinds of place, taken with photo mode).

@@ -333,6 +333,10 @@ class Locks {
   add(pts, W, thick, o = {}) {
     const curve = new THREE.CatmullRomCurve3(pts), seg = o.seg || 16, ridges = o.ridges !== undefined ? o.ridges : (o.strands || 0) * 2, groove = o.groove === undefined ? 0.16 : o.groove, nu = ridges ? Math.max(16, ridges * 5) : o.edge ? 12 : 6, halo = o.halo === false ? 0 : o.halo === undefined ? 1 : o.halo, centre = o.centre || new THREE.Vector3(HC[0], HC[1], HC[2]);
     const P = new THREE.Vector3(), T = new THREE.Vector3(), N = new THREE.Vector3(), S = new THREE.Vector3(), V = new THREE.Vector3();
+    // a flame (the owner asked what makes one, then for it): a width with a belly, w = t^a (1-t)^b, widest at a/(a+b) (a under 1: a round
+    // base; b over 1: a long sharp point); and two different edges (`skew`: the whole width shifted to one side of the spine, so on a
+    // curving spine the outside of the curve bulges and the inside goes hollow)
+    const fa = o.fa || 0.45, fb = o.fb || 1.25, fpk = Math.pow(fa / (fa + fb), fa) * Math.pow(fb / (fa + fb), fb), flame = o.shape === 'flame', skew = o.skew || 0;
     const tone = o.tone || 1, base = this.p.length / 3, col = new THREE.Color(), tp = o.taper || 0.45;
     const len = o.still ? 0 : curve.getLength(), phase = (this.n++ * 0.6180339) % 1; // for the sway: see swaying()
     // a lock with a loose end is its own weight on a spring (its number goes to every vertex; 0: none)
@@ -340,11 +344,11 @@ class Locks {
     for (let side = 0; side < 2; side++) for (let i = 0; i <= seg; i++) {
       const t = i / seg; curve.getPoint(t, P); curve.getTangent(t, T);
       N.subVectors(P, centre).normalize(); S.crossVectors(T, N).normalize(); N.crossVectors(S, T).normalize();
-      const w = W * (o.shape === 'spike' ? (t < tp ? 0.75 + 0.25 * (t / tp) : Math.pow(Math.max(0, 1 - (t - tp) / (1 - tp)), 1.15)) : o.shape === 'tress' ? Math.min(1, 0.45 + t * 3.2) * (1 - 0.62 * t * t) : o.shape === 'band' ? 1 - 0.45 * t : (t < tp ? 0.5 + 0.5 * Math.sin((t / tp) * Math.PI / 2) : Math.pow(Math.max(0, 1 - (t - tp) / (1 - tp)), 0.8))) + (o.shape === 'spike' ? 0.0002 : 0.0015);
+      const w = W * (flame ? Math.pow(t, fa) * Math.pow(1 - t, fb) / fpk : o.shape === 'spike' ? (t < tp ? 0.75 + 0.25 * (t / tp) : Math.pow(Math.max(0, 1 - (t - tp) / (1 - tp)), 1.15)) : o.shape === 'tress' ? Math.min(1, 0.45 + t * 3.2) * (1 - 0.62 * t * t) : o.shape === 'band' ? 1 - 0.45 * t : (t < tp ? 0.5 + 0.5 * Math.sin((t / tp) * Math.PI / 2) : Math.pow(Math.max(0, 1 - (t - tp) / (1 - tp)), 0.8))) + (o.shape === 'spike' ? 0.0002 : 0.0015);
       for (let j = 0; j <= nu; j++) {
         const u = (j / nu) * 2 - 1, crest = ridges ? Math.cos(u * Math.PI * ridges) : 0; // +1 on a strand's crest, -1 in the groove between two
-        const arch = (1 - u * u) * thick * (o.shape === 'spike' ? Math.min(1, w / W) : 0.4 + 0.6 * Math.min(1, w / W)) * (1 + groove * crest * (1 - u * u));
-        V.copy(P).addScaledVector(S, u * w / 2).addScaledVector(N, side === 0 ? arch : -arch * 0.3);
+        const arch = (1 - u * u) * thick * (o.shape === 'spike' || flame ? Math.min(1, w / W) : 0.4 + 0.6 * Math.min(1, w / W)) * (1 + groove * crest * (1 - u * u));
+        V.copy(P).addScaledVector(S, (u + skew) * w / 2).addScaledVector(N, side === 0 ? arch : -arch * 0.3);
         this.p.push(V.x, V.y, V.z);
         this.k.push(o.still ? 0 : t, phase, len); this.d.push(id);
         this.h.push(u * w / 2, u); this.t.push(T.x, T.y, T.z); // (for the strands and their shine: see strands)
@@ -353,7 +357,7 @@ class Locks {
         let k = tone * (0.74 + 0.3 * Math.sin(Math.min(1, t * 1.3) * Math.PI * 0.6)) * (0.86 + 0.2 * (1 - u * u)) * (1 - (o.edge || 0) * smoothstep(0.66, 1, Math.abs(u))) * (1 + (0.1 + 0.3 * groove) * crest) * (1 + 0.1 * smoothstep(0.65, 1, t));
         // the halo (as anime hair, and the VRoid characters', is drawn): a band of light across the crown, its edges broken into points
         if (side === 0 && halo > 0) { const dx = V.x - HC[0], dy = V.y - HC[1], dz = V.z - HC[2], ny = dy / Math.hypot(dx, dy, dz) + 0.035 * Math.sin(Math.atan2(dx, dz) * 15); k *= 1 + halo * (0.42 * smoothstep(0.42, 0.5, ny) * (1 - smoothstep(0.66, 0.74, ny)) + 0.18 * smoothstep(0.69, 0.71, ny) * (1 - smoothstep(0.71, 0.74, ny))); }
-        col.copy(this.base).multiplyScalar(side === 0 ? k : k * (o.shape === 'spike' ? 0.6 : 0.7)); // (a spike's underside shows when it curves: not so dark)
+        col.copy(this.base).multiplyScalar(side === 0 ? k : k * (o.shape === 'spike' || flame ? 0.6 : 0.7)); // (a spike's underside shows when it curves: not so dark)
         this.c.push(col.r, col.g, col.b);
       }
     }
@@ -381,9 +385,9 @@ class Locks {
    * and up (`flick`, `up`).
    */
   clump(az, e0, e1, W, o = {}) {
-    const pts = [], n = 8, vol = o.vol === undefined ? 0.07 : o.vol, ease = o.ease || 1, curl = o.curl || 0, wave = o.wave || 0, flick = o.flick || 0, up = o.up || 0, sweep = o.sweep || 0, spiral = o.spiral || 0;
+    const fl = o.shape === 'flame', pts = [], n = 8, vol = o.vol === undefined ? 0.07 : o.vol, ease = o.ease || 1, curl = (o.curl || 0) * (fl ? 1.7 : 1), wave = fl ? 0 : o.wave || 0, flick = o.flick || 0, up = o.up || 0, sweep = o.sweep || 0, spiral = fl ? 0 : o.spiral || 0; // (a flame's spine curves all the way, tightening toward the tip: no S, no curl added at the end)
     for (let i = 0; i <= n; i++) {
-      const t = i / n, f = Math.max(0, (t - 0.58) / 0.42) ** 2;
+      const t = i / n, f = fl ? t * t : Math.max(0, (t - 0.58) / 0.42) ** 2;
       const q = onHead(az + sweep * Math.pow(t, ease) + wave * Math.sin(t * Math.PI * 1.6) + curl * f, e0 + (e1 - e0) * t, 1.01 + (o.layer || 0) + vol * Math.sin(Math.PI * Math.pow(t, 0.75)) + flick * f);
       q.y += up * f;
       pts.push(q);
@@ -399,7 +403,7 @@ class Locks {
       const rc = o.rc || 0.045, m = 7;
       for (let j = 1; j <= m; j++) { const a = (spiral * j) / m, rr = rc * (1 - (0.4 * j) / m); pts.push(P0.clone().addScaledVector(T0, rr * Math.sin(a)).addScaledVector(D, rr * (1 - Math.cos(a)))); }
     }
-    this.add(pts, W, o.thick || 0.06, Object.assign({ seg: spiral ? 30 : 20, free: true }, o));
+    this.add(pts, W, o.thick || 0.06, Object.assign({ seg: spiral ? 30 : 20, free: true, skew: fl ? 0.35 * Math.sign(curl || sweep || 1) : 0 }, o));
   }
   geometry() {
     const g = new THREE.BufferGeometry();
@@ -452,18 +456,19 @@ function boyHair(L, r) {
   // the head; the model had forty-odd small clumps run together into one bumpy shell). So: twenty pieces, each
   // wide at its base, one curve, one point; darker along its sides and underneath; no lines inside it;
   // neighbours at different heights so one lies over the next; the points standing out from the head.
-  const v = () => 0.96 + 0.1 * r(), alt = (i) => (i % 2 ? 1 : -1), sign = Math.sign, C3 = { ridges: 0, edge: 0.5, halo: 0.3, shape: 'spike', taper: 0.22 };
-  // the back and sides: six, from the crown down, longest at the nape, their points flicking out
-  for (let i = 0; i < 6; i++) {
-    const az = 1.25 + (i / 5) * (TAU - 2.5), back = 1 - Math.min(1, Math.abs(Math.PI - az) / 1.7);
-    L.clump(az, 1.15, 0.08 - 0.36 * back, 0.42, { vol: 0.09, wave: 0.06 * alt(i), curl: 0.2 * alt(i), flick: 0.26 + 0.2 * back, up: 0.03 * back, layer: i % 2 ? 0.08 : 0.02, thick: 0.07, spiral: 0.45, rc: 0.16, tilt: -0.2 * alt(i), tone: v() * 0.9, ...C3 });
+  const v = () => 0.96 + 0.1 * r(), alt = (i) => (i % 2 ? 1 : -1), sign = Math.sign, C3 = { ridges: 0, edge: 0.5, halo: 0.3, shape: 'flame' };
+  // the back and sides: eight, from the crown down, longest at the nape, their points flicking out
+  for (let i = 0; i < 8; i++) {
+    const az = 1.25 + (i / 7) * (TAU - 2.5), back = 1 - Math.min(1, Math.abs(Math.PI - az) / 1.7);
+    L.clump(az, 1.15, 0.08 - 0.36 * back, 0.38, { fa: 0.3, // (broad from near the root, to cover the back of the head; eight, not fewer and wider: a wide flat piece does not wrap the head, its middle sinks in and only its dark edges show)
+       vol: 0.09, wave: 0.06 * alt(i), curl: 0.2 * alt(i), flick: 0.15 + 0.1 * back, layer: i % 2 ? 0.08 : 0.02, thick: 0.07, spiral: 0.45, rc: 0.16, tilt: -0.2 * alt(i), tone: v() * 0.9, ...C3 });
   }
   // a tuft in front of each ear
   [-1, 1].forEach((sd) => L.clump(sd * 0.98, 0.95, -0.02, 0.17, { vol: 0.06, curl: -sd * 0.14, flick: 0.06, layer: 0.04, thick: 0.045, spiral: 0.6, rc: 0.1, tilt: sd * 1.2, tone: v() * 0.95, ...C3 }));
   // over them: five, standing well off the head, their points out past the outline
   for (let i = 0; i < 5; i++) {
     const az = 1.0 + (i / 4) * (TAU - 2.0), side = Math.min(1, Math.max(0, (Math.abs(Math.PI - az) - 1.6) / 0.5)); // (1 beside the face)
-    L.clump(az, 1.45, 0.46 + 0.1 * alt(i), 0.44, { vol: 0.16, wave: 0.08 * alt(i + 1), curl: 0.26 * alt(i), flick: 0.42 * (1 - 0.8 * side) + 0.03, up: 0.04 * (1 - side), layer: i % 2 ? 0.17 : 0.1, thick: 0.08, spiral: 0.5 * (1 - side), rc: 0.17,
+    L.clump(az, 1.45, 0.46 + 0.1 * alt(i), 0.42, { fa: 0.35, vol: 0.16, wave: 0.08 * alt(i + 1), curl: 0.26 * alt(i), flick: 0.24 * (1 - 0.8 * side) + 0.03, layer: i % 2 ? 0.17 : 0.1, thick: 0.08, spiral: 0.5 * (1 - side), rc: 0.17,
       tilt: (side > 0.4 ? 1.45 : 0.3) * alt(i + 1), // (beside the face the curve lies along the head: lifting outward there, they stood up like horns)
       tone: v(), ...C3 });
   }
@@ -472,7 +477,7 @@ function boyHair(L, r) {
   [[0.4, 0.5], [1.9, -0.5], [3.3, 0.5], [4.9, -0.5]].forEach(([az, c], i) => {
     const up = (q, y) => { q.y += y; return q; }, k = 1 + 0.12 * (i % 2);
     L.add([onHead(az, 1.42, 1.03), onHead(az + c * 0.15, 1.18, 1.03 + 0.17 * k), up(onHead(az + c * 0.4, 1.02, 1.03 + 0.36 * k), 0.08), up(onHead(az + c * 0.9, 0.95, 1.03 + 0.5 * k), 0.17)],
-      0.32, 0.065, { ...C3, taper: 0.3, seg: 20, free: true, tone: v() * 1.08 });
+      0.34, 0.065, { ...C3, skew: 0.35 * sign(c), seg: 20, free: true, tone: v() * 1.08 });
   });
   // the fringe: from a parting over his left brow, three swept across the forehead to just above the brows, one the other way
   const part = 0.45;
@@ -504,7 +509,7 @@ function girlHair(L, r, bunAt) {
   // sheet part by part, thin: hers are wisps that leave the forehead and the ears showing, not a bob). Pointed
   // spikes, as the boy's are. Parted a little to one side and drawn aside like curtains: on each side a long
   // one down past the eye to the jaw and a shorter one over it, the forehead open between
-  const part = 0.12, sign = Math.sign, S3 = { ridges: 0, edge: 0.5, halo: 0.3, shape: 'spike', taper: 0.2 };
+  const part = 0.12, sign = Math.sign, S3 = { ridges: 0, edge: 0.5, halo: 0.3, shape: 'flame' };
   [[-1.0, -0.62, 0.115, -0.3], [-0.62, 0.0, 0.105, -0.26], [0.98, -0.58, 0.11, 0.3], [0.6, 0.06, 0.1, 0.28]].forEach(([az, e1, W, curl]) => {
     const a0 = part + (az - part) * 0.3;
     L.clump(a0, 1.32, e1, W, { sweep: az - a0, ease: 0.45, vol: 0.08, wave: 0.06 * sign(curl), curl: curl * 0.5, flick: 0.06, layer: 0.05, thick: 0.03, spiral: 1.3, rc: 0.06, tilt: 1.15 * sign(curl), tone: v() * 1.03, ...S3 });
@@ -589,7 +594,7 @@ export function makeKid(spec = KIDS.boy) {
   let seed = C.hairStyle === 'bun' ? 71 : 37;
   const r = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
-  KIND.clear(); [C.skin, '#f6f1e6', '#d8b25a', C.badge, shade(C.hair, 0.72)].forEach((c) => c && KIND.set(c, 0)); [C.pants, C.cuff, shade(C.pants, 0.92)].forEach((c) => c && KIND.set(c, 3)); // (skin, rubber and metal smooth; the trousers a twill)
+  KIND.clear(); [C.skin, '#f6f1e6', '#d8b25a', C.badge, shade(C.hair, 0.84)].forEach((c) => c && KIND.set(c, 0)); [C.pants, C.cuff, shade(C.pants, 0.92)].forEach((c) => c && KIND.set(c, 3)); // (skin, rubber and metal smooth; the trousers a twill)
   const dims = Object.assign({}, KID_DIMS), outer = C.coat || C.jacket || C.top, wide = C.wideLegs ? 1.3 : 1.14; // (baggy trousers, as the sheets draw them)
 
   // legs: baggy trousers with a rolled cuff, a sock, and a chunky sneaker
@@ -708,7 +713,7 @@ export function makeKid(spec = KIDS.boy) {
   const addLocks = (parent, build) => { const L = new Locks(C.hair, freeLocks); build(L); const m = new THREE.Mesh(L.geometry(), hairMat()); m.castShadow = true; m.receiveShadow = false; parent.add(m); return m; };
   // the cap under the locks, darker so the gaps between locks read as depth
   const fluffy = C.hairStyle === 'fluffy';
-  part(hair, [{ f: capField((x, z) => (fluffy ? 0.31 : 0.3) + (z > 0 ? 0.7 : 0.6) * z - 0.1 * Math.abs(x) * (z > 0 ? 1 : 0)), color: shade(C.hair, 0.72) }], [-0.37, 0.0, -0.36, 0.37, 0.62, 0.36], 36);
+  part(hair, [{ f: capField((x, z) => (fluffy ? 0.31 : 0.3) + (z > 0 ? 0.7 : 0.6) * z - 0.1 * Math.abs(x) * (z > 0 ? 1 : 0)), color: shade(C.hair, 0.84) }], [-0.37, 0.0, -0.36, 0.37, 0.62, 0.36], 36);
   const HAT_LINE = (z) => 0.31 + 0.06 * z / 0.36;                                                // the hat's edge: over the brow at the front, lower at the back
   // a knitted hat: a soft dome over the hair with a ribbed band and a pompom (her bun peeks out at the back)
   if (C.hat) {

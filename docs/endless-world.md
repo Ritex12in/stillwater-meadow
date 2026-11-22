@@ -471,6 +471,13 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   shoulders and the hood. Cloth, hair strands and the iris have detail drawn by the shader and faded
   by its size on screen (an idea from the film crimson-loong; its code was not used). No settings
   choice of character.
+- **Pets** (2026-11-22, the owner: "redesign pets after the sheets"): the dogs and cats are sculpted as
+  the children are, in their chibi style (`makeDog` and `makeCat` in `characters/rigs.js`): a big round
+  head, a small plump body, short legs with white paws. The first dog is the sheet's puppy (cream with
+  ginger ears and a patch over one eye, tongue out, a red bandana with a white paw print), the first cat
+  the sheet's calico (white with orange patches, pink inside its ears, a dark collar with a gold bell);
+  the others are the same shapes in other coats. Same rigs (head, four legs, tail, eyes), so all their
+  behaviour is unchanged. `tools/studio/pets.html` shows them beside the boy.
 - **The sea** (`seaAt`, `SEA_DEPTH` in `core/shape.js`): a continent field, broad as the climate's,
   sinks the land under one sea at the lakes' level (0); lowland goes under first and hills stand out
   as islands and headlands. Sand where land meets sea (`beachAt`, shown through the desert's look),

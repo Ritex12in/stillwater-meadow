@@ -32,7 +32,7 @@ function addAnimal(kind, rig, near, range, desc) {
     state: 'idle', timer: rand(1, 5), sitting: rng() < 0.5, target: { x: p.x, z: p.z }, hasTarget: false,
     heading: rng() * TAU, speed: 0, phase: rng() * TAU, sit: 0, wag: 0.3, look: 0, side: rng() * TAU,
     bond: 0, petted: false, petAmt: 0, purr: null, shake: 0, shakeDelay: 0, goal: null, name: '',
-    radius: kind === 'dog' ? 0.42 * (rig.scale || 1) : 0.28, nudgeT: 0, tilt: 0,
+    radius: (rig.radius || (kind === 'dog' ? 0.42 : 0.28)) * (rig.scale || 1), nudgeT: 0, tilt: 0,
     desc, tamed: false, trust: 0, cornerT: 0, cornerCool: 0,
   }));
 }
@@ -42,13 +42,14 @@ export function buildAnimals() {
   const homeA = lakePoint(DOCK_A - 0.43, 1.2);
   const homeB = lakePoint(DOCK_A - 0.73, 1.22);
   const homeC = lakePoint(DOCK_A + 1.02, 1.6);
-  addAnimal('dog', makeDog({ coat: '#d9a65a', accent: '#f2dcb0', ear: '#b9853f' }), homeA, 22, 'golden dog');
-  addAnimal('dog', makeDog({ coat: '#3a3330', accent: '#e9e2d6', ear: '#2a2523', scale: 0.85, collar: '#3f8f86' }), homeB, 20, 'black-and-white dog');
-  addAnimal('dog', makeDog({ coat: '#f1ece2', accent: '#ffffff', ear: '#8a5a3a', scale: 0.72, collar: '#4a6fb0' }), homeC, 18, 'little white dog');
-  addAnimal('cat', makeCat({ fur: '#e0954a', belly: '#f6dcb8' }), homeA, 12, 'ginger cat');
-  addAnimal('cat', makeCat({ fur: '#7f8288', belly: '#c9cbd0', eye: '#d9c14a' }), homeB, 12, 'grey cat');
-  addAnimal('cat', makeCat({ fur: '#2a2726', belly: '#3a3634', eye: '#d6c23a' }), lakePoint(DOCK_A - 1.05, 1.5), 9, 'black cat');
-  addAnimal('cat', makeCat({ fur: '#f3efe7', belly: '#ffffff', eye: '#7fb6d9' }), homeC, 12, 'white cat');
+  // (after the owner's sheets: the first dog is the sheet's puppy, the first cat the sheet's calico)
+  addAnimal('dog', makeDog({ coat: '#f6eee2', patch: '#d98a4a' }), homeA, 22, 'white-and-ginger dog');
+  addAnimal('dog', makeDog({ coat: '#f3efe8', patch: '#3a3330', bandana: '#3f8f86', scale: 0.9 }), homeB, 20, 'black-and-white dog');
+  addAnimal('dog', makeDog({ coat: '#e2b46a', patch: '#b9853f', paw: '#f6ead6', bandana: '#4a6fb0', scale: 0.8 }), homeC, 18, 'little golden dog');
+  addAnimal('cat', makeCat({ fur: '#fbf6ee', patch: '#e58c3f', eye: '#8a6a2a' }), homeA, 12, 'calico cat');
+  addAnimal('cat', makeCat({ fur: '#8f9298', belly: '#e9e7e2', eye: '#d9c14a', collar: '#3f6fa0' }), homeB, 12, 'grey cat');
+  addAnimal('cat', makeCat({ fur: '#2d2a29', belly: '#f1ede6', eye: '#d6c23a', collar: '#c4473a' }), lakePoint(DOCK_A - 1.05, 1.5), 9, 'black cat');
+  addAnimal('cat', makeCat({ fur: '#e8a35a', belly: '#fbf2e4', patch: '#c9783a', eye: '#6f9a3a' }), homeC, 12, 'ginger cat');
 }
 
 const setTarget = (a, x, z) => { a.target.x = x; a.target.z = z; a.hasTarget = true; };

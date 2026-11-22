@@ -1,9 +1,10 @@
-// Low-poly rigs: people, dogs and cats. Pivots are groups so limbs can rotate. Fixed detail
+// Rigs: people (low-poly), dogs and cats (sculpted, after the owner's sheets). Pivots are groups so limbs can rotate. Fixed detail
 // (paws, trim, stripes, hair) is merged into one mesh per material per pivot, so it costs few
 // draw calls, and tiny pieces don't cast shadows.
 import * as THREE from 'three';
 import { TAU } from '../core/math.js';
 import { std, mergeGeos } from '../core/materials.js';
+import { sculpt, sphere, ellipsoid, capsule, rbox, strand, ring, blend, both, mirror, turned, frontOf } from '../core/sculpt.js';
 
 export function pivot(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; }
 export function box(parent, w, h, d, mat, x, y, z) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); parent.add(m); return m; }
@@ -78,89 +79,111 @@ export function makePerson(c = {}) {
   return { root, body, legs, knees, arms, head, eyes };
 }
 
+// ───────────── pets, after the owner's character sheets ─────────────
+// Sculpted as the children are (core/sculpt.js), in their chibi style: a big round head, a small plump
+// body, short legs with white paws, soft fur. The dog after the sheet's puppy: floppy ears and a patch over
+// one eye in a second colour, a pink tongue out, a red bandana with a paw print. The cat after the
+// sheet's: round cheeks, pointed ears with pink insides, patches, a dark collar with a gold bell.
+
+/** Fur: vertex colours, matt, with the children's soft warm rim. */
+function furMat() {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+  m.onBeforeCompile = (sh) => {
+    const at = 'gl_FragColor = vec4( outgoingLight, diffuseColor.a );';
+    if (!sh.fragmentShader.includes(at)) throw new Error('shader: no "' + at + '"');
+    sh.fragmentShader = sh.fragmentShader.replace(at, `
+      float kRim = pow(1.0 - clamp(dot(normalize(vNormal), normalize(vViewPosition)), 0.0, 1.0), 2.6);
+      outgoingLight += diffuseColor.rgb * (kRim * 0.22 + 0.05) * vec3(1.0, 0.94, 0.88);
+      ` + at);
+  };
+  m.customProgramCacheKey = () => 'petfur';
+  return m;
+}
+/** One sculpted piece on a pivot. */
+function carved(parent, layers, bx6, n, k = 0.02) {
+  const m = new THREE.Mesh(sculpt(layers, bx6, n, k, { ao: 0.3 }), furMat());
+  parent.add(m);
+  return m;
+}
+/** A glossy dark eye lying on the face at (x, y) of the head's field `f`, with a highlight; scaling it in y squints it. */
+function petEye(head, f, x, y, iris) {
+  const z = frontOf(f, x, y) || 0.1, e = new THREE.Group();
+  e.position.set(x, y, z + 0.002); e.rotation.y = Math.sign(x) * 0.35; head.add(e);
+  const add = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.userData.small = true; e.add(m); return m; };
+  add(new THREE.IcosahedronGeometry(1, 2).scale(0.026, 0.032, 0.008), std(iris || '#2a1a12', { roughness: 0.35 }));
+  if (iris) add(new THREE.IcosahedronGeometry(1, 2).scale(0.011, 0.024, 0.006).translate(0, 0, 0.004), std('#1a120e', { roughness: 0.3 })); // a cat's pupil
+  add(new THREE.IcosahedronGeometry(1, 1).scale(0.009, 0.01, 0.004).translate(-0.008, 0.012, 0.007), std('#ffffff', { emissive: '#888888' }));
+  add(new THREE.IcosahedronGeometry(1, 1).scale(0.004, 0.004, 0.003).translate(0.009, -0.012, 0.007), std('#ffffff', { emissive: '#888888' }));
+  return e;
+}
+const patchy = (base, patch, test) => (x, y, z) => (patch && test(x, y, z) ? patch : base);
+
 export function makeDog(c) {
   const root = new THREE.Group();
   root.rotation.order = 'YXZ'; // heading first, then the slope tilt
   const rig = new THREE.Group(); root.add(rig);
-  const coat = std(c.coat), accent = std(c.accent), ear = std(c.ear), dark = std('#1d1b1a');
-  lump(rig, coat, [
-    bx(0.4, 0.36, 0.9, 0, 0.62, 0),
-    bx(0.44, 0.34, 0.3, 0, 0.63, 0.27),                          // shoulders
-    bx(0.43, 0.33, 0.3, 0, 0.61, -0.28),                         // haunches
-    bx(0.27, 0.34, 0.26, 0, 0.8, 0.4, -0.55),                    // neck
-    bx(0.3, 0.05, 0.6, 0, 0.815, -0.05),                         // back ridge
-  ]);
-  lump(rig, accent, [bx(0.3, 0.26, 0.2, 0, 0.56, 0.38), bx(0.26, 0.2, 0.08, 0, 0.6, 0.47), bx(0.3, 0.05, 0.62, 0, 0.428, 0)]); // bib, chest, belly
-  lump(rig, std(c.collar || '#c4473a'), [turn(new THREE.CylinderGeometry(0.2, 0.2, 0.055, 8), -0.55).translate(0, 0.83, 0.42)], true);
-  lump(rig, std('#e3b341', { metalness: 0.4, roughness: 0.5 }), [ball(0.04, 0, 0.7, 0.55, 1, 1, 0.5)], true); // tag
-  const head = pivot(rig, 0, 0.9, 0.5);
-  lump(head, coat, [bx(0.34, 0.32, 0.36, 0, 0, 0), bx(0.3, 0.05, 0.1, 0, 0.13, 0.17, 0.25), bx(0.37, 0.16, 0.2, 0, -0.07, 0.02)]); // skull, brow, cheeks
-  lump(head, accent, [bx(0.2, 0.16, 0.22, 0, -0.06, 0.26), bx(0.16, 0.05, 0.16, 0, -0.165, 0.22)]);               // muzzle and jaw
-  lump(head, dark, [bx(0.08, 0.06, 0.04, 0, -0.01, 0.38), bx(0.14, 0.012, 0.012, 0, -0.142, 0.345)], true);        // nose and mouth line
-  lump(head, std('#e58a94'), [bx(0.06, 0.02, 0.07, 0, -0.15, 0.33)], true);                                        // tongue tip
-  const shine = std('#ffffff', { emissive: '#666666' });
-  const eyes = [-0.09, 0.09].map((x) => {
-    const e = box(head, 0.045, 0.05, 0.02, dark, x, 0.06, 0.18);
-    const s = box(e, 0.016, 0.016, 0.012, shine, 0.008, 0.012, 0.008);
-    e.userData.small = s.userData.small = true;
-    return e;
-  });
-  [-1, 1].forEach((s) => { const e = lump(head, ear, [bx(0.08, 0.22, 0.15, 0, -0.06, 0), bx(0.07, 0.07, 0.12, 0, -0.19, 0.01)]); e.position.set(s * 0.18, 0.08, -0.03); e.rotation.z = s * 0.28; });
-  const legs = [[-0.13, 0.3], [0.13, 0.3], [-0.13, -0.3], [0.13, -0.3]].map(([x, z]) => {
-    const p = pivot(rig, x, 0.46, z);
-    lump(p, coat, [bx(0.12, 0.42, 0.12, 0, -0.21, 0), bx(0.145, 0.2, 0.17, 0, -0.07, z > 0 ? 0 : -0.01)]);         // leg and thigh
-    lump(p, accent, [bx(0.14, 0.07, 0.175, 0, -0.425, 0.022)], true);                                             // paw
+  const coat = c.coat, patch = c.patch, white = c.paw || '#fbf7f0', band = c.bandana || '#d9483b';
+  // the body: plump, a fluffy chest; a patch over the back
+  carved(rig, [
+    { f: blend(0.06, ellipsoid(0, 0.3, -0.01, 0.15, 0.14, 0.22), ellipsoid(0, 0.33, 0.13, 0.13, 0.13, 0.11)), color: patchy(coat, patch, (x, y, z) => y > 0.36 && z < 0.06 && z > -0.16 && x > -0.06) },
+    { f: ellipsoid(0, 0.29, 0.2, 0.09, 0.09, 0.05), color: white },                                                 // the chest's fluff
+    // the bandana: a band round the neck and a point hanging at the front, a white paw print on it
+    { f: blend(0.02, turned(ring(0, 0.42, 0.13, 0.115, 0.022), -0.5, 0, 0, 0, 0.42, 0.13), both(turned(turned(rbox(0, 0.35, 0.232, 0.065, 0.065, 0.012, 0.008), 0, 0, Math.PI / 4, 0, 0.35, 0.232), -0.3, 0, 0, 0, 0.35, 0.232), (x, y) => y - 0.38)),
+      color: (x, y, z) => { const d = Math.hypot(x, (y - 0.322) * 1.1); return z > 0.2 && (d < 0.016 || [-0.019, 0, 0.019].some((px) => Math.hypot(x - px, y - 0.346 + (px ? 0.004 : 0)) < 0.0075)) ? '#ffffff' : band; } },
+  ], [-0.2, 0.12, -0.27, 0.2, 0.5, 0.28], 40, 0.015);
+  const head = pivot(rig, 0, 0.44, 0.2);
+  const skull = blend(0.05, ellipsoid(0, 0.1, 0, 0.17, 0.15, 0.15), mirror(ellipsoid(0.09, 0.03, 0.05, 0.09, 0.08, 0.08)), ellipsoid(0, 0.025, 0.12, 0.075, 0.06, 0.07));
+  carved(head, [
+    { f: skull, color: (x, y, z) => (patch && x > 0.02 && y > 0.06 && z > 0.02 && Math.hypot(x - 0.075, y - 0.105) < 0.065 ? patch : z > 0.08 && y < 0.06 && Math.abs(x) < 0.08 ? white : coat) }, // a patch over one eye; the muzzle white
+    { f: ellipsoid(0, 0.06, 0.188, 0.03, 0.021, 0.018), color: '#2a201c' },                                        // the nose
+    { f: turned(ellipsoid(0, -0.03, 0.155, 0.028, 0.012, 0.034), 0.5, 0, 0, 0, -0.03, 0.155), color: '#ef8f98' },  // the tongue, out
+    { f: mirror(turned(ellipsoid(0.165, 0.07, -0.01, 0.035, 0.09, 0.065), 0, 0, 0.38, 0.165, 0.07, -0.01)), color: patch || c.ear || coat }, // floppy ears
+  ], [-0.25, -0.08, -0.18, 0.25, 0.28, 0.22], 48, 0.012);
+  const eyes = [-1, 1].map((sd) => petEye(head, skull, sd * 0.068, 0.1));
+  const legs = [[-0.08, 0.12], [0.08, 0.12], [-0.08, -0.14], [0.08, -0.14]].map(([x, z]) => {
+    const p = pivot(rig, x, 0.25, z);
+    carved(p, [
+      { f: capsule([0, 0, 0], [0, -0.19, 0.01], 0.056, 0.05), color: patchy(coat, patch, () => false) },
+      { f: ellipsoid(0, -0.215, 0.025, 0.058, 0.035, 0.068), color: white },
+    ], [-0.08, -0.26, -0.08, 0.08, 0.06, 0.12], 22, 0.02);
     return p;
   });
-  const tail = pivot(rig, 0, 0.74, -0.44);
-  lump(tail, coat, [bx(0.085, 0.085, 0.2, 0, 0, -0.1), bx(0.07, 0.07, 0.16, 0, 0.01, -0.27, 0.15)]);
-  lump(tail, accent, [bx(0.06, 0.06, 0.1, 0, 0.035, -0.39, 0.3)], true);
-  tail.rotation.x = -0.6;
+  const tail = pivot(rig, 0, 0.36, -0.2);
+  carved(tail, [{ f: strand([0, 0, 0], [0, 0.1, -0.08], [0, 0.18, -0.03], 0.035, 0.05), color: (x, y) => (y > 0.14 ? white : coat) }], [-0.07, -0.05, -0.15, 0.07, 0.25, 0.05], 22, 0.02);
   shadows(root);
-  return { root, rig, head, legs, tail, eyes, sitDrop: 0.12, scale: c.scale || 1, length: 0.9 };
+  return { root, rig, head, legs, tail, eyes, sitDrop: 0.06, scale: c.scale || 1, length: 0.55, radius: 0.3 };
 }
 
 export function makeCat(c) {
   const root = new THREE.Group();
   root.rotation.order = 'YXZ';
   const rig = new THREE.Group(); root.add(rig);
-  const lum = new THREE.Color(c.fur).getHSL({}).l;
-  const fur = std(c.fur), belly = std(c.belly), nose = std('#e79aa6'), eye = std(c.eye || '#a6c43b'), dark = std('#151312');
-  const stripe = tone(c.fur, lum < 0.25 ? 1.6 : 0.72); // markings: darker, or lighter on a black cat
-  lump(rig, fur, [
-    bx(0.26, 0.25, 0.6, 0, 0.37, 0),
-    bx(0.28, 0.25, 0.22, 0, 0.375, -0.2),                        // haunches
-    bx(0.24, 0.22, 0.18, 0, 0.44, 0.27, -0.5),                   // neck and shoulders
-  ]);
-  lump(rig, belly, [bx(0.2, 0.06, 0.4, 0, 0.25, 0.02), bx(0.17, 0.16, 0.06, 0, 0.36, 0.305)]);                     // belly and chest
-  lump(rig, stripe, [-0.2, -0.07, 0.06, 0.18].map((z) => bx(0.266, 0.14, 0.04, 0, 0.428, z)), true);              // stripes over the back
-  const head = pivot(rig, 0, 0.55, 0.35);
-  lump(head, fur, [bx(0.26, 0.21, 0.23, 0, 0, 0), bx(0.07, 0.09, 0.08, -0.14, -0.055, 0.04, 0, 0, 0.3), bx(0.07, 0.09, 0.08, 0.14, -0.055, 0.04, 0, 0, -0.3)]); // head and cheek tufts
-  lump(head, belly, [bx(0.12, 0.08, 0.06, 0, -0.05, 0.12), bx(0.1, 0.03, 0.05, 0, -0.1, 0.1)]);                     // muzzle and chin
-  lump(head, nose, [bx(0.035, 0.025, 0.02, 0, -0.02, 0.155),
-    turn(new THREE.ConeGeometry(0.032, 0.085, 3), 0, Math.PI, 0).translate(-0.085, 0.14, 0.012), turn(new THREE.ConeGeometry(0.032, 0.085, 3), 0, Math.PI, 0).translate(0.085, 0.14, 0.012)], true); // nose and inner ears
-  lump(head, stripe, [bx(0.03, 0.02, 0.1, -0.05, 0.1, 0.03), bx(0.03, 0.02, 0.1, 0, 0.1, 0.04), bx(0.03, 0.02, 0.1, 0.05, 0.1, 0.03)], true); // forehead marks
-  lump(head, std('#f2efe8'), [-1, 1].flatMap((s) => [bx(0.15, 0.005, 0.005, s * 0.13, -0.045, 0.13, 0, 0, s * 0.12), bx(0.15, 0.005, 0.005, s * 0.13, -0.065, 0.13, 0, 0, -s * 0.1)]), true); // whiskers
-  const eyes = [-0.065, 0.065].map((x) => {
-    const e = box(head, 0.05, 0.044, 0.02, eye, x, 0.03, 0.12);
-    const p = box(e, 0.014, 0.038, 0.012, dark, 0, 0, 0.006);
-    e.userData.small = p.userData.small = true;
-    return e;
-  });
-  [-1, 1].forEach((s) => {
-    const e = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.13, 4), fur);
-    e.position.set(s * 0.085, 0.15, -0.01); e.rotation.y = Math.PI / 4; head.add(e);
-  });
-  const legs = [[-0.08, 0.2], [0.08, 0.2], [-0.08, -0.2], [0.08, -0.2]].map(([x, z]) => {
-    const p = pivot(rig, x, 0.28, z);
-    lump(p, fur, [bx(0.075, 0.25, 0.075, 0, -0.125, 0), bx(0.09, 0.12, 0.11, 0, -0.04, 0)]);
-    lump(p, belly, [bx(0.085, 0.05, 0.105, 0, -0.255, 0.012)], true);                                             // white socks
+  const fur = c.fur, patch = c.patch, white = c.belly || '#fbf6ee';
+  carved(rig, [
+    { f: ellipsoid(0, 0.17, -0.01, 0.12, 0.11, 0.17), color: (x, y, z) => (y < 0.11 || (z > 0.08 && y < 0.24) ? white : patch && x < 0.02 && z < 0.06 && z > -0.12 ? patch : fur) },
+    // the collar, dark, with a gold bell
+    { f: turned(ring(0, 0.26, 0.1, 0.078, 0.014), -0.6, 0, 0, 0, 0.26, 0.1), color: c.collar || '#5a3a2a' },
+    { f: sphere(0, 0.215, 0.165, 0.022), color: '#e3b341' },
+  ], [-0.15, 0.04, -0.2, 0.15, 0.31, 0.2], 36, 0.012);
+  const head = pivot(rig, 0, 0.28, 0.12);
+  const skull = blend(0.04, ellipsoid(0, 0.08, 0, 0.13, 0.115, 0.115), mirror(ellipsoid(0.075, 0.03, 0.04, 0.07, 0.06, 0.07)));
+  carved(head, [
+    { f: skull, color: (x, y, z) => (z > 0.06 && y < 0.06 && Math.abs(x) < 0.07 ? white : patch && x < -0.01 && y > 0.08 ? patch : fur) }, // the muzzle white; a patch over one side
+    { f: ellipsoid(0, 0.06, 0.122, 0.016, 0.011, 0.01), color: '#e88a99' },                                        // the nose
+    { f: mirror(capsule([0.075, 0.15, -0.01], [0.105, 0.245, -0.02], 0.045, 0.008)), color: (x) => (patch && x < 0 ? patch : fur) }, // pointed ears
+    { f: mirror(capsule([0.075, 0.16, 0.014], [0.1, 0.225, 0.004], 0.026, 0.004)), color: '#f2a7b1' },                // their pink insides
+  ], [-0.2, -0.05, -0.15, 0.2, 0.28, 0.16], 48, 0.008);
+  const eyes = [-1, 1].map((sd) => petEye(head, skull, sd * 0.055, 0.075, c.eye || '#7a9a3a'));
+  const legs = [[-0.06, 0.08], [0.06, 0.08], [-0.06, -0.1], [0.06, -0.1]].map(([x, z]) => { // (short and stubby, as the sheet's)
+    const p = pivot(rig, x, 0.11, z);
+    carved(p, [
+      { f: capsule([0, 0, 0], [0, -0.08, 0.005], 0.045, 0.042), color: fur },
+      { f: ellipsoid(0, -0.095, 0.015, 0.045, 0.024, 0.052), color: white },
+    ], [-0.07, -0.13, -0.07, 0.07, 0.06, 0.09], 20, 0.015);
     return p;
   });
-  const tail = pivot(rig, 0, 0.44, -0.29);
-  lump(tail, fur, [bx(0.06, 0.06, 0.3, 0, 0, -0.15), bx(0.052, 0.052, 0.2, 0, 0.045, -0.37, 0.5)]);
-  lump(tail, stripe, [bx(0.064, 0.064, 0.04, 0, 0, -0.12), bx(0.064, 0.064, 0.04, 0, 0, -0.24), bx(0.056, 0.056, 0.06, 0, 0.085, -0.445, 0.5)], true);
-  tail.rotation.x = -0.95;
+  const tail = pivot(rig, 0, 0.2, -0.16);
+  carved(tail, [{ f: strand([0, 0, 0], [0, 0.15, -0.12], [0, 0.27, -0.05], 0.03, 0.036), color: (x, y) => (patch && Math.sin(y * 70) > 0.3 ? patch : fur) }], [-0.06, -0.05, -0.2, 0.06, 0.33, 0.05], 26, 0.015);
   shadows(root);
-  return { root, rig, head, legs, tail, eyes, sitDrop: 0.08, scale: 1, length: 0.6 };
+  return { root, rig, head, legs, tail, eyes, sitDrop: 0.04, scale: c.scale || 1, length: 0.4, radius: 0.22 };
 }

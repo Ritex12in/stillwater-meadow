@@ -98,7 +98,7 @@ function makeFace(head, C, surfAt) {
   const glow = smooth('#7d4a30', { roughness: 0.6 });
   const eyes = [-1, 1].map((sd) => {
     // sits on the curve of the face, turned a little outward
-    const e = pivot(head, sd * EX, EY, Z); e.rotation.y = sd * 0.36;
+    const e = pivot(head, sd * EX, EY, Z); e.rotation.y = sd * 0.24;
     const ballG = pivot(e, 0, 0, 0);
     // a soft dark oval lying almost flat on the face: no hard ring, just a warmer glow low in the eye
     lump(ballG, dark, [ball(0.056, 0, 0, 0, { s: [1, 1.34, 0.24] })], true);
@@ -108,7 +108,7 @@ function makeFace(head, C, surfAt) {
     const lash = lump(e, hairMat, [new THREE.TorusGeometry(0.056, 0.006, 5, 14, Math.PI * 0.8).rotateZ(Math.PI * 0.1).scale(1, 1.34, 1).translate(0, 0.003, 0.006)], true);
     // shut and smiling: an upturned arc
     const arc = lump(e, hairMat, [new THREE.TorusGeometry(0.044, 0.0065, 5, 14, Math.PI * 0.8).rotateZ(Math.PI * 0.1).translate(0, -0.024, 0.006)], true);
-    const brow = pivot(head, sd * EX, EY + 0.104, surf(EX, EY + 0.104) + 0.004); brow.rotation.y = sd * 0.36;
+    const brow = pivot(head, sd * EX, EY + 0.104, surf(EX, EY + 0.104) + 0.004); brow.rotation.y = sd * 0.24;
     lump(brow, browMat, [cap(0.0115, 0.044, 0, 0, 0.004, { r: [0, 0, Math.PI / 2 + sd * 0.14], s: [1, 1, 0.5] })], true);
     return { e, ball: ballG, lash, arc, brow, sd };
   });
@@ -122,7 +122,7 @@ function makeFace(head, C, surfAt) {
   mk('oh', inside, [[null, [ball(0.014, 0, 0.002, 0, { s: [0.9, 1.15, 0.25] })]]]);
   mk('flat', lip, [[null, [cap(0.0042, 0.022, 0, 0.004, 0, { r: [0, 0, Math.PI / 2], s: [1, 1, 0.5] })]]]);
   mk('frown', lip, [[null, [curve(0.04, 1.2, 0.0055, false).translate(0, 0.004, 0)]]]);
-  const blush = [-1, 1].map((sd) => { const m = new THREE.Mesh(ball(0.052, sd * 0.19, 0.125, surf(0.19, 0.125) - 0.008, { s: [1, 0.58, 0.3], r: [0, sd * 0.8, 0] }), blushMat); m.renderOrder = 2; head.add(m); return m; });
+  const blush = [-1, 1].map((sd) => { const m = new THREE.Mesh(ball(0.048, sd * 0.152, 0.14, surf(0.152, 0.14) - 0.008, { s: [1, 0.58, 0.3], r: [0, sd * 0.62, 0] }), blushMat); m.renderOrder = 2; head.add(m); return m; });
   const st = { name: 'calm', until: 0, base: 'calm', open: 1, arc: 0, brow: 0, tilt: 0, lop: 0, blush: 0.55, mouth: 'smile', blinkT: 2 };
   return {
     eyes, state: st,
@@ -164,12 +164,18 @@ function part(parent, layers, box, n, k = 0.02) {
   return m;
 }
 
-/** The head's skin: a soft skull with full cheeks, a small chin and ears. */
-const headField = () => blend(0.018, blend(0.06,
-  ellipsoid(0, 0.27, 0, 0.292, 0.25, 0.262),
-  mirror(ellipsoid(0.14, 0.15, 0.07, 0.135, 0.1, 0.13)),           // full cheeks
-  ellipsoid(0, 0.07, 0.06, 0.13, 0.06, 0.11)),                     // chin
-  mirror(ellipsoid(0.292, 0.165, -0.015, 0.024, 0.052, 0.04)));     // ears, low on the head
+/**
+ * The head's skin, shaped as the VRoid characters' faces are (measured from their meshes,
+ * tools/face-profile.mjs): a rounded cranium; below it a lower face narrower than the cranium, set a
+ * little forward, that tapers smoothly to a small soft chin, so the face is widest just below the
+ * eyes and narrows to the chin (no cheeks bulging out at the sides, no wide jaw); a fairly flat
+ * front for the eyes to sit on; ears at the eyes' height.
+ */
+const headField = () => blend(0.018, blend(0.075,
+  ellipsoid(0, 0.285, -0.012, 0.29, 0.255, 0.272),                 // the cranium
+  ellipsoid(0, 0.165, 0.05, 0.222, 0.15, 0.205),                   // the lower face: narrower, set forward
+  ellipsoid(0, 0.062, 0.088, 0.085, 0.058, 0.088)),                // a small, soft chin
+  mirror(ellipsoid(0.284, 0.2, -0.02, 0.024, 0.048, 0.04)));      // ears, at the eyes' height
 
 // Hair is drawn the way the reference draws it: big flat locks shaped like leaves (wide in the
 // middle, pointed at the tip), layered over one another and radiating from the crown. Each lock is

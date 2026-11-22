@@ -457,7 +457,7 @@ function boyHair(L, r) {
   // the crown, as real hair does, in even rings laid like roof tiles, each ring's pieces over the gaps of the
   // ring below; nothing alternates left and right, nothing is placed by chance.
   const clump = (az, e0, e1, W, o) => L.clump(az, e0, e1, W * 0.86, Object.assign({}, o, { thick: (o.thick || 0.06) * 0.7 })); // (a little thinner: the owner asked)
-  const v = () => 0.97 + 0.06 * r(), sign = Math.sign, SW = -1, C3 = { ridges: 0, edge: 0.5, halo: 0.3, shape: 'flame' }; // (SW: which way the whorl turns; the fringe sweeps the same way)
+  const v = () => 0.97 + 0.06 * r(), sign = Math.sign, SW = -1, C3 = { ridges: 0, edge: 0.5, halo: 1.0, shape: 'flame' }; // (halo: the sheet's soft band of light across the top. SW: which way the whorl turns; the fringe sweeps the same way)
   // the back and sides: eight, evenly round, longest at the nape
   for (let i = 0; i < 8; i++) {
     const az = 1.25 + (i / 7) * (TAU - 2.5), back = 1 - Math.min(1, Math.abs(Math.PI - az) / 1.7);
@@ -500,14 +500,16 @@ function girlHair(L, r, bunAt) {
     const az = 0.75 + (i / 10) * (TAU - 1.5), dB = Math.abs(Math.PI - az), e0 = -0.45 + 0.75 * Math.min(1, dB / 2) + 0.35 * Math.max(0, (dB - 2) / 0.4) + (r() - 0.5) * 0.1, over = i % 2 ? 0.02 : 0; // (the hairline: low at the nape, above the ears at the sides)
     const sw = (r() - 0.5) * 0.22;
     const pts = [0, 0.3, 0.62].map((t) => onHead(az + sw * (1 - t), e0 + (1.2 - e0) * t, 1.03 + over + 0.07 * Math.sin(t * 3))).concat([bunAt.clone().add(new THREE.Vector3(0, -0.02, 0))]);
-    L.add(pts, 0.36, 0.045, { shape: 'tress', edge: 0.22, tone: v() * (i % 2 ? 1.03 : 0.98) }); // (close in tone: the sheet's is one smooth mass. Fewer, broader ones stood off the head's curve like a brim)
+    L.add(pts, 0.36, 0.045, { shape: 'tress', edge: 0, tone: 0.99 + 0.02 * (i % 2) }); // (close in tone: the sheet's is one smooth mass. Fewer, broader ones stood off the head's curve like a brim)
   }
   // thin strands running up the sweep over the tresses, so it reads as hair, not slabs
-  for (let i = 0; i < 5; i++) {
-    const az = 0.85 + (i / 4) * (TAU - 1.7) + (r() - 0.5) * 0.12, dB = Math.abs(Math.PI - az), e0 = -0.38 + 0.75 * Math.min(1, dB / 2) + 0.35 * Math.max(0, (dB - 2) / 0.4) + (r() - 0.5) * 0.08;
+  for (let i = 0; i < 3; i++) {
+    const az = 1.2 + (i / 2) * (TAU - 2.4) + (r() - 0.5) * 0.12, dB = Math.abs(Math.PI - az), e0 = -0.38 + 0.75 * Math.min(1, dB / 2) + 0.35 * Math.max(0, (dB - 2) / 0.4) + (r() - 0.5) * 0.08;
     const pts = [0, 0.35, 0.68].map((t) => onHead(az + (r() - 0.5) * 0.06, e0 + (1.2 - e0) * t, 1.055 + 0.07 * Math.sin(t * 3))).concat([bunAt.clone().add(new THREE.Vector3((r() - 0.5) * 0.04, -0.03, 0))]);
-    L.add(pts, 0.05 + 0.03 * r(), 0.014, { shape: 'band', tone: v() * (1.04 + 0.08 * r()) });
+    L.add(pts, 0.05 + 0.03 * r(), 0.012, { shape: 'band', tone: 1.04 }); // (three long lines, faint: the sheet's is a plain smooth mass)
   }
+  // a loose hairline (the sheet's is not a neat band): short thin wisps from it falling onto the forehead between the curtains
+  [[-0.34, 0.26, -0.14], [-0.12, 0.36, -0.08], [0.1, 0.32, 0.1], [0.3, 0.4, 0.14]].forEach(([az, e1, c]) => L.clump(az, 0.95, e1, 0.085, { vol: 0.025, curl: c, flick: 0.03, layer: 0.03, thick: 0.014, ridges: 0, edge: 0.4, halo: 0.3, shape: 'flame', tone: v() * 1.02 }));
   // baby hairs at the temples
   [-1, 1].forEach((sd) => [0, 1, 2].forEach((j) => L.over(sd * (0.98 + 0.07 * j), 0.62, 0.22 - 0.07 * j, 0.035, { sweep: sd * 0.05, lift: 0.012, flick: 0.02, layer: 0.008, thick: 0.008, tone: v() * 1.06 })));
   // the fringe and the locks beside the face (the owner: sharp and long, with a curve; and, compared with the

@@ -127,7 +127,7 @@ export function treeFamily(t) {
   return h < 30 ? 'common' : h < 56 ? 'maple' : h < 76 ? 'birch' : kit.models.NormalTree_1 ? 'normal' : 'common';
 }
 /** How tall each family's model stands at scale 1 (the far cards are sized to match). */
-export const TREE_HEIGHT = { pine: 6.4, slimpine: 7.6, common: 6.2, blossom: 6.6, maple: 6.6, birch: 7.4, normal: 6.8 };
+export const TREE_HEIGHT = { pine: 6.4, slimpine: 7.6, common: 6.2, blossom: 6.6, maple: 6.6, birch: 7.4, normal: 6.8, giant: 7.6, willow: 6.0 };
 
 /**
  * Kit trees in place of the hand-built ones. `lists` holds four lists of trees: `pines` and
@@ -170,6 +170,7 @@ export function kitTrees(lists, lod) {
     // maples (broad, spreading), birches (tall, white-barked) and light, airy common trees
     const fams = [['MapleTree_', 6.6, 'maple', 14], ['BirchTree_', 7.4, 'birch', 15]];
     if (kit.models.NormalTree_1) fams.push(['NormalTree_', 6.8, 'normal', 17]);
+    if (kit.models.GiantTree_1) fams.push(['GiantTree_', 7.6, 'giant', 18], ['WillowTree_', 6.0, 'willow', 19]); // (the biomes' own: core/biome.js)
     fams.forEach(([prefix, h, fam, salt]) => {
       const models = [1, 2, 3, 4, 5].map((i) => fit(pieces(prefix + i), h, 0.15));
       const ml = models.map((m) => first(m, /Leaves/)), mb = models.map((m) => first(m, /Bark/));

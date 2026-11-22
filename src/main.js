@@ -37,7 +37,9 @@ import { wx, WX_LABEL, buildWeather, updateWeather, updatePrecip, weatherModify,
 import { quality, initQuality, tickQuality, onQualityChange, loadingStarted, loadingFinished } from './systems/quality.js';
 import { grassU, updateGrassMap, resetGrassMap } from './world/grassfield.js';
 import { farForest } from './world/farforest.js';
-import { updateWilds, settleWilds, wildStats, growSquare, growRocks, growSmall, growPicks, picksNear } from './world/wilds.js';
+import { updateWilds, settleWilds, wildStats, growSquare, growRocks, growSmall, growPicks, picksNear, growBiome } from './world/wilds.js';
+import { buildBiomeThings } from './world/biomethings.js';
+import { biomesAt, biomeAt } from './core/biome.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
 import { store, onSave, flush } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
@@ -100,6 +102,7 @@ chooseShrineSite();
 buildRocks();
 buildGrass();
 buildFlowers();
+buildBiomeThings();
 buildReedsAndPads();
 if (kit) buildUndergrowth();
 if (kit) buildWildflowers();
@@ -229,6 +232,7 @@ function applySky() {
   skyU.horizonColor.value.copy(cur.horizon);
   skyU.sunColor.value.copy(cur.glow);
   skyU.stars.value = cur.stars;
+  skyU.aurora.value += ((seasonState.auroraHere || 0) * (1 - wx.cloud * 0.9) - skyU.aurora.value) * 0.01;
   neonU.value = (1 - smooth(-10, -2, solar.sunElev)) * (1 - wx.fog * 0.4) * (1 - wx.snow * 0.85); // the flowers glow neon once the sun is well down (dimmed under snow)
   groundU.haze.value = 0.62 + 0.38 * clamp(Math.max(wx.fog, wx.rain * 0.5, wx.snow * 0.5), 0, 1); // far hills show through the haze, unless the weather hides them
   groundU.bloom.value = seasonState.flowerFrac ?? 1;
@@ -254,8 +258,9 @@ function applySky() {
   lampMat.emissiveIntensity = cur.eve * 1.6;
   if (lampGlows.length) lampGlows[0].material.opacity = cur.eve * 0.75; // the lamps share one glow material
   lampGlows.forEach((g) => { g.visible = cur.eve > 0.02; });
-  ffMat.opacity = cur.eve * 0.95 * (1 - wx.rain) * (1 - wx.snow * 0.8) * seasonState.bugs;
-  fireflies.visible = cur.eve > 0.02 && seasonState.bugs > 0.05;
+  const ffAmt = Math.max(seasonState.bugs, seasonState.enchantedHere || 0); // (the enchanted wood has its fireflies in any season)
+  ffMat.opacity = cur.eve * 0.95 * (1 - wx.rain) * (1 - wx.snow * 0.8) * ffAmt;
+  fireflies.visible = cur.eve > 0.02 && ffAmt > 0.05;
   const showBf = cur.day > 0.5 && seasonState.bugs > 0.5 && wx.rain < 0.2 && wx.snow < 0.3 && wx.fog < 0.6 && wx.storm < 0.1;
   butterflies.forEach((b) => { b.g.visible = showBf; });
   // pollen glints in clear daylight, most of all in low golden sun
@@ -383,7 +388,9 @@ window.__meadow = {
   // the trees beyond the valley: what is loaded, a way to bring it up to date, and one square's trees
   /** The shrine sites within `r` metres of you (the shrine stands at `shrine`, one of them). */
   shrines: (r = 1500) => shrineSitesNear(player.x, player.z, r), rawHeight,
-  wilds: { stats: wildStats, settle: settleWilds, square: growSquare, rocks: growRocks, small: (ix, iz) => growSmall(ix, iz, growSquare(ix, iz)), picks: growPicks, picksNear },
+  wilds: { stats: wildStats, settle: settleWilds, square: growSquare, rocks: growRocks, small: (ix, iz) => growSmall(ix, iz, growSquare(ix, iz)), picks: growPicks, picksNear, biome: growBiome },
+  /** The biomes at a spot (core/biome.js): their weights, and the strongest. */
+  biomes: (x, z) => biomesAt(x, z, height(x, z)), biomeAt: (x, z) => biomeAt(x, z, height(x, z)),
   /** How many objects the scene holds (it must not creep up as you travel). */
   objects: () => { let n = 0; scene.traverse(() => { n++; }); return n; },
   hour: () => wrap24(timeCtl.hour),

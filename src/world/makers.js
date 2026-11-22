@@ -84,6 +84,32 @@ export function cactus(variant) {
   return b.build();
 }
 
+// ───────────── the swamp's pools and lotus ─────────────
+/** A flat, irregular pool of still water, about 3 m across (scaled by its instance). */
+export function poolDisc(variant) {
+  const R = mulberry32(9700 + variant * 43), n = 14, pts = [];
+  for (let i = 0; i < n; i++) { const a = (i / n) * TAU, r = 1.2 + R() * 0.5 + Math.sin(a * 3 + variant) * 0.2; pts.push([Math.cos(a) * r, 0, Math.sin(a) * r]); }
+  const b = new Builder();
+  for (let i = 0; i < n; i++) b.tri([0, 0, 0], pts[(i + 1) % n], pts[i], 1, 1, 1, [0, 1, 0]);
+  return b.build();
+}
+/** A lotus: a round pad and a flower of pointed petals open on it. White petals: tinted by the instance (they glow at night). */
+export function lotus(variant) {
+  const R = mulberry32(9900 + variant * 47), b = new Builder(), green = [0.35, 0.55, 0.3];
+  const pad = 0.38 + R() * 0.12;
+  for (let i = 0; i < 10; i++) { const a0 = (i / 10) * TAU + 0.3, a1 = ((i + 1) / 10) * TAU + 0.3; b.tri([0, 0.02, 0], [Math.cos(a1) * pad, 0.02, Math.sin(a1) * pad], [Math.cos(a0) * pad, 0.02, Math.sin(a0) * pad], green, green, green, [0, 1, 0]); }
+  for (const [n, len, lift, turn] of [[8, 0.2, 0.55, 0], [6, 0.15, 1.0, 0.3]]) {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU + turn, ca = Math.cos(a), sa = Math.sin(a), cl = Math.cos(lift), sl = Math.sin(lift);
+      const tip = [ca * len * cl, 0.06 + len * sl, sa * len * cl], l = [-sa * 0.045, 0.06, ca * 0.045], r = [sa * 0.045, 0.06, -ca * 0.045], mid = [ca * len * 0.5 * cl, 0.06 + len * 0.5 * sl, sa * len * 0.5 * cl];
+      const side = 0.06;
+      b.tri(l, [mid[0] - sa * side, mid[1], mid[2] + ca * side], tip, 0.8, 0.95, 1); b.tri(r, tip, [mid[0] + sa * side, mid[1], mid[2] - ca * side], 0.8, 1, 0.95);
+      b.tri(l, tip, r, 0.85, 1, 0.85);
+    }
+  }
+  return b.build();
+}
+
 /** Merge a maker's geometry into one with an upward normal-friendly bounding box (for slot sets). */
 export const ready = (g) => { g.computeBoundingSphere(); return g; };
 export { THREE };

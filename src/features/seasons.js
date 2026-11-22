@@ -9,7 +9,7 @@ import { clamp, damp, rnd, mulberry32, hash } from '../core/math.js';
 import { query } from '../core/env.js';
 import { glowTex } from '../core/materials.js';
 import { hooks, seasonState as st, world } from '../core/state.js';
-import { coldAt, coldBase, northness, ASPECT, HOME, lakeChill, height } from '../core/shape.js';
+import { coldAt, coldBase, northness, ASPECT, HOME, lakeChill, height, groveAt, biomesAt } from '../core/shape.js';
 import { yearPhase, seasonValue, isCooling, phaseName, dayOfPhase, chillNow, snowFrom, iceFrom, flowersOut, leavesAt, SEASON_PHASE, ICE_LAG, seasonU } from '../core/year.js';
 import { bindKey } from '../systems/actions.js';
 import { store, saveSoon } from '../systems/save.js';
@@ -102,6 +102,10 @@ function readHere(x, z) {
   st.coverFloor = COVER * snowFrom(c, st.season);
   st.flowerFrac = flowersOut(c, st.season, st.cooling);
   st.leavesHere = leavesAt(c, st.season, st.cooling);
+  st.groveHere = groveAt(x, z);
+  st.enchantedHere = biomesAt(x, z, h, base).enchanted;
+  // the northern lights: over cold country (more of them in winter)
+  st.auroraHere = Math.min(1, Math.max(0, (base - 0.25) / 0.45) + Math.max(0, now - 0.6) * 0.8);
   // the snowman and the home lake's skating go by the home lake
   st.homeWinter = chillNow(lakeChill(HOME), st.season) > 0.47;
 }
@@ -174,7 +178,7 @@ export function initSeasons() {
     gr.setRGB(damp(gr.r, p.ground[0], 1, dt), damp(gr.g, p.ground[1], 1, dt), damp(gr.b, p.ground[2], 1, dt));
 
     // falling leaves where the trees have turned, petals where it is spring
-    const kind = st.leavesHere === 'autumn' ? 'autumn' : st.leavesHere === 'spring' ? 'spring' : '';
+    const kind = st.leavesHere === 'autumn' ? 'autumn' : st.leavesHere === 'spring' || (st.groveHere > 0.5 && st.leavesHere !== 'winter') ? 'spring' : '';
     if (kind && kind !== fallingKind) {
       fallingKind = kind;
       const pal = kind === 'autumn' ? ['#d9822b', '#e3a33b', '#c4542d', '#e8c547', '#b0452a'] : ['#f7c6d6', '#ffffff', '#f3a8c3', '#fde3ea'];

@@ -26,6 +26,7 @@ import { TILE_N, CELL, rockAmt } from './terrain.js';
 import { setWildTrees, MODEL_FAR, TREE_COLOURS, dressFlower } from './vegetation.js';
 import { setFarTrees } from './farforest.js';
 import { treeFamily } from './kitplants.js';
+import { biomesAt } from '../core/biome.js';
 
 const S = TILE_N * CELL;
 /**
@@ -35,7 +36,7 @@ const S = TILE_N * CELL;
  */
 export const WILD = { load: 235, drop: 265, nearIn: MODEL_FAR + 8, nearOut: MODEL_FAR + 30, closeIn: 66, closeOut: 86, tries: 96 };
 const squares = new Map();
-let cards = 0, lost = 0, near = 0, stale = false, rockCount = 0, smallCount = 0, pickCount = 0, lostRocks = 0, lostSmall = 0, rockBlocks = [];
+let biomeCount = 0, cards = 0, lost = 0, near = 0, stale = false, rockCount = 0, smallCount = 0, pickCount = 0, lostRocks = 0, lostSmall = 0, rockBlocks = [];
 /** The cards show each tree's season colour: ask for them to be redone when the season has turned. */
 world.refreshFarTrees = () => { stale = true; };
 
@@ -50,6 +51,8 @@ const woodAt = (x, z) => smooth(0.4, 0.62, fbm(x * 0.0063 + 31.7, z * 0.0063 - 1
 export function growSquare(ix, iz) {
   const R = seedOf(ix, iz, 0);
   const x0 = ix * S, z0 = iz * S, trees = [];
+  // the biome at the square's middle: no woods in the desert, thick old woods in the enchanted wood
+  const B = biomesAt(x0 + S / 2, z0 + S / 2, height(x0 + S / 2, z0 + S / 2)), biomeWood = (1 - B.desert * 0.97) * (1 - B.volcanic * 0.9);
   for (let k = 0; k < WILD.tries; k++) {
     // (every try takes the same draws, so turning one spot down never moves the trees after it)
     const x = x0 + R() * S, z = z0 + R() * S, roll = R(), size = R(), turn = R(), tint = R(), keep = R();
@@ -60,7 +63,7 @@ export function growSquare(ix, iz) {
     // woods in broad patches with open country between, and clumps and clearings inside a wood;
     // lush country is wooded nearly everywhere, the heath and the snowfields hardly at all
     // (and thinning out toward the treeline)
-    const wooded = Math.min(1, (0.06 + woodAt(x, z) * 0.9) * (1 - dry * 0.8) * (1 - snow * 0.65) + lush * 0.45 * (1 - snow * 0.5) + grove * 0.6) * (1 - line);
+    const wooded = Math.min(1, (0.06 + woodAt(x, z) * 0.9) * (1 - dry * 0.8) * (1 - snow * 0.65) + lush * 0.45 * (1 - snow * 0.5) + grove * 0.6 + B.enchanted * 0.5) * (1 - line) * biomeWood;
     if (keep > wooded * (0.35 + fbm(x * 0.03 + 9, z * 0.03))) continue;
     // not on rock, cliffs or the high peaks (the same test the grass and the ground's texture use)
     const slope = slopeOf(x, z);
@@ -71,11 +74,15 @@ export function growSquare(ix, iz) {
     const nearLine = smooth(TREELINE - 34, TREELINE - 8, felt);
     const pines = clamp(0.36 + cold * 0.7 + smooth(22, 60, h) * 0.3 - dry * 0.22 - grove + nearLine * 0.8, 0, 0.97);
     const type = roll < pines ? 'pine' : roll > 0.975 - grove * 0.8 ? 'blossom' : 'round';
-    const s = (0.8 + size * 0.7) * (1 + lush * 0.14 - snow * 0.12) * (1 - 0.4 * smooth(TREELINE - 28, TREELINE, felt)), cols = TREE_COLOURS[type];
+    const s = (0.8 + size * 0.7) * (1 + lush * 0.14 - snow * 0.12 + B.enchanted * 0.6) * (1 - 0.4 * smooth(TREELINE - 28, TREELINE, felt)), cols = TREE_COLOURS[type];
     const t = { x, z, y: h - 0.15, type, s, ry: turn * TAU, color: cols[Math.floor(tint * cols.length)], top: (kit ? 6.2 : 5.2) * s, wild: true, chill: cold };
     if (kit) {
       // on the heath the broadleaf trees are the light, airy ones: birches and the open-crowned "normal" trees
       t.family = type === 'round' && dry > 0.5 && kit.models.BirchTree_1 ? (tint < 0.62 || !kit.models.NormalTree_1 ? 'birch' : 'normal') : treeFamily(t);
+      if (type === 'round' && kit.models.GiantTree_1) {
+        if (tint < B.enchanted * 0.75) { t.family = 'giant'; t.s *= 1.7; t.top *= 1.7; }
+        else if (tint < B.swamp * 0.8) t.family = 'willow';
+      }
     }
     trees.push(t);
   }
@@ -221,6 +228,38 @@ export function picksNear(x, z, r) {
   return out;
 }
 
+/**
+ * The biomes' own things in one square (core/biome.js): cacti in the desert; crystals and glowing
+ * mushrooms in the enchanted wood. From a stream of its own, so nothing else moves.
+ */
+export function growBiome(ix, iz) {
+  const R = seedOf(ix, iz, 0x6B10E), x0 = ix * S, z0 = iz * S, out = { cacti: [], crystals: [], mushrooms: [], pools: [], lotus: [] };
+  const mx = x0 + S / 2, mz = z0 + S / 2, B = biomesAt(mx, mz, height(mx, mz));
+  if (B.desert < 0.05 && B.enchanted < 0.05 && B.swamp < 0.05) return out;
+  const MUSH = [0xb8f4ff, 0x9fffd0, 0xffa6f0, 0xc7b0ff].map((c) => col('#' + c.toString(16).padStart(6, '0')));
+  const CRYS = [0x7fe3ff, 0xb48cff, 0xff8fd6, 0x8fffd9].map((c) => col('#' + c.toString(16).padStart(6, '0')));
+  const CACT = ['#5f8a3e', '#6d9645', '#557d38'].map(col), LOTUS = ['#ffd6ec', '#ffffff', '#f6b8ff', '#c9e8ff'].map(col);
+  for (let k = 0; k < 60; k++) {
+    const x = x0 + R() * S, z = z0 + R() * S, roll = R(), size = R(), turn = R(), v = Math.floor(R() * 4), tint = R();
+    if (lakeT(x, z) < 1.15 || clearingAt(x, z)) continue;
+    const h = height(x, z), b = biomesAt(x, z, h);
+    if (rockAmt(h, slopeOf(x, z), feltAt(x, z, h)) > 0.4) continue;
+    if (roll < b.desert * 0.12) out.cacti.push({ x, z, y: h - 0.1, s: 0.8 + size * 0.6, ry: turn * TAU, v, color: CACT[Math.floor(tint * CACT.length)] });
+    else if (roll > 1 - b.enchanted * 0.5) {
+      if (size < 0.3) out.crystals.push({ x, z, y: h - 0.05, s: 0.6 + size * 2.4, ry: turn * TAU, v, color: CRYS[Math.floor(tint * CRYS.length)] });
+      else out.mushrooms.push({ x, z, y: h - 0.02, s: 0.8 + size * 1.2, ry: turn * TAU, v, color: MUSH[Math.floor(tint * MUSH.length)] });
+    } else if (roll < b.swamp * 0.3 && slopeOf(x, z) < 0.08) {
+      // a still pool in the swamp's low ground (on level ground only, standing on its highest edge), and lotus on some
+      const ps = 0.9 + size * 1.3;
+      let top = h; for (let e = 0; e < 6; e++) { const a = e * 1.047; top = Math.max(top, height(x + Math.cos(a) * ps * 1.6, z + Math.sin(a) * ps * 1.6)); }
+      if (top - h > 0.35) continue;
+      out.pools.push({ x, z, y: top + 0.1, s: ps, ry: turn * TAU, v });
+      for (let m = 0; m < Math.floor(tint * 4); m++) { const a = m * 2.4 + turn * 6, d = ps * (0.3 + 0.15 * m); out.lotus.push({ x: x + Math.cos(a) * d, z: z + Math.sin(a) * d, y: top + 0.12, s: 1 + size * 0.5, ry: a, v: m, color: LOTUS[(v + m) % LOTUS.length] }); }
+    }
+  }
+  return out;
+}
+
 /** Distance from the camera to a square (0 inside it). */
 const away = (q, cx, cz) => Math.hypot(Math.max(q.ix * S - cx, 0, cx - q.ix * S - S), Math.max(q.iz * S - cz, 0, cz - q.iz * S - S));
 
@@ -236,7 +275,7 @@ export function updateWilds(cx, cz, all = false) {
     for (let ix = i0; ix <= i1; ix++) {
       const key = ix + ':' + iz;
       if (squares.has(key) || (!all && made >= 2)) continue;
-      const q = { ix, iz, trees: null, rocks: null, small: null, picks: null, near: false, close: false };
+      const q = { ix, iz, trees: null, rocks: null, small: null, picks: null, biome: null, near: false, close: false };
       if (away(q, cx, cz) >= WILD.load) continue;
       q.trees = growSquare(ix, iz);
       squares.set(key, q);
@@ -248,7 +287,7 @@ export function updateWilds(cx, cz, all = false) {
     const d = away(q, cx, cz);
     if (d > WILD.drop) { squares.delete(key); if (q.trees.length) cardsDirty = true; if (q.near) modelsDirty = true; if (q.close) smallDirty = true; return; }
     const isNear = q.near ? d < WILD.nearOut : d < WILD.nearIn;
-    if (isNear !== q.near) { q.near = isNear; modelsDirty = true; if (isNear && !q.rocks) q.rocks = growRocks(q.ix, q.iz); }
+    if (isNear !== q.near) { q.near = isNear; modelsDirty = true; if (isNear && !q.rocks) { q.rocks = growRocks(q.ix, q.iz); q.biome = growBiome(q.ix, q.iz); } }
     const isClose = q.close ? d < WILD.closeOut : d < WILD.closeIn;
     if (isClose !== q.close) { q.close = isClose; smallDirty = true; if (isClose && !q.small && kit) q.small = growSmall(q.ix, q.iz, q.trees); if (isClose && !q.picks) q.picks = growPicks(q.ix, q.iz); }
   });
@@ -274,6 +313,11 @@ export function updateWilds(cx, cz, all = false) {
     for (const r of rocks) if (r.s > 0.6) { const b = r.block || (r.block = { x: r.x, z: r.z, r: r.s * 0.95 }); obstacles.push(b); rockBlocks.push(b); }
     rockCount = rocks.length;
     lostRocks = world.setWildRocks ? world.setWildRocks(rocks) : 0;
+    // the biomes' own things, with the boulders
+    const things = { cacti: [], crystals: [], mushrooms: [], pools: [], lotus: [] };
+    squares.forEach((q) => { if (q.near && q.biome) for (const k in things) for (const it of q.biome[k]) things[k].push(it); });
+    biomeCount = things.cacti.length + things.crystals.length + things.mushrooms.length + things.pools.length + things.lotus.length;
+    lostRocks += world.setBiomeThings ? world.setBiomeThings(things) : 0;
   }
   if (smallDirty) {
     const all4 = { bushes: [], ferns: [], shrooms: [], clover: [], flowers: [] };
@@ -297,4 +341,4 @@ export function settleWilds(x, z) { updateWilds(x, z, true); }
  * For tests and the debug panel: squares kept, trees with a card, trees drawn as models, boulders,
  * small plants and flowers to pick set out. `dropped` is things that found no free slot to be drawn in: it should stay 0.
  */
-export const wildStats = () => ({ squares: squares.size, cards, near, rocks: rockCount, small: smallCount, picks: pickCount, dropped: lost + lostRocks + lostSmall + (world.picksDropped || 0) + ((world.roundTop && world.roundTop.dropped) || 0) });
+export const wildStats = () => ({ squares: squares.size, cards, near, rocks: rockCount, things: biomeCount, small: smallCount, picks: pickCount, dropped: lost + lostRocks + lostSmall + (world.picksDropped || 0) + ((world.roundTop && world.roundTop.dropped) || 0) });

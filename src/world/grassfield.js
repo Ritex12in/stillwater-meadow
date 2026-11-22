@@ -9,6 +9,7 @@ import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtil
 import { scene } from '../core/render.js';
 import { smooth } from '../core/math.js';
 import { SEASON_GLSL, seasonU } from '../core/year.js';
+import { biomesAt } from '../core/biome.js';
 import { heightAt, slopeAt, lakeAt, nearReserved, onDock, BENCH_SPOT, SPAWN, coldBase, coldAt, dryOf, slopeLook, feltHeight, ASPECT, moistAt, snowCold, snowOf } from '../core/shape.js';
 import { weatherize, bothSides, timeU, windU, camU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
@@ -31,6 +32,8 @@ function grassy(x, z, h, north, base) {
   const lake = lakeAt(x, z), b = Math.min(lake.beach, 1); // (grass begins where that lake's sand ends)
   return smooth(1.02 + 0.1 * b, 1.1 + 0.12 * b, lake.t(x, z)) * (1 - smooth(0.15, 0.5, lake.path(x, z))) * (1 - rockAmt(h, slopeAt(x, z), feltHeight(x, z, h, north, base)));
 }
+/** How much grass a biome lets grow: none on the desert's sand, sparse in the swamp's peat (its pools show). */
+const biomeGrass = (b) => (1 - 0.9 * b.desert) * (1 - 0.65 * b.swamp);
 /** Work the whole map out again at the next update (the jetty, the fire or the bench has moved, and it remembers where they were). */
 export function resetGrassMap() { mapIx = null; }
 /** Keep the map round (cx, cz). Call once a frame; it only does work when the camera has moved on. */
@@ -48,7 +51,7 @@ export function updateGrassMap(cx, cz) {
         // (on the tundra, cold country too dry for snow, the grass is sparse, low and tawny)
         const tundra = smooth(0.42, 0.65, chill) * (1 - snowOf(cold));
         // (and little grass on scree)
-        mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h, north, base) * (1 - 0.55 * tundra) * (1 - 0.85 * scree); mapNext[o + 2] = cold; mapNext[o + 3] = Math.max(dryOf(wet), tundra * 0.85);
+        mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h, north, base) * (1 - 0.55 * tundra) * (1 - 0.85 * scree) * biomeGrass(biomesAt(x, z, h, base, wet)); mapNext[o + 2] = cold; mapNext[o + 3] = Math.max(dryOf(wet), tundra * 0.85);
       }
     }
   }

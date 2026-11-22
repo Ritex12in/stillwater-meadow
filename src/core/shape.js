@@ -106,6 +106,7 @@ function cellSpot(cx, cz) {
  * turns them on (their tests use it).
  */
 export const SETTLEMENTS = query.has('settlements');
+let sitesReady = false;
 // A lake is settled if it outranks every lake in the eight squares round its own, by a rank fixed
 // by the seed. So no two settled lakes are neighbours: they lie half a kilometre apart at the
 // least, each out of sight of the next. The home lake outranks all.
@@ -223,7 +224,7 @@ function land(x, z, open) {
   return meadow + open * (hills * hills * 46 + range * (28 + crest * crest * 205 + detail * 24 * range));
 }
 /** How much a spot is in the mountains (0 none .. 1 the heart of a range). */
-function rangeAt(x, z) { return smooth(0.5, 0.72, fbm((x + SX * 31) * 0.0014 + 41.3, (z + SZ * 31) * 0.0014 - 17.9)); }
+export function rangeAt(x, z) { return smooth(0.5, 0.72, fbm((x + SX * 31) * 0.0014 + 41.3, (z + SZ * 31) * 0.0014 - 17.9)); }
 let shaped = false; // (did the last rawHeight() land on a lake's own shaped ground: its bowl, shore and path?)
 /**
  * The land as the seed gives it, before the ground under any shrine is levelled: held down in the
@@ -258,8 +259,10 @@ export function height(x, z) {
   const h = rawHeight(x, z);
   if (shaped) return h;
   const s = shrineSiteAt(x, z, PAD_OUT);
-  if (!s) return h;
-  return h + (s.y - h) * (1 - smooth(PAD_FLAT, PAD_OUT, Math.hypot(x - s.x, z - s.z)));
+  if (s) return h + (s.y - h) * (1 - smooth(PAD_FLAT, PAD_OUT, Math.hypot(x - s.x, z - s.z)));
+  const b = sitesReady ? siteAt(x, z) : null; // (a building's levelled ground)
+  if (b && b.out > 0) return h + (b.y - h) * (1 - smooth(b.flat, b.out, Math.hypot(x - b.x, z - b.z)));
+  return h;
 }
 
 // ── Climate ────────────────────────────────────────────────────
@@ -470,6 +473,7 @@ const marksOf = (lake) => lake.marks || (lake.marks = landmarksOf(lake));
  */
 export function clearingAt(x, z) {
   if (shrineSiteAt(x, z, SHRINE_R + 7)) return true;
+  if (sitesReady && siteAt(x, z, -1)) return true; // (and a building's ground)
   const L = lakeAt(x, z);
   if (!L.settled) return false;
   const dx = x - L.x, dz = z - L.z, d = Math.hypot(dx, dz), r = L.r(Math.atan2(dz, dx));
@@ -573,6 +577,108 @@ export function shrineSitesNear(x, z, r) {
   for (let cz = Math.floor((z - r) / SHRINE_CELL); cz <= Math.floor((z + r) / SHRINE_CELL); cz++) for (let cx = Math.floor((x - r) / SHRINE_CELL); cx <= Math.floor((x + r) / SHRINE_CELL); cx++) { const s = shrineOfCell(cx, cz); if (s && near(s) < r) out.push(s); }
   return out.sort((a, b) => near(a) - near(b));
 }
+// ── Biomes ─────────────────────────────────────────────────────
+// (core/biome.js explains them; their weights live here so the land's height can use them for the
+// buildings' levelled ground without the two modules needing each other.)
+let BSX = null, BSZ = 0;
+const awayFromHome = (x, z) => smooth(450, 900, Math.hypot(x - HOME.x, z - HOME.z));
+/** The wonder field: rare pockets (0..1), a few hundred metres across, of two kinds (a and b) that never meet. */
+export function wonderAt(x, z) {
+  if (BSX === null) { BSX = hash(WORLD.seed, 101) * 7000; BSZ = hash(WORLD.seed, 103) * 7000; }
+  const n = fbm((x + BSX) * 0.0011 + 5.3, (z + BSZ) * 0.0011 - 8.1), k = fbm((x - BSZ) * 0.0004 - 2.2, (z + BSX) * 0.0004 + 6.6);
+  const w = smooth(0.66, 0.74, n) * awayFromHome(x, z);
+  return { a: w * smooth(0.45, 0.55, k), b: w * (1 - smooth(0.45, 0.55, k)) };
+}
+/** The biomes' weights at a spot (0..1 each): desert, swamp, enchanted, volcanic. `base` and `rain` may be passed when known. */
+export function biomesAt(x, z, h, base = coldBase(x, z), rain = rainAt(x, z)) {
+  const away = awayFromHome(x, z), wonder = wonderAt(x, z), range = rangeAt(x, z);
+  return {
+    desert: smooth(-0.18, -0.36, base) * smooth(0.45, 0.37, rain) * away,
+    swamp: smooth(0.6, 0.68, rain) * (1 - smooth(8, 22, h)) * (1 - range) * (1 - smooth(0.2, 0.4, base)) * away,
+    enchanted: wonder.a * smooth(0.5, 0.58, rain) * (1 - smooth(0.3, 0.5, base)),
+    volcanic: wonder.b * smooth(0.2, 0.5, range),
+  };
+}
+/** The strongest biome at a spot and its weight, or null in ordinary country. */
+export function biomeAt(x, z, h, min = 0.5) {
+  const w = biomesAt(x, z, h);
+  let best = null, bw = min;
+  for (const k in w) if (w[k] > bw) { bw = w[k]; best = k; }
+  return best ? { id: best, w: bw } : null;
+}
+
+// ── Buildings' sites ───────────────────────────────────────────
+// Where the biomes' buildings stand (world/landmarks.js builds and sets them down): fixed by the
+// land, so by the seed, each kind by its own rule, one or none to a square of its own size, in the
+// square's middle half (so two are never close), on ground levelled for it (see height()), clear
+// of every lake, of the shrines and of the start. `flat`/`out`: the levelled ground's radii.
+const SITE_KINDS = {
+  // a pagoda in a blossom grove
+  pagoda: { cell: 560, flat: 10, out: 18, salt: 0x9A60D, tries: 10, rule: (x, z, h) => groveAt(x, z) > 0.6 && h > 1 && h < 45 },
+  // a castle on a hilltop in mild, open country
+  castle: { cell: 1500, flat: 20, out: 34, salt: 0x2C451E, tries: 16, rule: (x, z, h) => Math.abs(coldBase(x, z)) < 0.2 && rangeAt(x, z) < 0.15 && h > 8 && h < 60 && hilltop(x, z, h) > 5 },
+  // ruins: in the plains, and sandstone ones in the desert
+  ruin: { cell: 760, flat: 7, out: 12, salt: 0x5017, tries: 10, chance: 0.6, rule: (x, z, h) => h > 1 && h < 50 && (biomesAt(x, z, h).desert > 0.5 || (rangeAt(x, z) < 0.2 && Math.abs(coldBase(x, z)) < 0.25)) },
+  // a hut on stilts in the swamp (no levelled ground: it stands over the water)
+  hut: { cell: 420, flat: 0, out: 0, salt: 0x4D7, tries: 12, rule: (x, z, h) => h < 4 && biomesAt(x, z, h).swamp > 0.5 },
+  // a windmill on an open, windy rise
+  windmill: { cell: 980, flat: 6, out: 12, salt: 0x3111, tries: 12, chance: 0.7, rule: (x, z, h) => h > 14 && h < 70 && rangeAt(x, z) < 0.35 && Math.abs(coldBase(x, z)) < 0.3 && hilltop(x, z, h) > 3 },
+};
+/** How much higher a spot is than the ground about it (m, the mean of eight looks 70 m out). */
+function hilltop(x, z, h) {
+  let s = 0;
+  for (let k = 0; k < 8; k++) { const a = (k / 8) * TAU; s += rawHeight(x + Math.cos(a) * 70, z + Math.sin(a) * 70); }
+  return h - s / 8;
+}
+const siteCells = new Map(), lastSite = {};
+function siteOfCell(kind, cx, cz) {
+  const key = kind + ':' + cx + ':' + cz;
+  if (siteCells.has(key)) return siteCells.get(key);
+  const K = SITE_KINDS[kind], R = mulberry32((Math.floor(hash(cx * 13 + 7, cz * 5 - 11) * 4294967296) ^ Math.imul(WORLD.seed, 0x27D4EB2F) ^ K.salt) | 0);
+  let site = null;
+  const chance = R(), home = homeShrineSite();
+  if (chance < (K.chance === undefined ? 1 : K.chance)) {
+    let best = null;
+    for (let k = 0; k < K.tries; k++) {
+      const x = (cx + 0.25 + R() * 0.5) * K.cell, z = (cz + 0.25 + R() * 0.5) * K.cell, turn = R(), variant = R();
+      if (Math.hypot(x - HOME.x, z - HOME.z) < 600 || Math.hypot(x - home.x, z - home.z) < 120) continue;
+      const h = rawHeight(x, z);
+      if (!K.rule(x, z, h)) continue;
+      if (K.flat > 0 && !clearOfLakes(x, z)) continue;
+      if (K.flat === 0 && lakeAt(x, z).t(x, z) < 2.2) continue;
+      const relief = K.flat > 0 ? reliefAt(x, z, h) : 0;
+      if (relief > 6) continue;
+      const near = shrineSitesNear(x, z, 80);
+      if (near.length) continue;
+      if (!best || relief < best.relief) best = { x, z, h, relief, turn, variant };
+    }
+    if (best) site = { id: key, kind, x: best.x, z: best.z, y: best.h, turn: best.turn * TAU, variant: Math.floor(best.variant * 1000), flat: K.flat, out: K.out };
+  }
+  siteCells.set(key, site);
+  return site;
+}
+/** The building site whose levelled ground reaches a spot (within its `out`, or `reach` if given), or null. */
+export function siteAt(x, z, reach) {
+  for (const kind in SITE_KINDS) {
+    const K = SITE_KINDS[kind], cx = Math.floor(x / K.cell), cz = Math.floor(z / K.cell), m = lastSite[kind];
+    let s;
+    if (m && m.cx === cx && m.cz === cz) s = m.s; else { s = siteOfCell(kind, cx, cz); lastSite[kind] = { cx, cz, s }; }
+    if (!s) continue;
+    const r = reach === undefined ? s.out : reach < 0 ? Math.max(s.flat, 8) + 4 : reach; // (reach < 0: the ground kept clear round it)
+    if (r > 0 && (x - s.x) ** 2 + (z - s.z) ** 2 < r * r) return s;
+  }
+  return null;
+}
+/** Every building site of a kind (or all kinds) within `r` metres of a spot, nearest first. */
+export function sitesNear(x, z, r, kind) {
+  const out = [], dist = (s) => Math.hypot(s.x - x, s.z - z);
+  for (const k in SITE_KINDS) {
+    if (kind && k !== kind) continue;
+    const K = SITE_KINDS[k];
+    for (let cz = Math.floor((z - r) / K.cell); cz <= Math.floor((z + r) / K.cell); cz++) for (let cx = Math.floor((x - r) / K.cell); cx <= Math.floor((x + r) / K.cell); cx++) { const s = siteOfCell(k, cx, cz); if (s && dist(s) < r) out.push(s); }
+  }
+  return out.sort((a, b) => dist(a) - dist(b));
+}
 const HOME_PLACES = landmarksOf(HOME);
 DOCK_A = HOME_PLACES.dockA; CHAIR_A = HOME_PLACES.chairA;
 export const SPAWN = HOME_PLACES.spawn;
@@ -672,4 +778,4 @@ export function anchorTo(lake) {
   chairSpots.forEach((c, i) => Object.assign(c, m.chairs[i]));
 }
 export const nearReserved = (x, z, r) => chairSpots.some((c) => Math.hypot(x - c.x, z - c.z) < r) || Math.hypot(x - FIRE_SPOT.x, z - FIRE_SPOT.z) < r + 1.6;
-
+sitesReady = true; // (from here on the land's height levels the buildings' ground)

@@ -368,3 +368,26 @@ test('weather moves over the land: the same for everyone at a moment, carried by
   expect(r.auto).toBe(r.here);
   noErrors(errors);
 });
+
+test('biomes: desert, swamp, enchanted wood and volcanic rock lie beyond home, each grows its own things, and none crowds its slots', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const r = await page.evaluate(() => {
+    const m = window.__meadow, h = m.home, near = {};
+    for (let z = -4000; z <= 4000; z += 150) for (let x = -4000; x <= 4000; x += 150) { const w = m.biomes(h.x + x, h.z + z); for (const k in w) if (w[k] > 0.6 && (!near[k] || Math.hypot(x, z) < near[k].d)) near[k] = { d: Math.hypot(x, z), x: h.x + x, z: h.z + z }; }
+    const S = 57.6, at = (k) => { const s = near[k]; return s ? m.wilds.biome(Math.floor(s.x / S), Math.floor(s.z / S)) : null; };
+    const homeW = m.biomes(h.x, h.z);
+    const out = { near: Object.fromEntries(Object.entries(near).map(([k, v]) => [k, Math.round(v.d)])), home: Math.max(...Object.values(homeW)), desert: at('desert'), enchanted: at('enchanted'), swamp: at('swamp') };
+    // stand in each: nothing drops for want of a slot
+    const dropped = {};
+    for (const k of ['desert', 'enchanted', 'swamp']) { const s = near[k]; if (!s) continue; m.travelTo(s.x, s.z); for (let i = 0; i < 10; i++) m.tick(1 / 30); dropped[k] = m.wilds.stats().dropped; }
+    out.dropped = dropped;
+    return out;
+  });
+  for (const k of ['desert', 'swamp', 'enchanted', 'volcanic']) expect(r.near[k], `there is ${k} within 4 km`).toBeGreaterThan(0);
+  expect(r.home, 'home is ordinary country').toBeLessThan(0.05);
+  expect(r.desert.cacti.length + r.desert.crystals.length, 'cacti in the desert').toBeGreaterThan(0);
+  expect(r.desert.cacti.length).toBeGreaterThan(0);
+  expect(r.enchanted.mushrooms.length + r.enchanted.crystals.length, 'glowing things in the enchanted wood').toBeGreaterThan(0);
+  expect(r.dropped).toEqual({ desert: 0, enchanted: 0, swamp: 0 });
+  noErrors(errors);
+});

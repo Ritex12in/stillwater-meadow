@@ -307,8 +307,24 @@ const FAMILIES = {
     blobs: 15, blob: 1.1, perBlob: 24, leaf: 0.9, scatter: 0.8, jitter: 0.35, roll: 0.5,
     leaves: { shape: 'oval', wide: 0.45, size: 0.12, nodes: 8, reach: 0.42, fill: 80 }, bark: furrowed('#94705a', 'rgba(55,34,24,0.75)', 63),
   },
+  // the enchanted wood's giants: a vast flared trunk, great limbs reaching out and up, a deep crown
+  GiantTree: {
+    seed: 7100, trunk: 3.2, radius: 0.42, lean: 0.12, limbs: 6, limbAngle: 0.85, limbLen: 4.6, step: 0.45, taper: 0.6,
+    depth: 3, side: [0.2, 0.6, 0.55], sideFrom: [0.4, 0.15, 0.1], sideAngle: [0.85, 0.8, 0.75], sideLen: [0.55, 0.55, 0.5], shorten: 0.55,
+    wiggle: [0.25, 0.32, 0.42, 0.5], rise: [0.03, 0.0, -0.01, 0.0], minRise: 0.15, leafDepth: 1, leafFrom: 0.4,
+    blobs: 22, blob: 1.35, perBlob: 28, leaf: 1.0, scatter: 0.85, jitter: 0.4, roll: 0.6,
+    leaves: { shape: 'oval', wide: 0.55, size: 0.14, nodes: 8, reach: 0.44, fill: 75 }, bark: furrowed('#6f6257', 'rgba(35,30,26,0.8)', 71),
+  },
+  // the swamp's willows: a short trunk, long limbs arching out and their twigs hanging down
+  WillowTree: {
+    seed: 7300, trunk: 2.2, radius: 0.22, lean: 0.3, limbs: 5, limbAngle: 0.7, limbLen: 3.2, step: 0.4, taper: 0.62,
+    depth: 3, side: [0.4, 0.7, 0.6], sideFrom: [0.35, 0.15, 0.1], sideAngle: [0.9, 1.1, 1.2], sideLen: [0.6, 0.7, 0.8], shorten: 0.6,
+    wiggle: [0.2, 0.3, 0.35, 0.4], rise: [0.02, -0.06, -0.1, -0.12], minRise: -0.9, leafDepth: 1, leafFrom: 0.25,
+    blobs: 20, blob: 0.9, perBlob: 26, leaf: 0.8, scatter: 0.6, jitter: 0.25, roll: 0.3,
+    leaves: { shape: 'oval', wide: 0.3, size: 0.12, nodes: 9, reach: 0.4, fill: 85 }, bark: furrowed('#6b5d4a', 'rgba(40,34,26,0.75)', 73),
+  },
 };
-const TEX_NAMES = { MapleTree: 'maple', BirchTree: 'birch', NormalTree: 'normal' };
+const TEX_NAMES = { MapleTree: 'maple', BirchTree: 'birch', NormalTree: 'normal', GiantTree: 'giant', WillowTree: 'willow' };
 
 function buildTree(name, P, variant) {
   const r = mulberry32(P.seed + variant * 977);

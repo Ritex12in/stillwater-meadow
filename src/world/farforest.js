@@ -28,6 +28,8 @@ const FAMILIES = [
   { name: 'blossom', model: 'TwistedTree_1', leaves: 'leaves_bush', bark: 'bark_twisted' },
   { name: 'normal', model: 'NormalTree_2', leaves: 'normal_leaves', bark: 'normal_bark' },
   { name: 'slimpine', model: 'PineTree_2', leaves: 'slimpine_leaves', bark: 'slimpine_bark' },
+  { name: 'giant', model: 'GiantTree_2', leaves: 'giant_leaves', bark: 'giant_bark' },
+  { name: 'willow', model: 'WillowTree_2', leaves: 'willow_leaves', bark: 'willow_bark' },
 ];
 
 /** Render each family's tree, side on, into one texture (grey leaves: the cards tint them). */

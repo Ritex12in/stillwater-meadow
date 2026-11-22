@@ -18,7 +18,8 @@ import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { smooth, fbm } from '../core/math.js';
 import { SEASON_GLSL, seasonU } from '../core/year.js';
-import { wxU } from '../core/materials.js';
+import { biomesAt } from '../core/biome.js';
+import { wxU, neonU } from '../core/materials.js';
 import { height, lakeAt, setGroundSampler, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
@@ -116,11 +117,12 @@ function takePart() {
   if (p) return p;
   partsMade++;
   const geo = new THREE.BufferGeometry();
-  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, clm: new Float32Array(VERTS * 3), h: new Float32Array(GRID) };
+  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, clm: new Float32Array(VERTS * 3), look: new Float32Array(VERTS * 4), h: new Float32Array(GRID) };
   geo.setAttribute('position', new THREE.BufferAttribute(part.pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(part.nrm, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(part.col, 3));
   geo.setAttribute('clime', new THREE.BufferAttribute(part.clm, 3));
+  geo.setAttribute('look', new THREE.BufferAttribute(part.look, 4)); // (the biomes here: desert, swamp, enchanted, volcanic: core/biome.js)
   if (textured) geo.setAttribute('splat', new THREE.BufferAttribute(part.spl, 4));
   geo.setIndex(tileIndex);
   geo.boundingSphere = new THREE.Sphere();
@@ -135,7 +137,7 @@ function takePart() {
 /** Fill a tile's buffers from the land's formula. A generator: it yields every few rows so the work can be spread over frames. */
 function* fill(t) {
   const part = takePart(), s = tileSize(t.lv), cs = s / TILE_N, x0 = t.ix * s, z0 = t.iz * s;
-  const { pos, nrm, col: cols, spl, clm, h: hOut } = part;
+  const { pos, nrm, col: cols, spl, clm, look, h: hOut } = part;
   // heights, one cell beyond the tile on every side: normals then come from the land itself, not
   // from this tile's triangles, so light runs unbroken across the joins
   for (let j = 0; j < W; j++) {
@@ -171,6 +173,8 @@ function* fill(t) {
       const pond = t.lv > 0 && h < 0.02 ? 1 : 0;
       if (pond) { pos[k * 3 + 1] = 0.02; nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }
       clm[k * 3] = cold; clm[k * 3 + 1] = dry; clm[k * 3 + 2] = pond;
+      const bw = biomesAt(x, z, h, base, rain);
+      look[k * 4] = bw.desert; look[k * 4 + 1] = bw.swamp; look[k * 4 + 2] = bw.enchanted; look[k * 4 + 3] = bw.volcanic;
       c.multiplyScalar(1 - lushOf(rain) * 0.16);
       if (textured) {
         // the grass patches become a tint around 1 (the texture brings the colour); weights go apart
@@ -194,6 +198,7 @@ function* fill(t) {
       pos[to * 3 + 1] -= drop;
       if (spl) for (let q = 0; q < 4; q++) spl[to * 4 + q] = spl[from * 4 + q];
       for (let q = 0; q < 3; q++) clm[to * 3 + q] = clm[from * 3 + q];
+      for (let q = 0; q < 4; q++) look[to * 4 + q] = look[from * 4 + q];
     }
   }
   const { geo, mesh } = part;
@@ -319,11 +324,13 @@ function groundDetail(mat, textured) {
         tLeaves: { value: kit.tex.leaves_litter }, uAutumn: groundU.autumn,
       });
     }
-    sh.vertexShader = 'varying vec3 vGround;\nattribute vec3 clime;\nvarying vec3 vClime;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+    sh.uniforms.uNightGlow = neonU;
+    sh.vertexShader = 'varying vec3 vGround;\nattribute vec3 clime;\nvarying vec3 vClime;\nattribute vec4 look;\nvarying vec4 vLook;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
       vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;
       vClime = clime;
+      vLook = look;
       ${textured ? 'vSplat = splat;' : ''}`);
-    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nuniform vec3 uCam;\nuniform float uFreshSnow;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
+    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nvarying vec4 vLook;\nuniform vec3 uCam;\nuniform float uFreshSnow;\nuniform float uNightGlow;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
       // (wrapped first: far from the middle of the world the numbers get too big for sin() to scatter)
       float gHash(vec2 p) { return fract(sin(dot(mod(p, 1024.0), vec2(127.1, 311.7))) * 43758.5453); }
       float gNoise(vec2 p) {
@@ -339,7 +346,7 @@ function groundDetail(mat, textured) {
         float mid = gNoise(q * 0.8);
         // the season's snow, by this spot's own chill today (core/year.js), or fresh snow from the sky
         float seasonIn = chillNow(vClime.x) + (broad - 0.5) * 0.3 + (mid - 0.5) * 0.14;
-        gSnowAmt = max(uFreshSnow, 0.79 * smoothstep(0.47, 0.6, seasonIn));
+        gSnowAmt = max(uFreshSnow, 0.79 * smoothstep(0.47, 0.6, seasonIn)) * (1.0 - smoothstep(0.2, 0.6, vLook.w)); // (no snow lies on the volcano's warm black rock)
         ${textured ? `
         // grass: two scales and angles of the lush texture (so no tile repeats), patches of the
         // flowery one, and the fine one far off where the others would shimmer
@@ -394,14 +401,32 @@ function groundDetail(mat, textured) {
         // (in warm country the drought is in summer: gold then, green in the winter rains)
         float dryNow = clamp(vClime.y + (1.0 - smoothstep(-0.5, 0.0, vClime.x)) * 0.5 * (0.5 - uSeason / 0.75), 0.0, 1.0);
         diffuseColor.rgb *= mix(vec3(1.0), vec3(1.3, 1.07, 0.64) * (0.92 + 0.16 * mid), dryNow);` : ''}
+        // the biomes' grounds (core/biome.js): desert sand in wind ripples, dark peaty swamp, the
+        // enchanted wood's blue-green moss (glowing faintly here and there at night), black volcanic rock
+        {
+          float ripple = 0.9 + 0.1 * sin(dot(q, vec2(0.83, 0.31)) * 2.3 + gNoise(q * 0.2) * 5.0);
+          vec3 sand = vec3(0.93, 0.76, 0.5) * ripple * (0.92 + 0.16 * broad);
+          diffuseColor.rgb = mix(diffuseColor.rgb, sand, smoothstep(0.15, 0.7, vLook.x));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.26, 0.31, 0.18) * (0.85 + 0.3 * broad), smoothstep(0.2, 0.8, vLook.y) * 0.75);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.55, 0.82, 0.86), smoothstep(0.2, 0.8, vLook.z));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.12, 0.13) * (0.85 + 0.3 * mid), smoothstep(0.2, 0.75, vLook.w));
+        }
         // a lake a long way off: no sheet of water is spared for it, so its bed is painted the colour of water
         // (frozen over when the season is cold there, as a near lake's sheet of water would be)
         vec3 farWater = mix(vec3(0.2, 0.42, 0.58), vec3(0.8, 0.86, 0.92), smoothstep(0.5, 0.6, chillNow(vClime.x)));
         diffuseColor.rgb = mix(diffuseColor.rgb, farWater, smoothstep(0.3, 0.7, vClime.z));
         // in the cold, snow lies in ragged drifts that close up into snowfields (and on the high peaks all year)
-        float snowIn = vClime.x + (broad - 0.5) * 0.3 + (mid - 0.5) * 0.14;
+        float snowIn = vClime.x + (broad - 0.5) * 0.3 + (mid - 0.5) * 0.14 - vLook.w;
         vec3 snowCol = mix(vec3(0.78, 0.85, 0.96), vec3(0.95, 0.97, 1.0), smoothstep(0.3, 0.75, broad));
         diffuseColor.rgb = mix(diffuseColor.rgb, snowCol, smoothstep(0.47, 0.6, snowIn));
+      }`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      {
+        float speck = step(0.985, fract(sin(dot(floor(vGround.xz * 1.7), vec2(12.9898, 78.233))) * 43758.5453));
+        totalEmissiveRadiance += vec3(0.3, 0.9, 1.0) * speck * smoothstep(0.4, 0.9, vLook.z) * uNightGlow * 1.6;
+        // and the lava's glow in the cracks of volcanic rock
+        float crack = smoothstep(0.93, 0.985, 1.0 - abs(gNoise(vGround.xz * 0.09) * 2.0 - 1.0)) * smoothstep(0.4, 0.6, gNoise(vGround.xz * 0.013 + 7.0));
+        totalEmissiveRadiance += vec3(1.0, 0.35, 0.08) * crack * smoothstep(0.5, 0.9, vLook.w) * (0.5 + uNightGlow);
       }`);
     farHaze(sh);
   };

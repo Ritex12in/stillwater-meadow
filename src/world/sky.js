@@ -1,6 +1,6 @@
 // Gradient sky dome with sun, a phased moon, and a night sky drawn per pixel: stars that stay a
 // pixel or two wide at any resolution and twinkle, a Milky Way band with dark dust lanes, and a
-// moon with faint seas on its face.
+// moon with faint seas on its face; and over the cold country, the northern lights.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { GRADE_GLSL } from '../core/atmosphere.js';
@@ -16,6 +16,7 @@ export const skyU = {
   stars: { value: 0 },         // how much of the night sky shows (0 by day or under cloud)
   uTime: { value: 0 },         // star twinkle clock (set with the lake's, so it slows with reduced motion)
   uPA: { value: 0.001 },       // the angle one screen pixel covers, so stars stay pin sharp
+  aurora: { value: 0 },        // how strong the northern lights are (over cold country, on clear nights)
 };
 
 export let sky = null;
@@ -72,9 +73,32 @@ export function buildSky() {
       fragmentShader: GRADE_GLSL + `
         uniform vec3 topColor; uniform vec3 horizonColor; uniform vec3 sunColor; uniform vec3 sunDir;
         uniform vec3 moonDir; uniform float moonAmt; uniform float moonPhase;
-        uniform float stars; uniform float uTime; uniform float uPA;
+        uniform float stars; uniform float uTime; uniform float uPA; uniform float aurora;
         varying vec3 vDir;
         ` + NIGHT_GLSL + `
+        // the northern lights: curtains hanging in the northern sky (north is -z), folding slowly,
+        // green below and fading to violet at their tops, made of fine vertical rays
+        vec3 auroraSky(vec3 d) {
+          float az = atan(d.x, -d.z);                       // 0 toward the north
+          float north = smoothstep(1.9, 0.4, abs(az));      // mostly in the northern half of the sky
+          float h = d.y;
+          if (h < 0.02 || north <= 0.0) return vec3(0.0);
+          float t = uTime * 0.035;
+          float c = 0.0, top = 0.0;
+          for (int i = 0; i < 3; i++) {
+            float fi = float(i);
+            // where the curtain hangs (its lower edge), wandering across the sky
+            float edge = 0.1 + 0.16 * fi + 0.09 * (fbm3(vec3(az * 1.3 + fi * 4.7, t + fi, 2.0)) - 0.5) * 2.0;
+            float above = h - edge;
+            float sheet = smoothstep(-0.015, 0.02, above) * exp(-max(above, 0.0) * (5.0 - fi));
+            float rays = 0.55 + 0.45 * vn3(vec3(az * 60.0 + fi * 13.0, t * 6.0, fi));
+            float fold = smoothstep(0.35, 0.75, fbm3(vec3(az * 2.2 - t * 0.7 + fi * 9.1, fi * 3.3, t * 0.5)));
+            c += sheet * rays * fold * (1.0 - fi * 0.25);
+            top += sheet * rays * fold * smoothstep(0.0, 0.25, above);
+          }
+          vec3 green = vec3(0.25, 1.0, 0.55), violet = vec3(0.55, 0.35, 1.0);
+          return (green * (c - top * 0.6) + violet * top) * north * 0.85;
+        }
         void main() {
           vec3 d = normalize(vDir);
           float h = d.y;
@@ -83,6 +107,7 @@ export function buildSky() {
           c = mix(c, horizonColor * 0.92, smoothstep(0.0, -0.3, h));
           float s = max(dot(d, normalize(sunDir)), 0.0);
           if (stars > 0.01) c += nightSky(d) * stars * smoothstep(0.0, 0.12, h);
+          if (aurora > 0.01) c += auroraSky(d) * aurora * stars;
           c += sunColor * (pow(s, 5.0) * 0.16 + pow(s, 40.0) * 0.3 + pow(s, 2.0) * 0.08) * (1.0 - 0.4 * max(h, 0.0)); // same glow as meadowHaze (core/atmosphere.js)
           c = mix(c, vec3(1.0, 0.97, 0.9) * (0.6 + 0.6 * sunColor), smoothstep(0.99935, 0.9997, s) * above);
           // moon: a disc lit from one side according to its phase

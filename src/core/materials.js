@@ -543,3 +543,42 @@ export function neonAtNight(mat, k = 1) {
   mat.customProgramCacheKey = () => baseKey + '|neon' + k;
   return mat;
 }
+
+/**
+ * Fewer draws: the meshes hanging straight under `group` that never move on their own are merged, one
+ * mesh per material (and per shadow setting), in the group's own frame. Each draw costs a fixed amount of
+ * the frame on integrated graphics, whatever its size, so a jetty of 27 planks and posts drawn as 4 meshes
+ * is much cheaper. Only plain meshes (not instanced, not skinned) with the same set of attributes merge.
+ */
+export function mergeStatic(group) {
+  const sets = new Map();
+  for (const m of [...group.children]) {
+    if (!m.isMesh || m.isInstancedMesh || m.isSkinnedMesh || m.children.length || m.userData.keep) continue;
+    const key = m.material.uuid + (m.castShadow ? 'c' : '') + (m.receiveShadow ? 'r' : '');
+    if (!sets.has(key)) sets.set(key, []);
+    sets.get(key).push(m);
+  }
+  for (const list of sets.values()) {
+    if (list.length < 2) continue;
+    const names = Object.keys(list[0].geometry.attributes).filter((n) => list.every((m) => m.geometry.attributes[n]));
+    const geos = list.map((m) => {
+      m.updateMatrix();
+      const g = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrix);
+      for (const n of Object.keys(g.attributes)) if (!names.includes(n)) g.deleteAttribute(n);
+      return g;
+    });
+    let n = 0; for (const g of geos) n += g.attributes.position.count;
+    const out = new THREE.BufferGeometry();
+    for (const name of names) {
+      const size = geos[0].attributes[name].itemSize, arr = new Float32Array(n * size);
+      let o = 0; for (const g of geos) { arr.set(g.attributes[name].array, o); o += g.attributes[name].array.length; }
+      out.setAttribute(name, new THREE.BufferAttribute(arr, size));
+    }
+    out.computeBoundingSphere();
+    const mesh = new THREE.Mesh(out, list[0].material);
+    mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow;
+    for (const m of list) { group.remove(m); m.geometry.dispose(); }
+    group.add(mesh);
+  }
+  return group;
+}

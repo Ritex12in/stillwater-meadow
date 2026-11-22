@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, clamp, lerp, damp, smooth, angDiff, rnd } from '../core/math.js';
 import { lakeT, lakePoint, dockAt, DOCK_A, DOCK_LEN, DOCK_Y, KIT } from '../core/shape.js';
-import { std, weatherize, glowTex } from '../core/materials.js';
+import { std, weatherize, glowTex, mergeStatic } from '../core/materials.js';
 import { seasonState, hooks } from '../core/state.js';
 import { makeKid, KIDS, KID_DIMS } from './kid.js';
 import { player, sitDown, standUp } from './player.js';
@@ -83,6 +83,7 @@ export function buildBoat() {
   lanternPool.position.set(0.95, -0.01, 0.15); lanternPool.scale.set(3.4, 1, 3.4);
   lanternLight.position.set(0.7, 1.2, 0.15);
   boat.add(lanternGlow, lanternPool, lanternLight);
+  mergeStatic(boat); // (some forty poles, slats and boards drawn as six)
 
   // the skipper, drawn as the children are (characters/kid.js: KIDS.skipper), a little taller, under a straw hat
   skipper = makeKid(KIDS.skipper);

@@ -98,7 +98,7 @@ Each one leaves the game playable and tested.
 | N | **Seasons and weather by place** (2026-11-22; see "Plan: seasons and weather by place"). (1) Away from home, lakes are wild. (2) A game year of 8 real days, and each place's temperature through it; warmer regions. (3) Snow, ice, leaves, blossom and flowers from that local temperature. (4) Weather as a pattern moving across the land with the wind, the same for everyone in a world. (5) The World panel says what it is like where you stand; distant storms later. | Pure in seed, position and time; nothing rebuilt as the days pass. | done (see "How seasons and weather work") |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | | done: companions come with you when you travel; the journal's places found have a Go button |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | | started: the characters are the sculpted children, redrawn after the owner's character sheets (KayKit and then the VRoid characters were tried and removed by the owner).  Animals: a fox by country added and the deer travel with you, made in code (no CC0 rigged deer or fox could be fetched without a browser) |
-| 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | | view distance setting done (near, medium, far); tuning on the owner's GPU and a phone needs the owner |
+| 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | | view distance setting done; tuned on the owner's own computer, 2026-11-23 (see "Performance"); a real phone not tried |
 | 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; rivers and waterfalls done (see "Rivers and waterfalls"); islands in lakes done (see "Islands") |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
@@ -477,6 +477,26 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   wonder, "?" when thinking, red strokes when worried, a dark scrawl when cross, a tear-drop when sad,
   "z"s when sleepy; each bobs and fades in about 2.4 s, not again within 1.2 s, two made up front per
   head so the scene holds the same whatever faces are pulled.
+- **Performance** (2026-11-23, milestone 7, on the owner's own computer: Intel Iris Xe integrated graphics,
+  a 1080p screen; `tools/bench.mjs` measures fps, slow frames and draw calls per place and preset, uncapped,
+  with a CPU profile (PROFILE=1) or as a slow phone (PHONE=1)). Found, by A/B in one page:
+  - the frame is bound by the graphics chip: an empty scene is fast, a quarter of the pixels gives about
+    a third more fps, and every draw call costs a fixed amount however small. Auto (which lowers the
+    render resolution when frames are slow) holds about 47 fps at home at 1080p.
+  - the presets' resolution was only a cap on device pixels per CSS pixel, so on an ordinary screen (one
+    per one) Low drew every pixel High did and ran slower than Auto. Now Low draws 65% of the screen's
+    pixels and Medium 85% (and their caps stay): Low at home 31 -> 43 fps, in the woods 35 -> 48.
+  - fewer draw calls: the jetty, bench, lawn chairs and the boat's frame merged by material (a jetty of 27
+    planks and posts is 4 draws, a chair of 17 pieces 1), the path lamps two instanced meshes, a pet's eye
+    one mesh: about 720 draws a frame at home on High down to about 560. That alone did not move the
+    frame rate measurably on this computer; it lightens the load elsewhere.
+  - tried and taken out: a patch to three.js r128's instanced-mesh setup (it re-specifies every vertex
+    attribute of every instanced draw, about 1,500 calls a frame here): the calls went, the frame rate
+    did not change in an A/B, so it was not worth patching a library for.
+  - as a slow phone (390x844 at 3x, CPU slowed 4x, but this computer's graphics): Low 40-47 fps, Medium
+    34-40; running across new ground has hitches of about 110 ms. A real phone's graphics are untried.
+  Left: the plants and trees are some 150 instanced draws of 2-10 copies each (a kit of many models),
+  the largest share of the draws; fewer, bigger batches would need the vegetation reworked.
 - **Pets** (2026-11-22, the owner: "redesign pets after the sheets"): the dogs and cats are sculpted as
   the children are, in their chibi style (`makeDog` and `makeCat` in `characters/rigs.js`): a big round
   head, a small plump body, short legs with white paws. The first dog is the sheet's puppy (cream with

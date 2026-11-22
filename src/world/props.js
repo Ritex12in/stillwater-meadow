@@ -8,7 +8,7 @@ import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtil
 import { scene } from '../core/render.js';
 import { TAU, rand, pick, angDiff } from '../core/math.js';
 import { height, LAKE, lakePoint, PATH_T, dockStart, dockDir, DOCK_A, DOCK_BACK, DOCK_LEN, DOCK_HALF, DOCK_Y, chairSpots, BENCH_SPOT, KIT, PARK } from '../core/shape.js';
-import { std, weatherize, glowTex } from '../core/materials.js';
+import { std, weatherize, glowTex, mergeStatic } from '../core/materials.js';
 import { world, obstacles, seats, hooks } from '../core/state.js';
 import { kitBench } from './kitprops.js';
 
@@ -41,6 +41,7 @@ export function buildDockAndBench() {
       dock.add(post);
     }
   }
+  mergeStatic(dock); // (27 planks and posts drawn as 4)
   scene.add(dock);
 
   world.benchPos = BENCH_SPOT;
@@ -56,6 +57,7 @@ export function buildDockAndBench() {
     mesh.position.set(x, y, z); mesh.rotation.x = rx; mesh.castShadow = true;
     bench.add(mesh);
   });
+  mergeStatic(bench);
   scene.add(bench);
   benchBlock = { x: 0, z: 0, r: 0.95 };
   benchSeat = { name: 'bench', x: 0, z: 0, baseY: 0, top: 0.515, rot: 0, standOff: 1.35 };
@@ -93,7 +95,7 @@ function makeChair(paint) {
   for (let i = 0; i < 4; i++) add(0.62, 0.035, 0.12, 0, 0.43 - i * 0.012, 0.2 - i * 0.135, -0.08); // seat slats
   for (let i = 0; i < 5; i++) add(0.1, 0.78, 0.03, -0.24 + i * 0.12, 0.8, -0.34, -0.32);           // back slats
   add(0.62, 0.06, 0.04, 0, 1.12, -0.46, -0.32);
-  return g;
+  return mergeStatic(g); // (17 pieces drawn as 1)
 }
 // two lawn chairs by the water, and one at the end of the jetty
 const chairs = [];
@@ -148,21 +150,24 @@ export const lampSpots = [];
 // jetty. Each remembers its place in that circle *relative to the jetty* (`off`), so when the
 // landmarks stand at another lake, turned another way, the lamps turn with them.
 const lamps = [];
+let posts = null, glasses = null;
+const LM = new THREE.Matrix4(), LQ = new THREE.Quaternion(), LY = new THREE.Vector3(0, 1, 0), LS = new THREE.Vector3(1, 1, 1);
 
 export function buildLamps() {
   const postMat = std('#22282a', { flatShading: false, roughness: 0.55, metalness: 0.3 });
   const { iron, glass } = lampGeos();
   const glowMat = new THREE.SpriteMaterial({ map: glowTex, color: '#ffc979', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  // (all the posts are one instanced mesh, and all the lanterns another: two draws, not twenty-two)
+  posts = new THREE.InstancedMesh(iron, postMat, 12); posts.castShadow = true; posts.frustumCulled = false;
+  glasses = new THREE.InstancedMesh(glass, lampMat, 12); glasses.frustumCulled = false;
+  scene.add(posts, glasses);
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * TAU + 0.2;
     if (Math.abs(angDiff(a, DOCK_A)) < 0.2) continue;
-    const post = new THREE.Mesh(iron, postMat);
-    post.castShadow = true;
-    const lamp = new THREE.Mesh(glass, lampMat);
     const glow = new THREE.Sprite(glowMat); // all lamps share one material: one opacity update per frame
     glow.scale.set(2.4, 2.4, 1);
-    scene.add(post, lamp, glow);
-    const l = { post, lamp, glow, spot: new THREE.Vector3(), block: { x: 0, z: 0, r: 0.2 }, a, off: a - DOCK_A };
+    scene.add(glow);
+    const l = { glow, spot: new THREE.Vector3(), block: { x: 0, z: 0, r: 0.2 }, a, off: a - DOCK_A };
     lamps.push(l);
     lampGlows.push(glow);
     lampSpots.push(l.spot);
@@ -175,10 +180,12 @@ function placeLamps(first) {
   for (const l of lamps) {
     // (the lamps light the path of a lake that has a bench to walk to; otherwise they are put away)
     const a = first ? l.a : DOCK_A + l.off, p = KIT.bench ? lakePoint(a, PATH_T + 0.085) : PARK, y = KIT.bench ? height(p.x, p.z) : 0;
-    l.post.position.set(p.x, y, p.z); l.post.rotation.y = a;
-    l.lamp.position.copy(l.post.position); l.lamp.rotation.y = a;
+    LM.compose(new THREE.Vector3(p.x, y, p.z), LQ.setFromAxisAngle(LY, a), LS);
+    posts.setMatrixAt(lamps.indexOf(l), LM); glasses.setMatrixAt(lamps.indexOf(l), LM);
     l.glow.position.set(p.x, y + 2.44, p.z);
     l.spot.set(p.x, y + 2.44, p.z);
     l.block.x = p.x; l.block.z = p.z;
   }
+  posts.count = glasses.count = lamps.length;
+  posts.instanceMatrix.needsUpdate = glasses.instanceMatrix.needsUpdate = true;
 }

@@ -10,7 +10,7 @@ import { setShadowSize, sun } from '../world/lights.js';
 
 /** Every option, its choices (worst to best) and what each choice means. */
 export const OPTIONS = {
-  resolution: { label: 'Resolution', choices: { low: ['Low', 1], medium: ['Medium', 1.5], high: ['High', 2], ultra: ['Full', 3] } },           // cap on device pixels per CSS pixel
+  resolution: { label: 'Resolution', choices: { low: ['Low', [1, 0.65]], medium: ['Medium', [1.5, 0.85]], high: ['High', [2, 1]], ultra: ['Full', [3, 1]] } },           // cap on device pixels per CSS pixel
   shadows: { label: 'Shadows', choices: { off: ['Off', null], low: ['Low', [1024, 4]], medium: ['Medium', [1536, 3]], high: ['High', [2048, 2]], ultra: ['Ultra', [4096, 1]] } }, // [map size, refresh every n frames]
   effects: { label: 'Glow and sunbeams', choices: { off: ['Off', false], on: ['On', true] } },
   grass: { label: 'Grass', choices: { low: ['Sparse', 0.35], medium: ['Medium', 0.65], high: ['Dense', 1] } },
@@ -67,7 +67,10 @@ function apply(level, choice) {
 }
 /** The pixel ratio actually drawn at: the preset's, times the Auto scale. Only touched when it really changes. */
 function applyScale(force) {
-  const base = Math.min(window.devicePixelRatio || 1, quality.opts.resolution), dpr = Math.max(0.5, base * (quality.setting === 'auto' ? quality.scale : 1));
+  // (the resolution option: a cap on device pixels per CSS pixel, and a share of the screen's own pixels: on an ordinary screen
+  // of one device pixel per CSS pixel the cap alone changed nothing, so Low drew every pixel High did and ran slower than Auto)
+  const [cap, share] = Array.isArray(quality.opts.resolution) ? quality.opts.resolution : [quality.opts.resolution, 1];
+  const base = Math.min((window.devicePixelRatio || 1) * share, cap), dpr = Math.max(0.5, base * (quality.setting === 'auto' ? quality.scale : 1));
   if (!force && Math.abs(dpr - quality.dpr) / quality.dpr < 0.03) return;
   quality.dpr = dpr;
   renderer.setPixelRatio(dpr);

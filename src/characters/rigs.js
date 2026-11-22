@@ -105,15 +105,20 @@ function carved(parent, layers, bx6, n, k = 0.02) {
   parent.add(m);
   return m;
 }
+let EYE_MAT = null;
 /** A glossy dark eye lying on the face at (x, y) of the head's field `f`, with a highlight; scaling it in y squints it. */
 function petEye(head, f, x, y, iris) {
   const z = frontOf(f, x, y) || 0.1, e = new THREE.Group();
   e.position.set(x, y, z + 0.002); e.rotation.y = Math.sign(x) * 0.35; head.add(e);
-  const add = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.userData.small = true; e.add(m); return m; };
-  add(new THREE.IcosahedronGeometry(1, 2).scale(0.026, 0.032, 0.008), std(iris || '#2a1a12', { roughness: 0.35 }));
-  if (iris) add(new THREE.IcosahedronGeometry(1, 2).scale(0.011, 0.024, 0.006).translate(0, 0, 0.004), std('#1a120e', { roughness: 0.3 })); // a cat's pupil
-  add(new THREE.IcosahedronGeometry(1, 1).scale(0.009, 0.01, 0.004).translate(-0.008, 0.012, 0.007), std('#ffffff', { emissive: '#888888' }));
-  add(new THREE.IcosahedronGeometry(1, 1).scale(0.004, 0.004, 0.003).translate(0.009, -0.012, 0.007), std('#ffffff', { emissive: '#888888' }));
+  // (one mesh, its colours painted on: an eye of four pieces was four draws)
+  const parts = [[new THREE.IcosahedronGeometry(1, 2).scale(0.026, 0.032, 0.008), iris || '#2a1a12']];
+  if (iris) parts.push([new THREE.IcosahedronGeometry(1, 2).scale(0.011, 0.024, 0.006).translate(0, 0, 0.004), '#1a120e']); // a cat's pupil
+  parts.push([new THREE.IcosahedronGeometry(1, 1).scale(0.009, 0.01, 0.004).translate(-0.008, 0.012, 0.007), '#ffffff'], [new THREE.IcosahedronGeometry(1, 1).scale(0.004, 0.004, 0.003).translate(0.009, -0.012, 0.007), '#ffffff']);
+  const geos = parts.map(([g, col]) => { g = g.toNonIndexed(); const c = new THREE.Color(col), n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) c.toArray(a, i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.deleteAttribute('uv'); return g; });
+  const merged = new THREE.BufferGeometry();
+  for (const name of ['position', 'normal', 'color']) { let n = 0; geos.forEach((g) => { n += g.attributes[name].array.length; }); const arr = new Float32Array(n); let o = 0; geos.forEach((g) => { arr.set(g.attributes[name].array, o); o += g.attributes[name].array.length; }); merged.setAttribute(name, new THREE.BufferAttribute(arr, 3)); }
+  const m = new THREE.Mesh(merged, EYE_MAT || (EYE_MAT = std('#ffffff', { vertexColors: true, roughness: 0.32 })));
+  m.userData.small = true; e.add(m);
   return e;
 }
 const patchy = (base, patch, test) => (x, y, z) => (patch && test(x, y, z) ? patch : base);

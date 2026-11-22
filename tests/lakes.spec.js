@@ -54,7 +54,8 @@ test('going to a lake: its water is there, you can fish it, and visiting many le
   // visit lake after lake: the sheets of water are lent out, never added to
   const tour = await page.evaluate((ids) => {
     const m = window.__meadow, counts = [];
-    for (let round = 0; round < 2; round++) { for (const id of ids) { m.visitLake(id); for (let i = 0; i < 200; i++) m.ground.update(m.player.x, m.player.z); for (let i = 0; i < 5; i++) m.tick(1 / 30); } counts.push(m.counts().objects); }
+    // (a first round fills the pools, which build what they lend as it is first needed; then two rounds are counted)
+    for (let round = 0; round < 3; round++) { for (const id of ids) { m.visitLake(id); for (let i = 0; i < 200; i++) m.ground.update(m.player.x, m.player.z); for (let i = 0; i < 5; i++) m.tick(1 / 30); } if (round) counts.push(m.counts().objects); }
     return counts;
   }, lakes.slice(0, 6).map((L) => L.id));
   expect(tour[1], 'a second round of the same lakes adds no objects').toBe(tour[0]);

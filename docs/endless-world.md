@@ -53,6 +53,15 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
     face, hair and animation; it is behind `?hero=kaykit` until the owner has seen it, as the plan
     for milestone 6 says. Its adventurers fit the fantasy world.
   - The backpack starts with a tent and 8 lanterns (places you make need them).
+  - The sea: never within 2 km of home, so every start is inland by a lake; about 5% of world 1
+    within 6 km is sea, the nearest coast some 2 km from home. You cannot wade or swim (the shore
+    stops you, as at the lakes); no fishing at sea yet.
+  - Rivers and waterfalls were left out: a river must run downhill from lake to lake or to the sea
+    and be carved the same in every tile, which the height function cannot yet do without a
+    drainage pass over a whole region; that is a project of its own, best planned with the owner.
+    Islands in lakes were left out too (the lakes are small, and the boat only tours the home lake).
+  - New animals wait: no CC0 rigged deer or fox could be fetched without a browser, and the owner
+    disliked the code-made figures, so the existing deer and owl stay until the owner chooses.
 - **Worlds and carrying (2026-11-22):** seeds as in Minecraft: any text is a seed, the same text
   the same world, a new player gets a random one. The backpack is a real inventory of slots
   (flowers, later tools and other things); bouquets are tied from flowers in it.
@@ -86,12 +95,12 @@ Each one leaves the game playable and tested.
 | 4b-1 | **Landmarks that follow you.** Settled lakes (each outranking its eight neighbours, so at least half a kilometre apart) have a kit worked out from the seed and checked against the land: a jetty with the boat and skipper where the shore allows, a campfire with logs, a bench with lawn chairs and path lamps; each turned its own way. One of each object, moved to the nearest settled lake when the old one is well behind. Each place keeps its own state (bench bouquet, boat bouquet, fire). | Home is bit-for-bit unchanged; there and back leaves seats, obstacles and scene objects as they were; a bouquet stays at its own bench across a reload (`tests/places.spec.js`). | done |
 | 4b-2 | **Lake life at every lake.** Reeds and lily pads per lake, worked out from the lake and its country and drawn from fixed slots for the three nearest; the ducks, the heron, the frogs and the mist are at the lake you are at (not ducks on ice). | Each lake's are the same every visit; none undrawn; a tour of lakes leaves the scene as it was (`tests/lakes.spec.js`). | done |
 | 4c | **The valley goes.** Start beside a lake generated from the seed, with the full set of landmarks. The hand-placed valley, its plants, fences and pebbles are removed. Flowers to pick grow everywhere. Shrine sites are fixed by the seed (one back from the home lake, others in blossom groves); the ground under each is levelled, and the one shrine stands at the site nearest you. Tests go by places found by query. | One full run of the suite. | done (full run 2026-11-22: 42 of 43 passed; the one failure, the untamed cat, was the test assuming the old valley's shore, fixed) |
-| 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed (done); (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
+| 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed (done); (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | done overnight 2026-11-22 (see "How the biomes, buildings and places work"): flower journal, fish by country, skating, places found with a journal and postcards, camp and lanterns; the giant old tree is the enchanted wood's giants ringed with glowing mushrooms |
 | N | **Seasons and weather by place** (2026-11-22; see "Plan: seasons and weather by place"). (1) Away from home, lakes are wild. (2) A game year of 8 real days, and each place's temperature through it; warmer regions. (3) Snow, ice, leaves, blossom and flowers from that local temperature. (4) Weather as a pattern moving across the land with the wind, the same for everyone in a world. (5) The World panel says what it is like where you stand; distant storms later. | Pure in seed, position and time; nothing rebuilt as the days pass. | done (see "How seasons and weather work") |
-| 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | |
-| 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | |
-| 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | |
-| 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | |
+| 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | | done: companions come with you when you travel; the journal's places found have a Go button |
+| 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | | started: KayKit Rogue and Mage (CC0) follow the two children under `?hero=kaykit`, for the owner to judge. Not done: rewiring actions to them; new animals (no CC0 rigged deer or fox could be fetched without a browser; the code-made deer and owl remain) |
+| 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | | view distance setting done (near, medium, far); tuning on the owner's GPU and a phone needs the owner |
+| 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; islands in lakes and rivers and waterfalls not done (see below) |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
@@ -455,8 +464,13 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   animations each, following the code-made children with walk, run, sit, lie, cheer, pick-up and
   petting animations; the code-made children are hidden under them. Off unless asked for, for the
   owner to judge first.
-- **Left for later** from the mood board: the ocean and Coastal Isles (beaches, palms, beach huts,
-  ships), rivers and waterfalls (frozen ones too), wind-bent trees, hanging moss, dunes, mesas and
+- **The sea** (`seaAt`, `SEA_DEPTH` in `core/shape.js`): a continent field, broad as the climate's,
+  sinks the land under one sea at the lakes' level (0); lowland goes under first and hills stand out
+  as islands and headlands. Sand where land meets sea (`beachAt`, shown through the desert's look),
+  palms on it (`world/makers.js palm`), nothing else growing there; huts on stilts on mild beaches
+  and ships at anchor offshore (`SITE_KINDS` beachhut and ship, `world/buildings.js ship`). The
+  water is the lakes' shader on one wide sheet that follows you when the sea is near (`world/water.js`).
+- **Left for later** from the mood board: rivers and waterfalls (frozen ones too), wind-bent trees, hanging moss, dunes, mesas and
   sea arches, a sky city on the floating islands, cave interiors; and new animals (deer, foxes,
   owls). See the milestone table.
 

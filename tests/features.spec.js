@@ -79,7 +79,9 @@ test('the skipper trades his rod for a full bouquet of three kinds, not before',
   const bp = await page.evaluate(() => window.__meadow.BOARD_POINT);
   await teleport(page, bp.x, bp.z);
   await press(page, 'KeyG', 0.5);
-  expect(await page.evaluate(() => window.__meadow.rod().rod)).toBe(true);
+  // (when it fails now and then, say why: what the skipper said, and what was offered)
+  const why = await page.evaluate(() => ({ toast: document.getElementById('toast').textContent, actions: window.__meadow.actions().map((a) => a.id), pack: JSON.stringify(window.__meadow.pack.items ? window.__meadow.pack.items() : '') }));
+  expect(await page.evaluate(() => window.__meadow.rod().rod), JSON.stringify(why)).toBe(true);
   await teleport(page, p.x, p.z, s.x, s.z);
   await step(page, 0.4);
   expect((await actions(page)).map((a) => a.id)).toContain('fish-cast');
@@ -308,5 +310,30 @@ test('frame cost stays small', async ({ page }) => {
   const ms = await page.evaluate(() => { const t0 = performance.now(); for (let i = 0; i < 300; i++) window.__meadow.tick(1 / 60); return (performance.now() - t0) / 300; });
   console.log(`simulation: ${ms.toFixed(2)} ms per frame (excluding rendering)`);
   expect(ms).toBeLessThan(6);
+  noErrors(errors);
+});
+
+test('fishing in a river: cast from the bank, the float rides the river, a river fish bites', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#8');
+  await step(page, 0.5);
+  await page.evaluate(() => { window.__meadow.pack.add('rod'); });
+  // on the bank of a calm river near home, facing across it
+  const r = await page.evaluate(async () => {
+    const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
+    const SH = await import(url('/src/core/shape.js')), m = window.__meadow, H = m.home;
+    const v = SH.riversNear(H.x, H.z, 2000).filter((q) => !q.fall.some((f) => f) && q.w[q.n >> 1] > 3).sort((a, b) => Math.hypot(a.x[0] - H.x, a.z[0] - H.z) - Math.hypot(b.x[0] - H.x, b.z[0] - H.z))[0];
+    const i = v.n >> 1, tx = v.x[i + 1] - v.x[i], tz = v.z[i + 1] - v.z[i], tl = Math.hypot(tx, tz), nx = -tz / tl, nz = tx / tl, off = v.w[i] / 2 + 1.2;
+    return { x: v.x[i] + nx * off, z: v.z[i] + nz * off, fx: -nx, fz: -nz, lv: v.lv[i] };
+  });
+  await page.evaluate(({ x, z, fx, fz }) => window.__meadow.travelTo(x, z, x + fx, z + fz), r);
+  await step(page, 0.6);
+  expect((await actions(page)).map((a) => a.id)).toContain('fish-cast');
+  await page.keyboard.down('KeyR'); await step(page, 0.3); await page.keyboard.up('KeyR');
+  let info = await page.evaluate(() => window.__meadow.fishingInfo());
+  for (let i = 0; i < 600 && info.state !== 'bite'; i++) { await step(page, 0.1); info = await page.evaluate(() => window.__meadow.fishingInfo()); }
+  expect(info.state).toBe('bite');
+  expect(info.river, 'the float is in the river').toBe(true);
+  expect(Math.abs(info.floatY - r.lv), 'it rides the river, not the lakes\' level').toBeLessThan(0.2);
+  expect(['trout', 'minnow', 'char', 'perch', 'bluegill', 'pike', 'catfish', 'carp', 'koi', 'pupfish', 'bowfin', 'glowfin', 'ember']).toContain(info.species);
   noErrors(errors);
 });

@@ -507,7 +507,13 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   or hidden. On seed 1 the nearest river is about 480 m from home, a mountain stream stepping down
   into a lake. Rivers meet in 3 places within 6 km of home; at one their levels differ by 1.6 m,
   leaving a small step. Not done: rivers between lakes (every lake lies at the same level, so water
-  cannot run from one to another), fishing in rivers. (Bridges came later: see "Ways across water".)
+  cannot run from one to another). (Bridges came later: see "Ways across water".)
+  Fishing in rivers (2026-11-23, the owner chose it next): from a river's bank you cast a shorter line
+  across it (up to 5 m), the float riding the river's own water, onto a calm stretch well inside its
+  banks, not a fall and not frozen (by a frozen lake you may still fish a river that runs). A river is
+  never deep, so the biggest, deep-water fish are not in it; trout and minnows love running water and
+  the big still-water fish (carp, catfish, pike, koi) keep mostly to the lakes, and what is in it still
+  follows its country, as at the lakes. The catch says "in the river".
 - **Islands** (2026-11-22, the owner: "add islands in lakes"; `core/shape.js` "Islands"). About 70% of
   the wild lakes 20 m or more across have one (never home nor a settled lake, which the boat tours): a
   low mound 1.4 to 3.6 m high and a fifth to a third of the lake's radius across, its shore wobbling,

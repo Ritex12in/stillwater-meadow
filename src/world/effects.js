@@ -46,10 +46,10 @@ export function buildEffects() {
   }
 }
 
-export function spawnRipple(x, z, size) {
+export function spawnRipple(x, z, size, y = 0.045) {
   const r = ripples.find((q) => q.life <= 0);
   if (!r) return;
-  r.m.position.set(x, 0.045, z); r.life = 1.6; r.size = size; r.m.visible = true;
+  r.m.position.set(x, y, z); // (y: a river's water is higher than the lakes') r.life = 1.6; r.size = size; r.m.visible = true;
 }
 
 /** Hearts float up from an animal's head. */

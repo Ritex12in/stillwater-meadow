@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, clamp, lerp, damp, rnd } from '../core/math.js';
-import { lakeT, lakeAt, lakeIce, lakeChill, groveAt, biomesAt, onIce, waterAhead, animalWalkable, onDock, heightAt } from '../core/shape.js';
+import { lakeT, lakeAt, lakeIce, lakeChill, groveAt, biomesAt, onIce, waterAhead, animalWalkable, onDock, heightAt, riverNear, riverIce, riverChill } from '../core/shape.js';
 import { std } from '../core/materials.js';
 import { clock } from '../core/clock.js';
 import { hooks, seasonState, world } from '../core/state.js';
@@ -102,9 +102,11 @@ function reelRateOf(sp) {
   const cycles = FIGHT_LEN[sp.tier] / (pull + rest);
   return (1 / cycles + TAKE[sp.tier] * pull) / rest;
 }
-function pickSpecies(depthT) {
-  const L = lakeAt(player.x, player.z);
-  const ws = SPECIES.map((s) => (depthT > DEPTH[s.tier] ? 0 : Math.max(0, s.w()) * Math.max(0, countryOf(s, L)) * (icy() && s.id !== 'burbot' ? 0.4 : 1)));
+/** How much more (or less) a fish is found in running water than in a lake: trout and minnows love it; the big still-water fish keep to the lakes. */
+const RIVER_LIKES = { trout: 3, minnow: 1.6, char: 1.3, perch: 0.8, bluegill: 0.6, pike: 0.4, catfish: 0.4, carp: 0.3, koi: 0.2, burbot: 0, bowfin: 0.5 };
+function pickSpecies(depthT, where = null) {
+  const L = where || lakeAt(player.x, player.z), river = !!(where && where.river);
+  const ws = SPECIES.map((s) => (depthT > DEPTH[s.tier] ? 0 : Math.max(0, s.w()) * Math.max(0, countryOf(s, L)) * (river ? (RIVER_LIKES[s.id] ?? 1) : icy() && s.id !== 'burbot' ? 0.4 : 1)));
   let r = rnd() * ws.reduce((a, b) => a + b, 0);
   for (let i = 0; i < SPECIES.length; i++) { r -= ws[i]; if (r <= 0) return SPECIES[i]; }
   return SPECIES[6];
@@ -155,7 +157,7 @@ const F = {
 };
 export const fishingState = () => F.state;
 /** For tests: the fight's numbers. */
-export const fishingInfo = () => ({ state: F.state, tension: F.tens, progress: F.prog, pulling: F.pull, power: F.power, species: F.sp && F.sp.id });
+export const fishingInfo = () => ({ state: F.state, tension: F.tens, progress: F.prog, pulling: F.pull, power: F.power, species: F.sp && F.sp.id, river: !!F.where, floatY: F.to.y });
 
 // R held (keyboard) or the on-screen Reel button held (touch)
 let rHeld = false, touchHeld = false;
@@ -216,20 +218,32 @@ export function initFishing() {
   scene.add(line);
 
   const bob = new THREE.Vector3();
+  const rippleAt = (x, z, size) => spawnRipple(x, z, size, F.to.y - 0.005); // (on the water the float is on: a lake's, or a river's higher up)
   const isWater = (x, z) => lakeT(x, z) < 0.97 && !onDock(x, z) && heightAt(x, z) < -0.05; // (not onto an island)
+  /** A river's water at a spot, where a float can lie: well inside its banks, not on a fall, not frozen (its stretch, a fresh copy), or null. */
+  const riverWater = (x, z) => {
+    const r = riverNear(x, z);
+    if (!r || r.d > r.w / 2 - 0.35 || r.drop > 0.25 || riverIce(r.river) > 0.5) return null;
+    return { river: true, id: r.river.id, x, z, lv: r.lv, chill: riverChill(r.river) }; // (what a fish there belongs to: see countryOf)
+  };
   /** Where a cast of this power lands (null if there's no water ahead). */
   const castSpot = (power = 0) => {
-    if (icy()) {
-      if (!onIce(player.x, player.z)) return null;
-      const f = camForward(), x = player.x + f.x * 1.4, z = player.z + f.z * 1.4;
+    const f = camForward(), want = 3 + power * 6;
+    if (icy() && onIce(player.x, player.z)) {
+      const x = player.x + f.x * 1.4, z = player.z + f.z * 1.4;
       return lakeT(x, z) < 0.97 ? { x, z, ice: true } : null;
     }
-    const f = camForward(), want = 3 + power * 6;
-    for (let d = want; d >= 2.5; d -= 0.5) {
+    // (by a frozen lake, only a river that still runs)
+    if (!icy()) for (let d = want; d >= 2.5; d -= 0.5) {
       const x = player.x + f.x * d, z = player.z + f.z * d;
       if (isWater(x, z)) return { x, z, ice: false };
     }
-    const p = waterAhead(player, f, [5.5, 4.5, 6.5, 8, 3.5]);
+    // or a river: a shorter cast across it, the float on its own water
+    for (let d = Math.min(want, 5); d >= 1.6; d -= 0.4) {
+      const x = player.x + f.x * d, z = player.z + f.z * d, rv = riverWater(x, z);
+      if (rv) return { x, z, ice: false, y: rv.lv + 0.05, river: rv };
+    }
+    const p = icy() ? null : waterAhead(player, f, [5.5, 4.5, 6.5, 8, 3.5]);
     return p ? { x: p.x, z: p.z, ice: false } : null;
   };
   const canFish = () => activity.free || (activity.is('sit') && player.seat === boatSeat && ferry.state === 'docked');
@@ -270,20 +284,21 @@ export function initFishing() {
   };
   const throwLine = () => {
     const spot = castSpot(F.power);
-    if (!spot) { stop('Face the lake from the jetty or the shore to cast.'); return; }
+    if (!spot) { stop('Face the water from the jetty or the shore to cast.'); return; }
     F.iceHole = spot.ice;
-    F.to.set(spot.x, 0.05, spot.z);
-    F.depth = lakeT(spot.x, spot.z) * (player.seat === boatSeat ? 0.8 : 1); // the moored boat sits over deeper water
+    F.to.set(spot.x, spot.y ?? 0.05, spot.z);
+    F.where = spot.river || null;
+    F.depth = spot.river ? 0.8 : lakeT(spot.x, spot.z) * (player.seat === boatSeat ? 0.8 : 1); // the moored boat sits over deeper water; a river is never deep
     F.state = 'cast'; F.t = 0;
     if (spot.ice) { hole.position.set(spot.x, 0.05, spot.z); hole.visible = true; }
     callBuddy();
   };
   const startCharge = () => {
-    if (!canFish() || !castSpot()) { toast(icy() ? 'The lake is frozen. Walk out onto the ice to fish through a hole.' : 'Face the lake from the jetty or the shore to cast.'); return; }
+    if (!canFish() || !castSpot()) { toast(icy() ? 'The lake is frozen. Walk out onto the ice to fish through a hole.' : 'Face the water from the jetty, the shore or a river bank to cast.'); return; }
     if (!activity.enter('fish')) return;
     if (!player.seat) { const f = camForward(); player.rot = Math.atan2(f.x, f.z); }
     rod.visible = true;
-    if (icy()) { F.power = 0; throwLine(); return; } // a hole needs no cast
+    if (icy() && onIce(player.x, player.z)) { F.power = 0; throwLine(); return; } // a hole needs no cast
     F.state = 'charge'; F.t = 0; F.power = 0;
     F.tapped = !rHeld && !touchHeld; // touch or a click on the prompt: a second tap throws
   };
@@ -294,7 +309,7 @@ export function initFishing() {
       const [a, b] = F.sp.len;
       F.cm = Math.round(a + Math.pow(rnd(), 1.6) * (b - a));
       F.state = 'fight'; F.tens = 0.35; F.prog = 0; F.pattern = 0; F.patternT = 0; F.pull = false; F.redT = 0; F.slackT = 0;
-      spawnRipple(bob.x, bob.z, 0.9); plop(bob.x, bob.z, 1.2);
+      rippleAt(bob.x, bob.z, 0.9); plop(bob.x, bob.z, 1.2);
       return;
     }
     if (F.state === 'wait' && F.nibOn > 0) { // too early: struck at a nibble
@@ -319,7 +334,7 @@ export function initFishing() {
   registerAction({
     id: 'fish-cast', key: 'KeyR', keyLabel: 'R', score: () => 0,
     available: () => hasRod() && F.state === 'idle' && canFish() && !moving() && spotCache,
-    label: () => (icy() ? 'Fish through the ice' : 'Hold to cast a line'),
+    label: () => (icy() && onIce(player.x, player.z) ? 'Fish through the ice' : 'Hold to cast a line'),
     run: startCharge,
   });
 
@@ -376,24 +391,24 @@ export function initFishing() {
         const k = clamp((F.t - 0.35) / 0.65, 0, 1);
         bob.lerpVectors(F.from, F.to, k);
         bob.y = lerp(F.from.y, F.to.y, k) + Math.sin(k * Math.PI) * 1.5;
-        if (k >= 1) { scheduleBite(); spawnRipple(F.to.x, F.to.z, 0.7); plop(F.to.x, F.to.z, 0.9); }
+        if (k >= 1) { scheduleBite(); rippleAt(F.to.x, F.to.z, 0.7); plop(F.to.x, F.to.z, 0.9); }
       }
     } else if (F.state === 'wait') {
       F.biteIn -= dt; F.nibbleIn -= dt;
       if (F.nibOn > 0) F.nibOn -= dt;
-      if (F.nibbles > 0 && F.nibbleIn <= 0) { F.nibbles--; F.nibOn = 0.4; F.nibbleIn = F.biteIn / (F.nibbles + 1); spawnRipple(F.to.x, F.to.z, 0.35); }
+      if (F.nibbles > 0 && F.nibbleIn <= 0) { F.nibbles--; F.nibOn = 0.4; F.nibbleIn = F.biteIn / (F.nibbles + 1); rippleAt(F.to.x, F.to.z, 0.35); }
       const dip = F.nibOn > 0 ? Math.abs(Math.sin((0.4 - F.nibOn) * 24)) * 0.035 : 0;
-      bob.set(F.to.x, 0.05 + Math.sin(t * 2.2) * 0.012 - dip, F.to.z);
+      bob.set(F.to.x, F.to.y + Math.sin(t * 2.2) * 0.012 - dip, F.to.z);
       if (F.biteIn <= 0 && F.nibOn <= 0) {
         // the real bite: the float plunges; the strike window depends on what's down there
-        F.sp = pickSpecies(F.depth);
+        F.sp = pickSpecies(F.depth, F.where);
         F.state = 'bite'; F.t = BITE_WINDOW[F.sp.tier] * (relaxed() ? 1.8 : 1);
         hero.face.flash('wow', 1.2);
-        spawnRipple(F.to.x, F.to.z, 0.8); plop(F.to.x, F.to.z, 1);
+        rippleAt(F.to.x, F.to.z, 0.8); plop(F.to.x, F.to.z, 1);
       }
     } else if (F.state === 'bite') {
       F.t -= dt;
-      bob.set(F.to.x + Math.sin(t * 30) * 0.03, 0.05 - 0.09 - Math.abs(Math.sin(t * 14)) * 0.05, F.to.z);
+      bob.set(F.to.x + Math.sin(t * 30) * 0.03, F.to.y - 0.09 - Math.abs(Math.sin(t * 14)) * 0.05, F.to.z);
       if (F.t <= 0) { toast('Too slow, it got away. Wait for the next bite.'); hero.face.flash('think', 2); scheduleBite(); }
     } else if (F.state === 'fight') {
       // the fish's fixed rhythm: pull, rest, pull…
@@ -413,8 +428,8 @@ export function initFishing() {
       F.slackT = F.tens < 0.05 ? F.slackT + dt : 0;
       // the float drags about with the fish and comes in as you win line
       const ang = t * (F.pull ? 3.1 : 1.2), k = F.prog * 0.75, wob = F.pull ? 0.35 : 0.12;
-      bob.set(lerp(F.to.x, player.x, k) + Math.sin(ang) * wob, 0.02 - (F.pull ? 0.05 : 0), lerp(F.to.z, player.z, k) + Math.cos(ang * 0.8) * wob);
-      if (F.pull && rnd() < dt * 6) spawnRipple(bob.x, bob.z, 0.4);
+      bob.set(lerp(F.to.x, player.x, k) + Math.sin(ang) * wob, 0.02 - (F.pull ? 0.05 : 0), lerp(F.to.z, player.z, k) + Math.cos(ang * 0.8) * wob); bob.y += F.to.y - 0.05; // (on a river's water)
+      if (F.pull && rnd() < dt * 6) rippleAt(bob.x, bob.z, 0.4);
       gauge.classList.add('fighting'); gauge.classList.remove('casting');
       gauge.classList.toggle('pulling', F.pull); gauge.classList.toggle('danger', F.tens > 0.82);
       gLabel.textContent = F.pull ? 'It\'s pulling! Ease off' : held ? 'Reeling…' : 'Hold R to reel';
@@ -426,7 +441,7 @@ export function initFishing() {
     } else if (F.state === 'reel') {
       F.t += dt / 0.9;
       const k = clamp(F.t, 0, 1);
-      bob.set(lerp(bob.x, tip.x, k * 0.3), lerp(0.05, tip.y, k) + Math.sin(k * Math.PI) * 0.6, lerp(bob.z, tip.z, k * 0.3));
+      bob.set(lerp(bob.x, tip.x, k * 0.3), lerp(F.to.y, tip.y, k) + Math.sin(k * Math.PI) * 0.6, lerp(bob.z, tip.z, k * 0.3));
       F.fish.position.set(bob.x, bob.y - 0.12, bob.z);
       F.fish.rotation.set(Math.PI / 2 - 0.3, Math.atan2(tip.x - bob.x, tip.z - bob.z), Math.sin(t * 25) * 0.5);
       if (k >= 1) {
@@ -438,7 +453,7 @@ export function initFishing() {
         renderCreel();
         const record = j && F.cm > j.best;
         const where = F.kept ? ` · into your backpack (${count('fish')}/${CREEL_MAX})` : count('fish') >= CREEL_MAX ? ` · you carry ${CREEL_MAX} fish already, so you let it go` : ' · your backpack is full, so you let it go';
-        toast(`${!j ? 'New species! ' : record ? 'New record! ' : ''}You caught a ${F.sp.name} · ${F.cm} cm${where}`, 4.5);
+        toast(`${!j ? 'New species! ' : record ? 'New record! ' : ''}You caught a ${F.sp.name} · ${F.cm} cm${F.where ? ' in the river' : ''}${where}`, 4.5);
         hero.face.flash(!j || record ? 'love' : 'happy', 3.5);
         world.caughtAt = clock.elapsed; // (a friend watching cheers)
         if (F.buddy) {
@@ -461,9 +476,9 @@ export function initFishing() {
       F.t += dt / 0.8; // no room: the fish leaps back into the lake
       const k = clamp(F.t, 0, 1);
       F.fish.position.lerpVectors(F.from, F.to, k);
-      F.fish.position.y = lerp(F.from.y, 0, k) + Math.sin(k * Math.PI) * 0.8;
+      F.fish.position.y = lerp(F.from.y, F.to.y - 0.05, k) + Math.sin(k * Math.PI) * 0.8;
       F.fish.rotation.x = -Math.cos(k * Math.PI) * 1.2;
-      if (k >= 1) { spawnRipple(F.to.x, F.to.z, 0.9); plop(F.to.x, F.to.z, 1); stop(); }
+      if (k >= 1) { rippleAt(F.to.x, F.to.z, 0.9); plop(F.to.x, F.to.z, 1); stop(); }
     }
     gauge.hidden = F.state !== 'charge' && F.state !== 'fight';
 

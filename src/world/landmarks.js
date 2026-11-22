@@ -68,6 +68,7 @@ function copyFor(kind, v) {
       c.steamR = slot.proto.steam.r;
     }
     group.visible = false;
+    group.userData.pooledLandmark = true;
     scene.add(group);
     slot.copies.push(c);
   }
@@ -90,6 +91,9 @@ function release(c) {
   for (const b of c.blocks) { const i = obstacles.indexOf(b.o); if (i >= 0) obstacles.splice(i, 1); }
   for (const st of c.seats) { const i = seats.indexOf(st.o); if (i >= 0) seats.splice(i, 1); }
 }
+/** For tests: how many blockers and seats the standing buildings have put down. */
+export const landmarkBlocks = () => Object.values(made).flat().filter(Boolean).flatMap((v) => v.copies).filter((c) => c.site).reduce((a, c) => a + c.blocks.length, 0);
+export const landmarkSeats = () => Object.values(made).flat().filter(Boolean).flatMap((v) => v.copies).filter((c) => c.site).reduce((a, c) => a + c.seats.length, 0);
 /** For tests: the buildings standing just now. */
 export const landmarksView = () => Object.entries(made).flatMap(([kind, vs]) => vs.filter(Boolean).flatMap((v) => v.copies.filter((c) => c.site).map((c) => ({ kind, id: c.site.id, name: placeName(c.site), x: c.site.x, z: c.site.z }))));
 

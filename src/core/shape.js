@@ -475,6 +475,7 @@ const marksOf = (lake) => lake.marks || (lake.marks = landmarksOf(lake));
 export function clearingAt(x, z) {
   if (shrineSiteAt(x, z, SHRINE_R + 7)) return true;
   if (sitesReady && siteAt(x, z, -1)) return true; // (and a building's ground)
+  if (sitesReady && trailAt(x, z) > 0.25) return true; // (and the trails)
   const L = lakeAt(x, z);
   if (!L.settled) return false;
   const dx = x - L.x, dz = z - L.z, d = Math.hypot(dx, dz), r = L.r(Math.atan2(dz, dx));
@@ -802,4 +803,71 @@ export function anchorTo(lake) {
   chairSpots.forEach((c, i) => Object.assign(c, m.chairs[i]));
 }
 export const nearReserved = (x, z, r) => chairSpots.some((c) => Math.hypot(x - c.x, z - c.z) < r) || Math.hypot(x - FIRE_SPOT.x, z - FIRE_SPOT.z) < r + 1.6;
+// ── Trails ─────────────────────────────────────────────────────
+// Worn paths between places, as walkers would wear them: each place (the home lake, the shrines,
+// the buildings) is joined to its nearest neighbour within TRAIL_REACH. A trail wanders a little
+// either side of the straight line (by a slow sine, fixed by its two ends), and keeps off lakes.
+// Worked out per square of TRAIL_CELL metres (the trails that pass near it), and kept.
+const TRAIL_CELL = 800, TRAIL_REACH = 1400, TRAIL_W = 2.2;
+const TRAIL_KINDS = new Set(['pagoda', 'castle', 'ruin', 'hut', 'windmill', 'circle', 'cairn', 'spring', 'icecastle', 'grotto', 'skyisle']);
+const trailCells = new Map();
+function placesAbout(x, z, r) {
+  const out = [];
+  if (Math.hypot(HOME.x - x, HOME.z - z) < r) { const d = Math.max(1, Math.hypot(SPAWN.x - HOME.x, SPAWN.z - HOME.z)); out.push({ id: 'home', name: HOME.name, x: SPAWN.x + (SPAWN.x - HOME.x) / d * 6, z: SPAWN.z + (SPAWN.z - HOME.z) / d * 6 }); }
+  for (const s of shrineSitesNear(x, z, r)) out.push({ id: 'shrine:' + s.id, name: s.name, x: s.x + s.fx * 24, z: s.z + s.fz * 24 });
+  for (const s of sitesNear(x, z, r)) if (TRAIL_KINDS.has(s.kind)) out.push({ id: s.id, kind: s.kind, variant: s.variant, x: s.x, z: s.z, out: s.out || 10 });
+  return out;
+}
+/** The trails that pass near a square: [{ a, b, len, ux, uz, phase }]. */
+function trailsOfCell(cx, cz) {
+  const key = cx + ':' + cz;
+  if (trailCells.has(key)) return trailCells.get(key);
+  const mx = (cx + 0.5) * TRAIL_CELL, mz = (cz + 0.5) * TRAIL_CELL;
+  const ps = placesAbout(mx, mz, TRAIL_REACH + TRAIL_CELL), segs = [], seen = new Set();
+  for (const p of ps) {
+    let best = null, bd = TRAIL_REACH;
+    for (const q of ps) { if (q === p) continue; const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < bd) { bd = d; best = q; } }
+    if (!best) continue;
+    const id = p.id < best.id ? p.id + '|' + best.id : best.id + '|' + p.id;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const a = p.id < best.id ? p : best, b = a === p ? best : p, len = Math.hypot(b.x - a.x, b.z - a.z);
+    const seg = { id, a, b, len, ux: (b.x - a.x) / len, uz: (b.z - a.z) / len, phase: hash(Math.round(a.x), Math.round(b.z)) * TAU };
+    // (only the ones that come near this square)
+    const nx = Math.max(Math.min(mx, Math.max(a.x, b.x)), Math.min(a.x, b.x)), nz = Math.max(Math.min(mz, Math.max(a.z, b.z)), Math.min(a.z, b.z));
+    if (Math.abs(nx - mx) < TRAIL_CELL && Math.abs(nz - mz) < TRAIL_CELL) segs.push(seg);
+  }
+  trailCells.set(key, segs);
+  return segs;
+}
+/** How far a trail wanders from the straight line at `t` (0..1) along it. */
+const wander = (seg, t) => Math.sin(t * seg.len / 90 + seg.phase) * Math.min(14, seg.len * 0.03) * Math.sin(Math.PI * t);
+/** How much a spot is on a trail (0 off it .. 1 in its middle). */
+export function trailAt(x, z) {
+  if (!sitesReady) return 0;
+  const segs = trailsOfCell(Math.floor(x / TRAIL_CELL), Math.floor(z / TRAIL_CELL));
+  let best = 0;
+  for (const s of segs) {
+    const dx = x - s.a.x, dz = z - s.a.z, along = dx * s.ux + dz * s.uz;
+    if (along < 0 || along > s.len) continue;
+    const t = along / s.len, across = -dx * s.uz + dz * s.ux - wander(s, t);
+    if (Math.abs(across) > TRAIL_W * 1.6) continue;
+    const w = 1 - smooth(TRAIL_W * 0.55, TRAIL_W * 1.6, Math.abs(across));
+    if (w > best) best = w;
+  }
+  if (best > 0 && lakeAt(x, z).t(x, z) < 1.35) return 0; // (not through a lake, nor its shore)
+  return best;
+}
+/** For signposts: the trails leaving places near a spot, each with the place at its far end. */
+export function trailEndsNear(x, z, r) {
+  const out = [], segs = new Map();
+  for (let cz = Math.floor((z - r) / TRAIL_CELL); cz <= Math.floor((z + r) / TRAIL_CELL); cz++) for (let cx = Math.floor((x - r) / TRAIL_CELL); cx <= Math.floor((x + r) / TRAIL_CELL); cx++) for (const s of trailsOfCell(cx, cz)) segs.set(s.id, s);
+  for (const s of segs.values()) for (const [from, to, dir] of [[s.a, s.b, 1], [s.b, s.a, -1]]) {
+    if (Math.hypot(from.x - x, from.z - z) > r) continue;
+    const off = (from.out || 8) + 6, t = dir > 0 ? off / s.len : 1 - off / s.len;
+    const px = s.a.x + s.ux * s.len * t - s.uz * wander(s, t), pz = s.a.z + s.uz * s.len * t + s.ux * wander(s, t);
+    out.push({ id: s.id + ':' + dir, x: px + s.uz * 2.4 * dir, z: pz - s.ux * 2.4 * dir, toward: Math.atan2(to.x - px, to.z - pz), to, far: Math.round(s.len) });
+  }
+  return out;
+}
 sitesReady = true; // (from here on the land's height levels the buildings' ground)

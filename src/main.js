@@ -48,7 +48,8 @@ import { initBackpack, backpackView } from './ui/backpack.js';
 import { RIGGED, loadRigged, followPlayer } from './characters/rigged.js';
 import { initFoundPlaces, foundView } from './features/places.js';
 import { initCamp } from './features/camp.js';
-import { initLandmarks, landmarksView } from './world/landmarks.js';
+import { initLandmarks, landmarksView, landmarkBlocks, landmarkSeats } from './world/landmarks.js';
+import { initSignposts, signsNear, signBlocks } from './world/signposts.js';
 import * as pack from './systems/pack.js';
 import { initCompass, compassView } from './ui/compass.js';
 import { updateAnchor, moveAnchor, anchorId, settledAbout } from './systems/anchor.js';
@@ -197,7 +198,7 @@ onQualityChange((o) => {
 window.addEventListener('resize', resize);
 
 // ── Features, each isolated so one failing can't take down the rest ──
-const features = { initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initWardrobe, initIceDance, initDanceCam, initDanceMusic, initFoley };
+const features = { initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initWardrobe, initIceDance, initDanceCam, initDanceMusic, initFoley };
 for (const [name, init] of Object.entries(features)) {
   try {
     const r = init();
@@ -376,7 +377,7 @@ window.__meadow = {
   geo: { get lakePoint() { return lakePoint; }, lakeT, walkable, dockAt, dockDir, onDock, FIRE_SPOT, BENCH_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') }, // (lakePoint: whichever lake the landmarks stand at)
   seed: WORLD.seed,
   backpack: backpackView,
-  found: foundView, landmarks: landmarksView,
+  found: foundView, landmarks: landmarksView, signs: signsNear,
   /** The backpack's contents and the ways to change them (systems/pack.js). */
   pack: { view: pack.packView, add: pack.add, addItem: pack.addItem, take: pack.take, count: pack.count, hold: pack.hold, held: pack.held, fish: () => pack.units('fish').map((u) => ({ id: u.key, cm: u.unit })), tie: (kinds) => world.tieBouquet(kinds) },
   compass: compassView,
@@ -393,7 +394,8 @@ window.__meadow = {
   anchor: anchorId, get kit() { return Object.assign({}, KIT); }, settled: settledAbout, boatShown: () => boat.visible,
   moveAnchor: (id) => { const L = lakesNear(player.x, player.z, 6000).find((q) => q.id === id); return !!L && moveAnchor(L); },
   /** What the scene holds besides the ground's own pooled tiles (which fill up once and are then reused), and the lists things are registered in. */
-  counts: () => { let n = 0; scene.traverse(() => { n++; }); return { objects: n - groundStats().parts, obstacles: obstacles.length, seats: seats.length }; },
+  // (the biomes' buildings are left out: each kind's copies are made the first time one is needed, then reused)
+  counts: () => { let n = 0; const walk = (o) => { if (o.userData.pooledLandmark) return; n++; o.children.forEach(walk); }; walk(scene); return { objects: n - groundStats().parts, obstacles: obstacles.length - landmarkBlocks() - signBlocks(), seats: seats.length - landmarkSeats() }; },
   /** The climate at a spot: how much snow lies, how parched, how lush, how much of a blossom grove (each 0..1). */
   climate: (x, z) => { const wet = moistAt(x, z), cold = coldAt(x, z, height(x, z)); return { snow: snowOf(snowCold(cold, wet)), cold, wet, dry: dryOf(wet), lush: lushOf(wet), grove: groveAt(x, z) }; },
   // the ground's tiles: what is loaded, and ways to bring it up to date without waiting for frames

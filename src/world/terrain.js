@@ -21,7 +21,7 @@ import { SEASON_GLSL, seasonU } from '../core/year.js';
 import { quality } from '../systems/quality.js';
 import { biomesAt } from '../core/biome.js';
 import { wxU, neonU } from '../core/materials.js';
-import { height, lakeAt, setGroundSampler, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf } from '../core/shape.js';
+import { height, lakeAt, setGroundSampler, trailAt, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -160,7 +160,7 @@ function* fill(t) {
       c.lerp(g3, smooth(0.5, 0.75, fbm(x * 0.11 - 5, z * 0.11 + 8)) * 0.6);
       // sand round the nearest lake, as broad as that lake's beach; soil on its path, if it has one
       const lake = lakeAt(x, z), lt = lake.t(x, z);
-      const wSand = (1 - smooth(1.02, 1.02 + 0.14 * lake.beach, lt)) * Math.min(1, lake.beach * 2), wBed = smooth(0.05, -0.8, h), wDirt = lt < 2.2 ? lake.path(x, z) * 0.9 : 0;
+      const wSand = (1 - smooth(1.02, 1.02 + 0.14 * lake.beach, lt)) * Math.min(1, lake.beach * 2), wBed = smooth(0.05, -0.8, h), wDirt = Math.max(lt < 2.2 ? lake.path(x, z) * 0.9 : 0, trailAt(x, z) * 0.85);
       // (a tile drawn coarse enough already has the slope over about 8 m: its neighbours)
       if (cs >= 3.6) { grad[0] = dx / (2 * cs); grad[1] = dz / (2 * cs); }
       const base = coldBase(x, z), lie = slopeLook(x, z, h, base, cs >= 3.6 ? grad : null), north = lie.north, scree = lie.scree, felt = feltHeight(x, z, h, north, base);

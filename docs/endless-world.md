@@ -437,6 +437,11 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   tent from the backpack (one camp a world, on the compass and in the journal); set lanterns down to
   mark a trail (they glow at night) and pick them up again (E).
 - **Skating**: on ice you gather speed and glide on (`characters/player.js`). Ice fishing was there.
+- **Trails** (`trailAt`, `trailEndsNear` in `core/shape.js`; milestone 8): each place (the home lake,
+  the shrines, the buildings) is joined to its nearest neighbour within 1.4 km by a worn path that
+  wanders a little and keeps off lakes; bare earth on the ground, no trees or grass on it; a
+  signpost where a trail leaves a place names the place at its other end and how far
+  (`world/signposts.js`). Islands in big lakes were left out (the boat only tours the home lake).
 - **Flower journal**: each kind picked, how many, and the country where first found.
 - **View distance** (Settings): near (about 0.7 km of land), medium (1.4 km), far (2.3 km).
 - **Imported character** (`characters/rigged.js`, `?hero=kaykit`): KayKit's Rogue (CC0, licence in

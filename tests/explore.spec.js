@@ -141,3 +141,27 @@ test('the imported character (?hero=kaykit) loads, rigged and animated, and walk
   for (const c of ['Idle', 'Walking_A', 'Running_A', 'Sit_Chair_Idle', 'Lie_Idle', 'Cheer']) expect(clips).toContain(c);
   noErrors(errors);
 });
+
+test('trails join the places: worn paths with no trees on them, and signposts naming where they go', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const r = await page.evaluate(async () => {
+    const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
+    const SH = await import(url('/src/core/shape.js')), m = window.__meadow, S = 57.6;
+    const ends = SH.trailEndsNear(m.home.x, m.home.z, 3000);
+    // walk the first trail from the home end: the ground is a trail all the way, and no tree stands on it
+    let onTrail = 0, trees = 0, looked = 0;
+    for (const e of ends.slice(0, 6)) for (let d = 10; d < Math.min(e.far - 10, 400); d += 7) {
+      const x = e.x + Math.sin(e.toward) * d, z = e.z + Math.cos(e.toward) * d;
+      let best = 0, bx = x, bz = z; for (let k = -16; k <= 16; k += 0.5) { const xx = x + Math.cos(e.toward) * k, zz = z - Math.sin(e.toward) * k, t = SH.trailAt(xx, zz); if (t > best) { best = t; bx = xx; bz = zz; } }
+      looked++; if (best > 0.9) onTrail++;
+      for (const t of m.wilds.square(Math.floor(bx / S), Math.floor(bz / S))) if (Math.hypot(t.x - bx, t.z - bz) < 1.2) trees++;
+    }
+    return { ends: ends.length, signs: m.signs(m.spawn.x, m.spawn.z), share: onTrail / looked, trees };
+  });
+  expect(r.ends, 'trails within 3 km of home').toBeGreaterThan(3);
+  expect(r.signs.length, 'a signpost by the home lake').toBeGreaterThan(0);
+  expect(r.signs[0].to.length).toBeGreaterThan(3);
+  expect(r.share, 'the trails run on unbroken (but across lakes)').toBeGreaterThan(0.8);
+  expect(r.trees, 'no tree stands on a trail').toBe(0);
+  noErrors(errors);
+});

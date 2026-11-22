@@ -252,3 +252,35 @@ test('kinds of country: the World popover lists every biome with the nearest one
   expect(again).toBe(true);
   noErrors(errors);
 });
+
+test('rivers: springs in the hills run down to a lake or the sea, never near home; water is drawn on them, falls step down, and you can wade across', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const r = await page.evaluate(async () => {
+    const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
+    const SH = await import(url('/src/core/shape.js')), m = window.__meadow, H = m.home;
+    const list = SH.riversNear(H.x, H.z, 2500);
+    let rising = 0, nearHome = 1e9, falls = 0, ends = new Set();
+    for (const v of list) {
+      ends.add(v.end.split(':')[0]);
+      for (let i = 0; i < v.n; i++) { if (i && v.lv[i] > v.lv[i - 1] + 1e-4) rising++; nearHome = Math.min(nearHome, Math.hypot(v.x[i] - H.x, v.z[i] - H.z)); falls += v.fall[i]; }
+    }
+    // a calm river near home, for wading: across it, from bank to bank, every step can be stood on, and its bed is under the water
+    const calm = list.filter((v) => !v.fall.some((f) => f)).sort((a, b) => Math.hypot(a.x[0] - H.x, a.z[0] - H.z) - Math.hypot(b.x[0] - H.x, b.z[0] - H.z))[0];
+    const i = Math.floor(calm.n / 2), tx = calm.x[i + 1] - calm.x[i], tz = calm.z[i + 1] - calm.z[i], tl = Math.hypot(tx, tz), nx = -tz / tl, nz = tx / tl;
+    let stand = 0, tries = 0;
+    for (let d = -calm.w[i] / 2 - 2; d <= calm.w[i] / 2 + 2; d += 0.5) { tries++; if (SH.walkable(calm.x[i] + nx * d, calm.z[i] + nz * d)) stand++; }
+    return { count: list.length, ends: [...ends], rising, nearHome, falls, stand, tries, bed: SH.height(calm.x[i], calm.z[i]) - calm.lv[i], spot: { x: calm.x[i] + nx * 6, z: calm.z[i] + nz * 6, fx: calm.x[i], fz: calm.z[i] }, id: calm.id };
+  });
+  expect(r.count, 'rivers within 2.5 km of home').toBeGreaterThanOrEqual(3);
+  expect(r.ends.every((e) => e === 'lake' || e === 'sea'), 'each ends in a lake or the sea').toBe(true);
+  expect(r.rising, 'the water never runs uphill').toBe(0);
+  expect(r.nearHome, 'none near home').toBeGreaterThan(440);
+  expect(r.falls, 'some fall in steps').toBeGreaterThan(0);
+  expect(r.stand, 'wadeable from bank to bank').toBe(r.tries);
+  expect(r.bed, 'its bed is under the water').toBeLessThan(-0.2);
+  // standing by it, its water is drawn
+  await page.evaluate(({ x, z, fx, fz }) => window.__meadow.travelTo(x, z, fx, fz), r.spot);
+  await step(page, 0.5);
+  expect(await page.evaluate(() => window.__meadow.riversShown())).toContain(r.id);
+  noErrors(errors);
+});

@@ -21,7 +21,7 @@ import { SEASON_GLSL, seasonU } from '../core/year.js';
 import { quality } from '../systems/quality.js';
 import { biomesAt } from '../core/biome.js';
 import { wxU, neonU } from '../core/materials.js';
-import { height, lakeAt, setGroundSampler, trailAt, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf } from '../core/shape.js';
+import { height, lakeAt, setGroundSampler, trailAt, riverNear, riverBank, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -160,7 +160,8 @@ function* fill(t) {
       c.lerp(g3, smooth(0.5, 0.75, fbm(x * 0.11 - 5, z * 0.11 + 8)) * 0.6);
       // sand round the nearest lake, as broad as that lake's beach; soil on its path, if it has one
       const lake = lakeAt(x, z), lt = lake.t(x, z);
-      const wSand = (1 - smooth(1.02, 1.02 + 0.14 * lake.beach, lt)) * Math.min(1, lake.beach * 2), wBed = smooth(0.05, -0.8, h), wDirt = Math.max(lt < 2.2 ? lake.path(x, z) * 0.9 : 0, trailAt(x, z) * 0.85);
+      const rb = riverBank(x, z); // (a river's bed and its pebbly banks)
+      const wSand = Math.max((1 - smooth(1.02, 1.02 + 0.14 * lake.beach, lt)) * Math.min(1, lake.beach * 2), rb * 0.8), wBed = Math.max(smooth(0.05, -0.8, h), rb >= 0.999 ? 0.6 : 0), wDirt = Math.max(lt < 2.2 ? lake.path(x, z) * 0.9 : 0, trailAt(x, z) * 0.85);
       // (a tile drawn coarse enough already has the slope over about 8 m: its neighbours)
       if (cs >= 3.6) { grad[0] = dx / (2 * cs); grad[1] = dz / (2 * cs); }
       const base = coldBase(x, z), lie = slopeLook(x, z, h, base, cs >= 3.6 ? grad : null), north = lie.north, scree = lie.scree, felt = feltHeight(x, z, h, north, base);
@@ -171,8 +172,10 @@ function* fill(t) {
       // cold country where little snow lies (it is too dry) is tundra: low olive-brown moss and sedge
       const wTundra = smooth(0.42, 0.65, chill) * (1 - snowOf(cold));
       // (clime: cold, dry, and whether this is a lake seen from too far off to have its own sheet of water)
-      const pond = t.lv > 0 && h < 0.02 ? 1 : 0;
-      if (pond) { pos[k * 3 + 1] = 0.02; nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }
+      // (far off, where the rivers have no water of their own drawn, the ground shows them as water: as wide as one square at least, so they are not lost between squares)
+      const rv = t.lv >= 3 ? riverNear(x, z) : null, rpond = rv && rv.d < Math.max(rv.w / 2, cs * 0.6);
+      const pond = (t.lv > 0 && h < 0.02) || rpond ? 1 : 0;
+      if (pond) { pos[k * 3 + 1] = rpond ? Math.max(rv.lv, Math.min(h, 0.02)) : 0.02; nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }
       clm[k * 3] = cold; clm[k * 3 + 1] = dry; clm[k * 3 + 2] = pond;
       const bw = biomesAt(x, z, h, base, rain);
       look[k * 4] = Math.max(bw.desert, bw.beach); look[k * 4 + 1] = bw.swamp; look[k * 4 + 2] = bw.enchanted; look[k * 4 + 3] = bw.volcanic;

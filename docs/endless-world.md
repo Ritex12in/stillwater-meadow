@@ -54,10 +54,8 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
   - The sea: never within 2 km of home, so every start is inland by a lake; about 5% of world 1
     within 6 km is sea, the nearest coast some 2 km from home. You cannot wade or swim (the shore
     stops you, as at the lakes); no fishing at sea yet.
-  - Rivers and waterfalls were left out: a river must run downhill from lake to lake or to the sea
-    and be carved the same in every tile, which the height function cannot yet do without a
-    drainage pass over a whole region; that is a project of its own, best planned with the owner.
-    Islands in lakes were left out too (the lakes are small, and the boat only tours the home lake).
+  - Rivers and waterfalls were left out that night (they came later, at the owner's asking: see
+    "Rivers and waterfalls" below). Islands in lakes were left out too (the lakes are small, and the boat only tours the home lake).
   - Animals: no CC0 rigged deer or fox could be fetched without a browser, so, as told ("whatever is
     best available"), the fox is made in code like the deer and owl; rigged ones can replace them later.
 - **Worlds and carrying (2026-11-22):** seeds as in Minecraft: any text is a seed, the same text
@@ -101,7 +99,7 @@ Each one leaves the game playable and tested.
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | | done: companions come with you when you travel; the journal's places found have a Go button |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | | started: the characters are the sculpted children, redrawn after the owner's character sheets (KayKit and then the VRoid characters were tried and removed by the owner).  Animals: a fox by country added and the deer travel with you, made in code (no CC0 rigged deer or fox could be fetched without a browser) |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | | view distance setting done (near, medium, far); tuning on the owner's GPU and a phone needs the owner |
-| 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; islands in lakes and rivers and waterfalls not done (see below) |
+| 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; rivers and waterfalls done (see "Rivers and waterfalls"); islands in lakes not done |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
@@ -478,6 +476,32 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   the sheet's calico (white with orange patches, pink inside its ears, a dark collar with a gold bell);
   the others are the same shapes in other coats. Same rigs (head, four legs, tail, eyes), so all their
   behaviour is unchanged. `tools/studio/pets.html` shows them beside the boy.
+- **Rivers and waterfalls** (2026-11-22, the owner: "add rivers and waterfalls"; `core/shape.js`
+  "Rivers", `world/rivers.js`). The land is ruled into 800 m squares; about 85% hold a spring, on the
+  highest of a few spots in the square that is at least 10 m up. From it the water is traced down the
+  land's slope in 6 m steps, carrying on a little the way it was going; caught in a hollow, it is
+  routed out over the hollow's lowest rim, as water would fill it and spill (a flood outward over
+  10 m squares, within 300 m). A river is kept only if it reaches a lake or the sea within 2 km, and
+  only if it keeps clear of the home neighbourhood (450 m), the shrines' and buildings' ground, the
+  volcano and the settled lakes. Its water level never rises, stays 0.15 m below the land along its
+  middle and below both banks, and may cut through rises of up to 9 m. Where it runs steeply it goes
+  down in steps: a lip, a fall of up to 3.2 m, a pool cut into the slope below. Each river comes from
+  its own square alone, so it is the same whichever way you come (the world's fingerprint near home
+  is unchanged); the rivers that could reach a spot are worked out the first time the ground there is
+  asked for (about 50 ms for a new 800 m region, 1 ms for a neighbouring one) and kept.
+  The ground: the land is cut down to the river's bed (0.35 m under the water in its middle) with
+  banks rising gently from the water's edge (steeper by the falls), pebbly sand on the banks, no
+  trees, grass or flowers in the water or on the bank. You and the animals can wade across (it comes
+  to the boy's knees); falls are too steep to climb, as cliffs are.
+  The water: a ribbon along each river within 1 km, on its water level, drifting downstream, taking
+  the sky as the lakes do, with lace along the banks; on a fall, white streaks pouring down over the
+  darker water, its edges thinning to spray, foam in the pool below and soft clouds of mist at its
+  foot. Further off, the coarse ground shows the river as water. In cold country a river freezes in
+  winter as its lakes do (our call: frozen, not gone).
+  Seed 1 has about 70 rivers within 6 km of home, most 200 to 900 m long, 30 of them with falls; the
+  nearest is about 480 m from home, a mountain stream stepping down into a lake. Not done: rivers
+  between lakes (every lake lies at the same level, so water cannot run from one to another), fishing
+  in rivers, bridges where trails cross them.
 - **The skipper** (2026-11-22, the owner: "redesign the skipper"): drawn as the children are
   (`KIDS.skipper` in `characters/kid.js`, a little taller): an old boatman in a green knitted coat, a
   mustard scarf, dark trousers and boots, short grey hair under his straw hat, a white moustache and

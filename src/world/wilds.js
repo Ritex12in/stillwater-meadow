@@ -18,7 +18,7 @@
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
 // walk.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
-import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt, seaAt, coldBase } from '../core/shape.js';
+import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt, seaAt, coldBase, cliffsAt } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -76,6 +76,7 @@ export function growSquare(ix, iz) {
     const type = roll < pines ? 'pine' : roll > 0.975 - grove * 0.8 ? 'blossom' : 'round';
     const s = (0.8 + size * 0.7) * (1 + lush * 0.14 - snow * 0.12 + B.enchanted * 0.6) * (1 - 0.4 * smooth(TREELINE - 28, TREELINE, felt)), cols = TREE_COLOURS[type];
     const t = { x, z, y: h - 0.15, type, s, ry: turn * TAU, color: cols[Math.floor(tint * cols.length)], top: (kit ? 6.2 : 5.2) * s, wild: true, chill: cold };
+    const wind = cliffsAt(x, z); if (wind > 0.2) t.rx = wind * (0.22 + 0.12 * tint); // (bent by the wind on the windy cliffs, all one way)
     if (kit) {
       // on the heath the broadleaf trees are the light, airy ones: birches and the open-crowned "normal" trees
       t.family = type === 'round' && dry > 0.5 && kit.models.BirchTree_1 ? (tint < 0.62 || !kit.models.NormalTree_1 ? 'birch' : 'normal') : treeFamily(t);

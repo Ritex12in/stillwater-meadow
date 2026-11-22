@@ -318,6 +318,12 @@ export function tick(dt) {
   safe('precipitation', () => updatePrecip(dt, clock.elapsed, camera, cur, sunDir, solar.sunElev));
   safe('sound', () => updateBeds(dt, { nearWater: 1 - smooth(1.0, 1.9, lakeT(player.x, player.z)), day: cur.day, eve: cur.eve, rain: wx.rain, storm: wx.storm, snow: wx.snow, wind: wx.wind, bugs: seasonState.bugs }));
   runHooks(hooks.frame, 'a feature', dt, clock.elapsed, camera);
+  // the imported girl (?hero=kaykit): KayKit's Mage, following your friend (her own figure hidden, after her own update has run)
+  if (riggedGirl && friend && friend.st) {
+    const st = friend.st;
+    friend.k.root.visible = false;
+    followPlayer(riggedGirl, { x: st.x, y: st.y, z: st.z, rot: st.rot, move: st.move, seat: st.sitAmt > 0.6 ? {} : null, sitAmt: st.sitAmt, lieAmt: st.lie || 0, pickT: 0, petAmt: st.petAmt || 0, skating: false }, dt, { act: '', ground: st.ground || 0, emote: st.cheerT > 0 ? 'cheer' : null });
+  }
   sky.position.copy(camera.position);
   sunAim.set(camTarget.x, camTarget.y - 1.55, camTarget.z);
   placeSun(sunAim, lightDir);
@@ -357,7 +363,9 @@ updateBoat(0, 0, cur.eve, cur.day);
 updatePlayer(0, updatePetting);
 // the imported character (?hero=kaykit): shown to the owner before anything is rewired to it
 let rigged = null;
+let riggedGirl = null;
 if (RIGGED) loadRigged('Rogue').then((r) => { if (!r) return; rigged = r; hero.root.visible = false; window.__meadow.rigged = { clips: r.clips }; });
+if (RIGGED) loadRigged('Mage').then((r) => { if (r) riggedGirl = r; });
 updateCamera(0, player);
 updateDetail(camera, camTarget);
 settleGround(camera.position.x, camera.position.z);

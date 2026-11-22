@@ -13,9 +13,14 @@ const DOGS = [{ coat: '#f6eee2', patch: '#d98a4a' }, { coat: '#f3efe8', patch: '
 const CATS = [{ fur: '#fbf6ee', patch: '#e58c3f', eye: '#8a6a2a' }, { fur: '#8f9298', belly: '#e9e7e2', eye: '#d9c14a', collar: '#3f6fa0' }, { fur: '#2d2a29', belly: '#f1ede6', eye: '#d6c23a', collar: '#c4473a' }, { fur: '#e8a35a', belly: '#fbf2e4', patch: '#c9783a', eye: '#6f9a3a' }];
 const place = (r, x, z, ry, sit) => {
   r.root.scale.setScalar(r.scale); r.root.position.set(x, 0, z); r.root.rotation.y = ry; scene.add(r.root);
-  if (sit) { r.legs[0].rotation.x = 0.45; r.legs[1].rotation.x = 0.45; r.legs[2].rotation.x = -1.25; r.legs[3].rotation.x = -1.25; r.rig.rotation.x = -0.45; r.rig.position.y = -r.sitDrop; r.head.rotation.x = 0.25; }
+  const S = r.sitPose || { front: 0.45, rear: -1.25, pitch: -0.45, head: 0.25 }; // (as animals.js sits them)
+  if (sit) { r.legs[0].rotation.x = r.legs[1].rotation.x = S.front; r.legs[2].rotation.x = r.legs[3].rotation.x = S.rear; r.rig.rotation.x = S.pitch; r.rig.position.y = -r.sitDrop; r.head.rotation.x = S.head; }
 };
-if (view === 'close') {
+if (view === 'side') {
+  // the dog sitting and standing, side on
+  place(makeDog(DOGS[0]), -0.4, 0, Math.PI / 2, true); place(makeDog(DOGS[0]), 0.45, 0, Math.PI / 2, false);
+  cam.position.set(0, 0.35, 2.4); cam.lookAt(0, 0.28, 0);
+} else if (view === 'close') {
   place(makeDog(DOGS[0]), -0.42, 0, 0.5, q.get('sit')); place(makeCat(CATS[0]), 0.4, 0, -0.5, q.get('sit'));
   cam.position.set(0, 0.55, 2.3); cam.lookAt(0, 0.3, 0);
 } else {

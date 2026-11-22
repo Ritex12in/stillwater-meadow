@@ -237,11 +237,13 @@ export function updateAnimal(a, dt, t) {
   a.phase += dt * a.speed * (a.kind === 'dog' ? 5.2 : 8);
   const amp = Math.min(1, a.speed / 1.2) * 0.7;
   const sw = Math.sin(a.phase) * amp;
-  a.legs[0].rotation.x = sw + a.sit * 0.45;
-  a.legs[1].rotation.x = -sw + a.sit * 0.45;
-  a.legs[2].rotation.x = -sw - a.sit * 1.25;
-  a.legs[3].rotation.x = sw - a.sit * 1.25;
-  a.rig.rotation.x = -0.45 * a.sit;
+  // sitting: the body tips back onto its rump, the hind legs fold forward under it, the front legs stand (each rig says how far: see sitPose)
+  const SP = a.sitPose || SIT;
+  a.legs[0].rotation.x = sw + a.sit * SP.front;
+  a.legs[1].rotation.x = -sw + a.sit * SP.front;
+  a.legs[2].rotation.x = -sw + a.sit * SP.rear;
+  a.legs[3].rotation.x = sw + a.sit * SP.rear;
+  a.rig.rotation.x = SP.pitch * a.sit;
   a.rig.position.y = -a.sitDrop * a.sit + Math.abs(Math.sin(a.phase)) * 0.025 * amp;
 
   if (a.kind === 'dog') {
@@ -253,7 +255,7 @@ export function updateAnimal(a, dt, t) {
   const lookTarget = dp < 6 ? clamp(angDiff(a.heading, Math.atan2(dxp, dzp)), -0.9, 0.9) : Math.sin(t * 0.4 + a.side) * 0.3;
   a.look = damp(a.look, lookTarget, 3, dt);
   a.head.rotation.y = a.look;
-  a.head.rotation.x = a.sit * 0.25 - a.petAmt * (a.kind === 'dog' ? 0.6 : 0.45); // looks up at you
+  a.head.rotation.x = a.sit * SP.head - a.petAmt * (a.kind === 'dog' ? 0.6 : 0.45); // looks up at you
   a.head.rotation.z = Math.sin(t * 1.7 + a.side) * 0.18 * a.petAmt;             // happy head tilt
   const squint = 1 - a.petAmt * (a.kind === 'cat' ? 0.85 : 0.55);                // content, half-closed eyes
   a.eyes[0].scale.y = squint; a.eyes[1].scale.y = squint;
@@ -271,6 +273,7 @@ export function updateAnimal(a, dt, t) {
 
 // Keep animals from walking into each other or into you. Only an animal that is up and about gets
 // nudged; if two have settled on top of each other, one gets up and walks a step aside instead.
+const SIT = { front: 0.45, rear: -1.25, pitch: -0.45, head: 0.25 };
 export function separateAnimals() {
   const free = (a) => a.speed > 0.1 || a.sit < 0.1;
   const shove = (a, dx, dz) => { const x = a.x + dx, z = a.z + dz; if (animalWalkable(x, z)) { a.x = x; a.z = z; a.root.position.x = x; a.root.position.z = z; } };

@@ -151,7 +151,9 @@ export function makeDog(c) {
   const tail = pivot(rig, 0, 0.36, -0.2);
   carved(tail, [{ f: strand([0, 0, 0], [0, 0.1, -0.08], [0, 0.18, -0.03], 0.035, 0.05), color: (x, y) => (y > 0.14 ? white : coat) }], [-0.07, -0.05, -0.15, 0.07, 0.25, 0.05], 22, 0.02);
   shadows(root);
-  return { root, rig, head, legs, tail, eyes, sitDrop: 0.06, scale: c.scale || 1, length: 0.55, radius: 0.3 };
+  // (sitting: the body tips back 0.6 so the rump meets the ground, the hind legs fold forward to lie along it under the belly,
+  // the front legs stand nearly upright, the head comes level again; the old sit, made for a long-legged dog, left its hind legs sticking out behind)
+  return { root, rig, head, legs, tail, eyes, sitDrop: 0.06, sitPose: { front: 0.06, rear: -0.85, pitch: -0.6, head: 0.5 }, scale: c.scale || 1, length: 0.55, radius: 0.3 };
 }
 
 export function makeCat(c) {

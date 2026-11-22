@@ -73,8 +73,9 @@ KIDS.boyWinter = Object.assign({}, KIDS.boy, { winter: true, coat: '#2c3e63', co
 KIDS.girlWinter = Object.assign({}, KIDS.girl, { winter: true, coat: '#c4323a', coatTrim: '#a3262e', pants: '#4a3a44', boot: '#f1ece4', bootTrim: '#ffffff', skirt: '#f6f2ec', scarf: '#fbf8f2', hat: '#fbf8f2', wideLegs: false, patch: null, motif: null });
 
 // sizes, in metres (the figure stands about 1.6 m to the top of its hair)
-const HIP = 0.52, THIGH = 0.25, SHIN = 0.27, SHOULDER = 0.93, UPPER = 0.2, FORE = 0.2, HAND = 0.045, NECK = 1.0;
-export const KID_DIMS = { hip: HIP, thigh: THIGH, shin: SHIN, shoulder: SHOULDER, arm: UPPER + FORE + HAND, handY: -(FORE + HAND), eye: NECK + 0.27, top: 1.62 };
+// (proportions after the owner's character sheets: the head about a third of the height, longer legs)
+const HIP = 0.63, THIGH = 0.3, SHIN = 0.33, SHOULDER = 1.04, UPPER = 0.23, FORE = 0.215, HAND = 0.045, NECK = 1.11, HEAD = 0.92;
+export const KID_DIMS = { hip: HIP, thigh: THIGH, shin: SHIN, shoulder: SHOULDER, arm: UPPER + FORE + HAND, handY: -(FORE + HAND), eye: NECK + 0.25, top: NECK + 0.56 * HEAD };
 
 // ───────────── the face ─────────────
 // Expressions are sets of targets the face eases toward: how open each eye is (0 shut .. 1, above 1
@@ -91,7 +92,7 @@ const FACES = {
 };
 function makeFace(head, C, surfAt) {
   const dark = smooth(C.eye, { roughness: 0.6 }), white = smooth('#ffffff', { roughness: 0.5, emissive: '#ffffff', emissiveIntensity: 0.25 });
-  const hairMat = smooth(C.hair), browMat = tone(C.hair, 0.95), lip = smooth('#b0685c'), inside = smooth('#8a4038'), tongue = smooth('#f0a09a');
+  const hairMat = smooth(C.hair), browMat = tone(C.hair, 0.95), lip = smooth('#9a5244'), inside = smooth('#8a4038'), tongue = smooth('#f0a09a');
   const blushU = { uBlush: { value: 0.5 } }; // (painted on the skin: see blushPaint)
   const surf = (x, y) => surfAt(Math.abs(x), y); // the sculpted face's front at (x, y)
   const EY = 0.215, EX = 0.122, Z = surf(EX, EY) + 0.004;
@@ -105,11 +106,12 @@ function makeFace(head, C, surfAt) {
     lump(ballG, glow, [ball(0.038, 0, -0.032, 0.008, { s: [1.05, 0.8, 0.16] })], true);
     lump(ballG, white, [ball(0.02, -0.018, 0.034, 0.012, { s: [1, 1.1, 0.14] }), ball(0.009, 0.02, -0.032, 0.012, { s: [1, 1, 0.14] })], true); // highlights
     // the upper lash line: a thin stroke along the top of the eye
-    const lash = lump(e, hairMat, [new THREE.TorusGeometry(0.056, 0.006, 5, 14, Math.PI * 0.8).rotateZ(Math.PI * 0.1).scale(1, 1.34, 1).translate(0, 0.003, 0.006)], true);
+    const lash = lump(e, hairMat, [new THREE.TorusGeometry(0.056, 0.0095, 6, 16, Math.PI * 0.82).rotateZ(Math.PI * 0.09).scale(1, 1.34, 1).translate(0, 0.003, 0.006),
+      cap(0.0075, 0.02, sd * 0.061, 0.034, 0.006, { r: [0, 0, sd * -0.85], s: [1, 1, 0.5] })], true); // (the lash line, and its flick at the outer corner)
     // shut and smiling: an upturned arc
     const arc = lump(e, hairMat, [new THREE.TorusGeometry(0.044, 0.0065, 5, 14, Math.PI * 0.8).rotateZ(Math.PI * 0.1).translate(0, -0.024, 0.006)], true);
     const brow = pivot(head, sd * EX, EY + 0.104, surf(EX, EY + 0.104) + 0.004); brow.rotation.y = sd * 0.24;
-    lump(brow, browMat, [cap(0.0115, 0.044, 0, 0, 0.004, { r: [0, 0, Math.PI / 2 + sd * 0.14], s: [1, 1, 0.5] })], true);
+    lump(brow, browMat, [new THREE.TorusGeometry(0.075, 0.0135, 6, 12, 0.78).rotateZ(Math.PI / 2 - 0.39 + sd * 0.1).translate(0, -0.068, 0.004).scale(1, 1, 0.5)], true); // (thick, short, gently arched)
     return { e, ball: ballG, lash, arc, brow, sd };
   });
   lump(head, tone(C.skin, 0.94), [ball(0.009, 0, 0.152, surf(0, 0.152) + 0.001, { s: [1.3, 0.8, 0.5] })], true); // nose: barely there
@@ -117,9 +119,9 @@ function makeFace(head, C, surfAt) {
   // a gentle curve: a short piece of a wide circle, `up` for a smile, down for a frown
   const curve = (R, arc, thick, up) => { const g = new THREE.TorusGeometry(R, thick, 5, 12, arc).rotateZ((up ? -Math.PI / 2 : Math.PI / 2) - arc / 2); return g.translate(0, up ? R : -R, 0).scale(1, 1, 0.5); };
   const mk = (name, mat, geos) => { const g = pivot(head, 0, my, mz); geos.forEach(([m, list]) => lump(g, m || mat, list, true)); g.visible = false; mouths[name] = g; };
-  mk('smile', lip, [[null, [curve(0.04, 1.35, 0.0055, true)]]]);
-  mk('grin', inside, [[null, [new THREE.SphereGeometry(0.03, 14, 8, 0, TAU, Math.PI / 2, Math.PI / 2).scale(1, 0.95, 0.2).translate(0, 0.012, 0)]], [tongue, [ball(0.016, 0, -0.008, 0.003, { s: [1.1, 0.6, 0.25] })]]]);
-  mk('oh', inside, [[null, [ball(0.014, 0, 0.002, 0, { s: [0.9, 1.15, 0.25] })]]]);
+  mk('smile', lip, [[null, [curve(0.042, 1.25, 0.0075, true)]]]);
+  mk('grin', inside, [[null, [new THREE.SphereGeometry(0.04, 16, 8, 0, TAU, Math.PI / 2, Math.PI / 2).scale(1, 0.95, 0.2).translate(0, 0.016, 0)]], [tongue, [ball(0.021, 0, -0.012, 0.003, { s: [1.1, 0.6, 0.25] })]]]);
+  mk('oh', inside, [[null, [ball(0.019, 0, 0.002, 0, { s: [0.9, 1.15, 0.25] })]]]);
   mk('flat', lip, [[null, [cap(0.0042, 0.022, 0, 0.004, 0, { r: [0, 0, Math.PI / 2], s: [1, 1, 0.5] })]]]);
   mk('frown', lip, [[null, [curve(0.04, 1.2, 0.0055, false).translate(0, 0.004, 0)]]]);
   const st = { name: 'calm', until: 0, base: 'calm', open: 1, arc: 0, brow: 0, tilt: 0, lop: 0, blush: 0.55, mouth: 'smile', blinkT: 2 };
@@ -171,9 +173,9 @@ function part(parent, layers, box, n, k = 0.02) {
  */
 const headField = () => blend(0.018, blend(0.075,
   ellipsoid(0, 0.29, -0.012, 0.268, 0.268, 0.266),                // the cranium: an oval, as tall as it is wide
-  ellipsoid(0, 0.158, 0.05, 0.2, 0.165, 0.2),                      // the lower face: narrower, longer, set forward
+  ellipsoid(0, 0.158, 0.05, 0.212, 0.165, 0.2),                    // the lower face: narrower, longer, set forward (cheeks a little full)
   ellipsoid(0, 0.05, 0.088, 0.078, 0.06, 0.086)),                  // a small, soft chin, a little lower
-  mirror(ellipsoid(0.262, 0.2, -0.02, 0.024, 0.048, 0.04)));      // ears, at the eyes' height
+  mirror(ellipsoid(0.27, 0.195, -0.012, 0.036, 0.06, 0.05)));      // ears, round and showing, at the eyes' height
 
 // Hair is drawn the way the reference draws it: big flat locks shaped like leaves (wide in the
 // middle, pointed at the tip), layered over one another and radiating from the crown. Each lock is
@@ -494,7 +496,7 @@ export function makeKid(spec = KIDS.boy) {
   lump(pack, smooth('#f6f1e6'), [ball(0.026, 0, -0.1, -0.147, { s: [1.15, 0.9, 0.3] }), ball(0.012, -0.034, -0.066, -0.147, { s: [1, 1, 0.4] }), ball(0.012, -0.012, -0.052, -0.147, { s: [1, 1, 0.4] }), ball(0.012, 0.012, -0.052, -0.147, { s: [1, 1, 0.4] }), ball(0.012, 0.034, -0.066, -0.147, { s: [1, 1, 0.4] })], true); // paw print
 
   // head: the sculpted skull, the face on its surface, and hair that sways after it
-  const head = pivot(chest, 0, NECK - HIP, 0); head.scale.setScalar(1.08);
+  const head = pivot(chest, 0, NECK - HIP, 0); head.scale.setScalar(HEAD);
   const skull = headField();
   const skin = part(head, [{ f: skull, color: C.skin }], [-0.36, -0.02, -0.29, 0.36, 0.56, 0.3], 44);
   const face = makeFace(head, C, (x, y) => frontOf(skull, x, y) || 0.25);

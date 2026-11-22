@@ -6,13 +6,13 @@ import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug, query } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU, updateDetail, neonU } from './core/materials.js';
-import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, moistAt, snowCold, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME } from './core/shape.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, moistAt, snowCold, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME, landNear } from './core/shape.js';
 import { hooks, seasonState, seats, world, obstacles } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU } from './world/sky.js';
 import { buildLights, hemi, ambient, sun, placeSun } from './world/lights.js';
 import { buildGround, updateGround, pumpGround, settleGround, groundStats, groundU } from './world/terrain.js';
-import { buildWater, updateWater, waterLakes, waterU } from './world/water.js';
+import { buildWater, updateWater, waterLakes, waterU, seaShown, seaDrawnAt } from './world/water.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots, TREE_REACH, MODEL_FAR } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
 import { loadingStep, paint, loadingDone, initScreen } from './ui/loading.js';
@@ -152,12 +152,13 @@ initSettings();
 initWorldPanel();
 /** Go to a spot at once (the Places list): the ground and what grows there are made ready first. */
 function travelTo(x, z, faceX, faceZ) {
+  if (!walkable(x, z)) { const to = landNear(x, z); if (faceX === undefined && (to.x !== x || to.z !== z)) { faceX = x; faceZ = z; } x = to.x; z = to.z; } // (out at sea, say: the nearest shore, facing it)
   player.x = x; player.z = z; player.slide = null; player.y = groundAt(x, z);
   if (faceX !== undefined) { player.rot = Math.atan2(faceX - x, faceZ - z); camState.yaw = Math.atan2(x - faceX, z - faceZ); }
   updateAnchor(0, true); // (if this is another settled lake, its jetty, fire and bench are here when you arrive)
   updateLifeLake(0, x, z, true);
   shrineNear(x, z, true); // (and the shrine, if a site of its own is nearer here)
-  settleGround(x, z); settleWilds(x, z); updateWater(x, z); updateLakeLife(x, z);
+  settleGround(x, z); settleWilds(x, z); updateWater(x, z, true); updateLakeLife(x, z);
   // your companions come with you: your friend if you walk together, and the dogs following you
   if (friend && friend.st && friend.st.together) { friend.st.x = x + 1; friend.st.z = z + 0.5; friend.st.y = groundAt(x + 1, z + 0.5); }
   for (const a of animals) if (a.state === 'follow') { const ang = Math.random() * Math.PI * 2; a.x = x + Math.cos(ang) * 2; a.z = z + Math.sin(ang) * 2; if (a.root) a.root.position.set(a.x, groundAt(a.x, a.z), a.z); }
@@ -412,6 +413,7 @@ window.__meadow = {
   // the trees beyond the valley: what is loaded, a way to bring it up to date, and one square's trees
   /** The shrine sites within `r` metres of you (the shrine stands at `shrine`, one of them). */
   shrines: (r = 1500) => shrineSitesNear(player.x, player.z, r), rawHeight,
+  seaShown, seaDrawnAt,
   wilds: { stats: wildStats, settle: settleWilds, square: growSquare, rocks: growRocks, small: (ix, iz) => growSmall(ix, iz, growSquare(ix, iz)), picks: growPicks, picksNear, biome: growBiome },
   /** The biomes at a spot (core/biome.js): their weights, and the strongest. */
   biomes: (x, z) => biomesAt(x, z, height(x, z)), biomeAt: (x, z) => biomeAt(x, z, height(x, z)),

@@ -32,7 +32,24 @@ export const waterU = {
   lampW: { value: [] },          // lamp lanterns, world space (set in main.js)
   lampAmt: { value: 0 },
   uStars: skyU.stars,            // the night sky's stars, glinting in the ripples
+  isSea: { value: 0 },           // (the sea's sheet: drawn only where the mask says there is sea)
+  seaMask: { value: null },
+  seaBox: { value: new THREE.Vector4(0, 0, 1, 1) },
 };
+const MASK_N = 128, MASK_SPAN = 8000;
+const maskData = new Uint8Array(MASK_N * MASK_N * 4);
+const maskTex = new THREE.DataTexture(maskData, MASK_N, MASK_N, THREE.RGBAFormat);
+maskTex.magFilter = THREE.LinearFilter; maskTex.minFilter = THREE.LinearFilter;
+waterU.seaMask.value = maskTex;
+let maskX = NaN, maskZ = NaN;
+/** Redraw the sea mask round a spot (8 km square, 62 m cells). */
+function drawMask(x, z) {
+  maskX = x; maskZ = z;
+  const x0 = x - MASK_SPAN / 2, z0 = z - MASK_SPAN / 2, c = MASK_SPAN / MASK_N;
+  for (let j = 0; j < MASK_N; j++) for (let i = 0; i < MASK_N; i++) { const v = seaAt(x0 + (i + 0.5) * c, z0 + (j + 0.5) * c); maskData[(j * MASK_N + i) * 4] = Math.min(255, Math.round(v * 2550)); }
+  maskTex.needsUpdate = true;
+  waterU.seaBox.value.set(x0, z0, MASK_SPAN, MASK_SPAN);
+}
 
 export function buildWater() {
   const geo = new THREE.CircleGeometry(48, 160);
@@ -52,6 +69,7 @@ export function buildWater() {
       uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun;
       uniform float fogNear; uniform float fogFar; uniform vec2 lakeC; uniform vec4 lakeShape; uniform vec3 lakePhase; uniform vec2 lakeStretch; uniform vec3 lakeTint;
       uniform vec3 lampW[12]; uniform float lampAmt; uniform float uStars;
+      uniform float isSea; uniform sampler2D seaMask; uniform vec4 seaBox;
       varying vec3 vWP;
       vec2 wave(vec2 p, vec2 d, float f, float s, float a) {
         return d * cos(dot(p, d) * f + uTime * s) * f * a;
@@ -97,6 +115,7 @@ export function buildWater() {
       }
       void main() {
         vec2 p = vWP.xz;
+        if (isSea > 0.5 && texture2D(seaMask, (p - seaBox.xy) / seaBox.zw).r < 0.004) discard; // (only over the sea)
         // soft, irregular ripples: a few octaves of drifting noise, plus a long gentle swell
         vec2 g = rippleGrad(p) + wave(p, normalize(vec2(1.0, 0.3)), 0.35, 0.6, 0.03);
         g += ripples(p) * uRain * (1.0 - uIce);
@@ -171,7 +190,7 @@ export function buildWater() {
     sheets.push({ mesh, u, lake: null });
   }
   // the sea: the same water, without a shore of its own (the land makes its shore), a little bluer
-  const su = Object.assign({}, waterU, { lakeC: { value: new THREE.Vector2() }, lakeShape: { value: new THREE.Vector4(1e6, 0, 0, 0) }, lakePhase: { value: new THREE.Vector3() }, lakeStretch: { value: new THREE.Vector2() }, lakeTint: { value: new THREE.Vector3(0.78, 1.02, 1.12) }, uIce: { value: 0 } });
+  const su = Object.assign({}, waterU, { lakeC: { value: new THREE.Vector2() }, lakeShape: { value: new THREE.Vector4(1e6, 0, 0, 0) }, lakePhase: { value: new THREE.Vector3() }, lakeStretch: { value: new THREE.Vector2() }, lakeTint: { value: new THREE.Vector3(0.78, 1.02, 1.12) }, uIce: { value: 0 }, isSea: { value: 1 } });
   sea = make(su);
   sea.scale.set(64, 1, 64); // (about 3 km round)
   sea.position.y = -0.04;
@@ -189,8 +208,8 @@ function seaNear(x, z) {
 
 const SHEETS = 4, WATER_REACH = 620, sheets = [];
 /** Once a frame: the sheets of water go to the lakes nearest (x, z). */
-export function updateWater(x, z) {
-  if (sea && --seaIn <= 0) { seaIn = 60; sea.visible = seaNear(x, z); }
+export function updateWater(x, z, now = false) {
+  if (sea && (now || --seaIn <= 0)) { seaIn = 60; sea.visible = seaNear(x, z); if (sea.visible && !(Math.abs(x - maskX) < 800 && Math.abs(z - maskZ) < 800)) drawMask(x, z); }
   if (sea && sea.visible) sea.position.set(x, -0.04, z);
   const near = lakesNear(x, z, WATER_REACH).slice(0, SHEETS);
   for (const s of sheets) if (s.lake && !near.includes(s.lake)) s.lake = null;
@@ -210,4 +229,9 @@ export function updateWater(x, z) {
 }
 /** For tests: which lakes have water drawn just now. */
 export const seaShown = () => !!(sea && sea.visible);
+/** For tests: whether the sea's sheet is drawn at a spot (its mask there; 0 where it is cut away). */
+export function seaDrawnAt(x, z) {
+  const b = waterU.seaBox.value, i = Math.floor((x - b.x) / b.z * MASK_N), j = Math.floor((z - b.y) / b.w * MASK_N);
+  return i >= 0 && j >= 0 && i < MASK_N && j < MASK_N ? maskData[(j * MASK_N + i) * 4] : 0;
+}
 export const waterLakes = () => sheets.filter((s) => s.lake).map((s) => s.lake.id);

@@ -232,7 +232,7 @@ function landShape(x, z, open) {
 }
 /** In the windy cliffs the hills rise higher and step into plateaus. */
 function stepped(h, hills, steps) {
-  if (steps < 0.01) return h;
+  if (steps <= 0) return h;
   const up = h + steps * hills * hills * 40 * (1 - smooth(40, 80, h));
   return up + (terrace(up) - up) * steps;
 }
@@ -727,6 +727,7 @@ function siteOfCell(kind, cx, cz) {
       if (Math.hypot(x - HOME.x, z - HOME.z) < 600 || Math.hypot(x - home.x, z - home.z) < 120) continue;
       const h = rawHeight(x, z);
       if (!K.ship && h < 1 && seaAt(x, z) > 0) continue; // (nothing but ships out at sea)
+      if (K.sink && h - K.sink < 1.5) continue; // (a sunk basin stays above the water)
       if (!K.rule(x, z, h)) continue;
       if (K.flat > 0 && !clearOfLakes(x, z)) continue;
       if (K.flat === 0 && lakeAt(x, z).t(x, z) < (K.cone ? 12 : 2.2)) continue;
@@ -827,6 +828,15 @@ export function nearestShore(x, z) {
   return { x, z };
 }
 
+/** The walkable ground nearest a spot, out to about a kilometre (a ship's place, say, is out at sea). */
+export function landNear(x, z) {
+  if (walkable(x, z)) return { x, z };
+  for (let r = 4; r < 1200; r += r < 60 ? 4 : 12) for (let k = 0; k < 32; k++) {
+    const a = (k / 32) * TAU, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+    if (walkable(px, pz) && !onIce(px, pz)) return { x: px, z: pz };
+  }
+  return { x, z };
+}
 /** First point straight ahead (dir = {x, z}) that is open water, trying several distances. */
 export function waterAhead(from, dir, dists = [4.5, 3.5, 6, 7.5, 2.5]) {
   for (const d of dists) {

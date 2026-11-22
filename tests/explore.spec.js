@@ -165,3 +165,39 @@ test('trails join the places: worn paths with no trees on them, and signposts na
   expect(r.trees, 'no tree stands on a trail').toBe(0);
   noErrors(errors);
 });
+
+test('the sea: never near home, not to be walked on, sand and palms by it, ships at anchor; travelling to a ship lands you on the shore', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const r = await page.evaluate(async () => {
+    const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
+    const SH = await import(url('/src/core/shape.js')), m = window.__meadow, H = m.home;
+    let nearHome = 0;
+    for (let d = 0; d < 2000; d += 100) for (let a = 0; a < 6.28; a += 0.3) if (SH.seaAt(H.x + Math.cos(a) * d, H.z + Math.sin(a) * d) > 0) nearHome++;
+    let open = null;
+    for (let d = 2000; d < 8000 && !open; d += 50) for (let a = 0; a < 6.28; a += 0.05) { const x = H.x + Math.cos(a) * d, z = H.z + Math.sin(a) * d; if (SH.seaAt(x, z) > 0.6 && SH.height(x, z) < -4) { open = { x, z }; break; } }
+    const sites = SH.sitesNear(H.x, H.z, 8000), ships = sites.filter((s) => s.kind === 'ship');
+    const drowned = sites.filter((s) => s.kind !== 'ship' && SH.height(s.x, s.z) < 0.5).map((s) => s.id);
+    const homeLake = m.seaDrawnAt(H.x, H.z); // (the sheet, if near, is cut away over the land)
+    const ship = ships[0];
+    m.travelTo(ship.x, ship.z);
+    for (let i = 0; i < 30; i++) m.tick(1 / 30);
+    let palms = 0; const S = 57.6;
+    for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) palms += m.wilds.biome(Math.floor(m.player.x / S) + i, Math.floor(m.player.z / S) + j).palms.length;
+    return { nearHome, open, walkOpen: open && SH.walkable(open.x, open.z), ships: ships.length, shipY: ships.map((s) => s.y), shipDeep: ships.every((s) => SH.height(s.x, s.z) < -5), drowned, homeLake,
+      shore: SH.walkable(m.player.x, m.player.z), far: Math.hypot(m.player.x - ship.x, m.player.z - ship.z), sea: m.seaShown(), palms, lost: m.wilds.stats().dropped };
+  });
+  expect(r.nearHome, 'no sea within 2 km of home').toBe(0);
+  expect(r.open, 'open sea within 8 km').not.toBeNull();
+  expect(r.walkOpen, 'the sea is not to be walked on').toBe(false);
+  expect(r.drowned, 'no building under the sea but the ships').toEqual([]);
+  expect(r.ships, 'ships at anchor within 8 km').toBeGreaterThan(0);
+  expect(r.shipDeep, 'ships ride in deep water').toBe(true);
+  for (const y of r.shipY) expect(y).toBe(0);
+  expect(r.homeLake, 'no sea drawn over the home lake').toBe(0);
+  expect(r.shore, 'travelling to a ship lands you on dry ground').toBe(true);
+  expect(r.far, 'on the shore nearest it').toBeLessThan(1200);
+  expect(r.sea, 'the sea is shown by the coast').toBe(true);
+  expect(r.palms, 'palms grow on the beaches about').toBeGreaterThan(0);
+  expect(r.lost, 'nothing is dropped for want of a slot').toBe(0);
+  noErrors(errors);
+});

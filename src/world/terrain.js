@@ -172,10 +172,11 @@ function* fill(t) {
       // cold country where little snow lies (it is too dry) is tundra: low olive-brown moss and sedge
       const wTundra = smooth(0.42, 0.65, chill) * (1 - snowOf(cold));
       // (clime: cold, dry, and whether this is a lake seen from too far off to have its own sheet of water)
-      // (far off, where the rivers have no water of their own drawn, the ground shows them as water: as wide as one square at least, so they are not lost between squares)
-      const rv = t.lv >= 3 ? riverNear(x, z) : null, rpond = rv && rv.d < Math.max(rv.w / 2, cs * 0.6);
+      // (further off the ground is too coarse to hold a river's cut bed, so it shows the river as water, just under the river's own: as wide as one square at least, so it is not lost between squares)
+      const rv = t.lv >= 2 ? riverNear(x, z) : null, rpond = rv && rv.d < Math.max(rv.w / 2, cs * 0.6); // (from the 4.8 m squares out: finer ones show the cut bed)
       const pond = (t.lv > 0 && h < 0.02) || rpond ? 1 : 0;
-      if (pond) { pos[k * 3 + 1] = rpond ? Math.max(rv.lv, Math.min(h, 0.02)) : 0.02; nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }
+      // (a river's just under its own water, which is drawn over it where near enough)
+      if (pond) { pos[k * 3 + 1] = rpond ? Math.max(rv.lv - 0.1, Math.min(h, 0.02)) : 0.02; nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }
       clm[k * 3] = cold; clm[k * 3 + 1] = dry; clm[k * 3 + 2] = pond;
       const bw = biomesAt(x, z, h, base, rain);
       look[k * 4] = Math.max(bw.desert, bw.beach); look[k * 4 + 1] = bw.swamp; look[k * 4 + 2] = bw.enchanted; look[k * 4 + 3] = bw.volcanic;

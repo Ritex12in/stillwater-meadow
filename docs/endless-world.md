@@ -496,12 +496,18 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   The water: a ribbon along each river within 1 km, on its water level, drifting downstream, taking
   the sky as the lakes do, with lace along the banks; on a fall, white streaks pouring down over the
   darker water, its edges thinning to spray, foam in the pool below and soft clouds of mist at its
-  foot. Further off, the coarse ground shows the river as water. In cold country a river freezes in
-  winter as its lakes do (our call: frozen, not gone).
-  Seed 1 has about 70 rivers within 6 km of home, most 200 to 900 m long, 30 of them with falls; the
-  nearest is about 480 m from home, a mountain stream stepping down into a lake. Not done: rivers
-  between lakes (every lake lies at the same level, so water cannot run from one to another), fishing
-  in rivers, bridges where trails cross them.
+  foot (one draw per river; lit as the foam is, so grey at night). From the 4.8 m ground squares out
+  the ground is too coarse to hold the cut bed, so it lies just under the river's water there (and
+  beyond 1 km, where no water is drawn, shows it as water). A river freezes in winter when its
+  middle's place would freeze a lake (our call: frozen, not gone), and then you walk on its ice. A
+  spring on a brink does not pour off it into the air: a river begins below a drop taller than 6 m.
+  Checked: seeds 1, 7 and the text seed "meadow" give 72, 41 and 68 rivers within 6 km of home (30, 6
+  and 12 with falls; worked out in about 0.3 s each), none crossing a building's or shrine's ground;
+  by day, at night and in winter; beside a cascade the frame rate is the same with the rivers shown
+  or hidden. On seed 1 the nearest river is about 480 m from home, a mountain stream stepping down
+  into a lake. Rivers meet in 3 places within 6 km of home; at one their levels differ by 1.6 m,
+  leaving a small step. Not done: rivers between lakes (every lake lies at the same level, so water
+  cannot run from one to another), fishing in rivers, bridges where trails cross them.
 - **The skipper** (2026-11-22, the owner: "redesign the skipper"): drawn as the children are
   (`KIDS.skipper` in `characters/kid.js`, a little taller): an old boatman in a green knitted coat, a
   mustard scarf, dark trousers and boots, short grey hair under his straw hat, a white moustache and

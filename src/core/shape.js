@@ -804,7 +804,16 @@ export function lakeIce(L) {
 }
 export const onIce = (x, z) => { const lake = lakeAt(x, z); return lakeIce(lake) > 0.85 && lake.t(x, z) < 1.0 && heightAt(x, z) < 0.3; }; // 
 export const ICE_Y = 0.09;
-export const groundAt = (x, z) => (onDock(x, z) ? Math.max(DOCK_Y + 0.05, heightAt(x, z)) : onIce(x, z) ? Math.max(heightAt(x, z), ICE_Y) : heightAt(x, z));
+/** A river's chill (its middle's cold in summer, at the lakes' height, as the lakes' is taken), kept on the river. */
+export const riverChill = (r) => (r.chill !== undefined ? r.chill : (r.chill = coldAt(r.x[r.n >> 1], r.z[r.n >> 1], 1)));
+/** How frozen a river is just now (0 running .. 1 ice you can walk on), as its lakes freeze. */
+export const riverIce = (r) => iceFrom(riverChill(r), seasonState.lagged || 0);
+/** The ice's top where (x, z) is on a frozen river, or null. */
+function riverIceAt(x, z) {
+  const r = riverNear(x, z);
+  return r && r.d < r.w / 2 + 0.3 && riverIce(r.river) > 0.85 ? r.lv : null;
+}
+export const groundAt = (x, z) => { if (onDock(x, z)) return Math.max(DOCK_Y + 0.05, heightAt(x, z)); if (onIce(x, z)) return Math.max(heightAt(x, z), ICE_Y); const ri = riverIceAt(x, z); return ri === null ? heightAt(x, z) : Math.max(heightAt(x, z), ri); };
 export const MAX_SLOPE = 1.25;    // steeper than this (about 51 degrees) is a cliff, not a hillside
 /** Anywhere that is dry land and not too steep to climb (or the jetty, or solid ice). */
 export function walkable(x, z) {
@@ -1073,7 +1082,7 @@ function traceRiver(cx, cz) {
   const n = X.length, lv = new Float32Array(n), gr = new Float32Array(n), w = new Float32Array(n), S = new Float32Array(n);
   let lvl = Infinity, along = 0;
   for (let i = 0; i < n; i++) {
-    if (i % 4 === 0 && riverBarred(X[i], Z[i])) return rfail('barred');
+    if (riverBarred(X[i], Z[i])) return rfail('barred'); // (every point: a small building's ground could lie between every fourth)
     if (i > 0) along += Math.hypot(X[i] - X[i - 1], Z[i] - Z[i - 1]);
     // (below the land in its middle, and below both banks, so the water never stands above the ground beside it)
     const g = rawHeight(X[i], Z[i]), a = Math.max(0, i - 1), b = Math.min(X.length - 1, i + 1), tx = X[b] - X[a], tz = Z[b] - Z[a], tl = Math.hypot(tx, tz) || 1, hw = (2.4 + 3.4 * smooth(0, 1600, along)) / 2 + 0.6;
@@ -1084,7 +1093,7 @@ function traceRiver(cx, cz) {
   }
   // (a spring on a brink: the river begins below the drop, not pouring off the top into the air)
   let s0 = 0;
-  while (s0 < n - 25 && lv[s0] - lv[s0 + 1] > 1.2) s0++;
+  while (s0 < n - 25 && lv[s0] - lv[s0 + 1] > 6) s0++; // (only a drop taller than any fall: a cascade below the spring is kept)
   if (s0 > 0) {
     const cut = (A) => A.slice(s0), base = S[s0];
     const r = { X: X.slice(s0), Z: Z.slice(s0), lv: cut(lv), g: cut(gr), w: cut(w), S: cut(S).map((v) => v - base) };

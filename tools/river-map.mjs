@@ -13,6 +13,7 @@ const out = await p.evaluate(async (R) => {
   const t0 = performance.now();
   const list = S.riversNear(H.x, H.z, R);
   const ms = performance.now() - t0;
+  let onGround = 0; for (const r of list) for (let i = 0; i < r.n; i++) if (S.siteAt(r.x[i], r.z[i]) || S.shrineSiteAt(r.x[i], r.z[i], 46)) onGround++;
   const info = list.map((r) => {
     let falls = 0, fallDrop = 0, steep = 0;
     for (let i = 0; i < r.n - 1; i++) { const seg = Math.hypot(r.x[i + 1] - r.x[i], r.z[i + 1] - r.z[i]), dr = (r.lv[i] - r.lv[i + 1]) / Math.max(0.5, seg); if (dr > 0.6) { steep++; fallDrop += r.lv[i] - r.lv[i + 1]; } }
@@ -36,10 +37,10 @@ const out = await p.evaluate(async (R) => {
     g.fillStyle = '#ffffff'; g.beginPath(); g.arc(...P(r.spring.x, r.spring.z), 3, 0, 7); g.fill();
   }
   g.fillStyle = '#ff00ff'; g.beginPath(); g.arc(...P(H.x, H.z), 5, 0, 7); g.fill();
-  return { ms: Math.round(ms), count: list.length, total: S.rivers.length, info, png: c.toDataURL('image/png') };
+  return { onGround, falls: list.filter((r) => r.fall.some((f) => f)).length, ms: Math.round(ms), count: list.length, total: S.rivers.length, info, png: c.toDataURL('image/png') };
 }, R);
 writeFileSync('e:/Games/_assets/previews/rivers-map.png', Buffer.from(out.png.split(',')[1], 'base64'));
 delete out.png;
-console.log(JSON.stringify({ ms: out.ms, count: out.count, total: out.total }));
+console.log(JSON.stringify({ seed: process.env.SEED || 1, ms: out.ms, count: out.count, withFalls: out.falls, pointsOnBuildingOrShrineGround: out.onGround, total: out.total }));
 for (const r of out.info) console.log(JSON.stringify(r));
 await b.close();

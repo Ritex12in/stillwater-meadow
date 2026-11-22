@@ -4,9 +4,7 @@
 // foam churning in the pool below; in cold country a river freezes in winter as its lakes do.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
-import { riversNear, coldAt } from '../core/shape.js';
-import { iceFrom } from '../core/year.js';
-import { seasonState } from '../core/state.js';
+import { riversNear, riverIce } from '../core/shape.js';
 import { waterU } from './water.js';
 import { GRADE_GLSL, HAZE_GLSL } from '../core/atmosphere.js';
 import { glowTex } from '../core/materials.js';
@@ -118,20 +116,18 @@ function ribbon(r) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(ox, 0, oz);
   mesh.receiveShadow = false; mesh.castShadow = false;
-  const mid = Math.floor(r.n / 2);
-  // spray at the foot of each fall: a few soft clouds that swell and fade
-  const mist = [];
-  for (let i = 0; i < r.n - 1; i++) {
-    if (!r.fall[i]) continue;
-    const h = r.lv[i] - r.lv[i + 1];
-    for (let k = 0; k < 2; k++) {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffffff, transparent: true, depthWrite: false, opacity: 0, fog: true }));
-      sp.position.set(r.x[i + 1] - ox + (k - 0.5) * r.w[i] * 0.4, r.lv[i + 1] + 0.5 + k * 0.4, r.z[i + 1] - oz);
-      sp.userData = { size: Math.min(7, 1.6 + r.w[i] * 0.45 + h * 0.25), phase: i * 1.7 + k * 2.3 };
-      mesh.add(sp); mist.push(sp);
-    }
+  // spray at the foot of each fall: soft clouds, all of a river's in one draw, swelling and fading together
+  const mp = [];
+  for (let i = 0; i < r.n - 1; i++) if (r.fall[i]) for (let k = 0; k < 2; k++) mp.push(r.x[i + 1] - ox + (k - 0.5) * r.w[i] * 0.4, r.lv[i + 1] + 0.6 + k * 0.4, r.z[i + 1] - oz);
+  let mist = null;
+  if (mp.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3));
+    mist = new THREE.Points(g, new THREE.PointsMaterial({ map: glowTex, color: 0xffffff, size: 3.6, sizeAttenuation: true, transparent: true, depthWrite: false, opacity: 0, fog: true }));
+    mist.frustumCulled = false;
+    mesh.add(mist);
   }
-  return { mesh, u, mist, chill: coldAt(r.x[mid], r.z[mid], 1) };
+  return { mesh, u, mist, river: r };
 }
 
 const shown = new Map(); // river id -> { mesh, u, chill }
@@ -145,12 +141,12 @@ export function updateRivers(x, z, now = false) {
       want.add(r.id);
       if (!shown.has(r.id)) { const s = ribbon(r); scene.add(s.mesh); shown.set(r.id, s); }
     }
-    for (const [id, s] of shown) if (!want.has(id)) { scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); for (const sp of s.mist) sp.material.dispose(); shown.delete(id); }
+    for (const [id, s] of shown) if (!want.has(id)) { scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); if (s.mist) { s.mist.geometry.dispose(); s.mist.material.dispose(); } shown.delete(id); }
   }
   const t = waterU.uTime.value;
   for (const s of shown.values()) {
-    const ice = (s.u.uIce.value = iceFrom(s.chill, seasonState.lagged || 0));
-    for (const sp of s.mist) { const w = 0.5 + 0.5 * Math.sin(t * 0.9 + sp.userData.phase), sz = sp.userData.size * (0.85 + 0.3 * w); sp.scale.set(sz, sz * 0.75, 1); sp.material.opacity = (0.22 + 0.16 * w) * (1 - ice); }
+    const ice = (s.u.uIce.value = riverIce(s.river));
+    if (s.mist) { const w = 0.5 + 0.5 * Math.sin(t * 0.9), L = waterU.uLight.value; s.mist.material.size = 3.2 + 0.8 * w; s.mist.material.opacity = (0.26 + 0.12 * w) * (1 - ice); s.mist.material.color.setScalar(Math.min(1, L)); } // (lit as the foam is: grey at night, not glowing)
   }
 }
 /** For tests: the rivers with water drawn just now. */

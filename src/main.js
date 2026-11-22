@@ -41,12 +41,12 @@ import { updateWilds, settleWilds, wildStats, growSquare, growRocks, growSmall, 
 import { buildBiomeThings } from './world/biomethings.js';
 import { biomesAt, biomeAt } from './core/biome.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
-import { store, onSave, flush } from './systems/save.js';
+import { store, onSave, flush, saveSoon } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
 import { initWorldPanel, initPlaces } from './ui/world-panel.js';
 import { initCountries, nearestCountries } from './ui/countries.js';
 import { initBackpack, backpackView } from './ui/backpack.js';
-import { RIGGED, loadRigged, followPlayer } from './characters/rigged.js';
+import { CHARACTERS, DEFAULT_YOU, DEFAULT_FRIEND, CLASSIC_ONLY, loadCharacter, dropCharacter, followFigure } from './characters/vroid.js';
 import { initFoundPlaces, foundView } from './features/places.js';
 import { initCamp } from './features/camp.js';
 import { initLandmarks, landmarksView, landmarkBlocks, landmarkSeats } from './world/landmarks.js';
@@ -55,7 +55,7 @@ import { initCloudSea } from './world/cloudsea.js';
 import * as pack from './systems/pack.js';
 import { initCompass, compassView } from './ui/compass.js';
 import { updateAnchor, moveAnchor, anchorId, settledAbout } from './systems/anchor.js';
-import { initSettings } from './ui/settings.js';
+import { initSettings, initCharacterPicker } from './ui/settings.js';
 import { initPetVoices } from './features/voices.js';
 import { initDucks, duckState } from './features/ducks.js';
 import { initWildlife, wildView } from './features/wildlife.js';
@@ -311,7 +311,7 @@ export function tick(dt) {
   safe('time', () => { advanceTime(dt); applySky(); });
   safe('boat', () => updateBoat(dt, clock.elapsed, cur.eve, cur.day));
   safe('player', () => updatePlayer(dt, updatePetting));
-  if (rigged) safe('character', () => followPlayer(rigged, player, dt, { act: activity.current, ground: emoteState.ground, emote: emoteState.amt > 0.3 ? emoteState.shown : null }));
+  if (youChar) safe('character', () => { hero.root.visible = false; followFigure(youChar, player, dt, { act: activity.current, ground: emoteState.ground, emote: emoteState.amt > 0.3 ? emoteState.shown : null }); });
   safe('places', () => updateAnchor(dt));
   safe('lake life', () => updateLifeLake(dt, player.x, player.z));
   safe('camera', () => updateCamera(dt, player));
@@ -322,11 +322,11 @@ export function tick(dt) {
   safe('precipitation', () => updatePrecip(dt, clock.elapsed, camera, cur, sunDir, solar.sunElev));
   safe('sound', () => updateBeds(dt, { nearWater: 1 - smooth(1.0, 1.9, lakeT(player.x, player.z)), day: cur.day, eve: cur.eve, rain: wx.rain, storm: wx.storm, snow: wx.snow, wind: wx.wind, bugs: seasonState.bugs }));
   runHooks(hooks.frame, 'a feature', dt, clock.elapsed, camera);
-  // the imported girl (?hero=kaykit): KayKit's Mage, following your friend (her own figure hidden, after her own update has run)
-  if (riggedGirl && friend && friend.st) {
+  // your friend's character, following her figure (hidden, after its own update has run)
+  if (friendChar && friend && friend.st) {
     const st = friend.st;
     friend.k.root.visible = false;
-    followPlayer(riggedGirl, { x: st.x, y: st.y, z: st.z, rot: st.rot, move: st.move, seat: st.sitAmt > 0.6 ? {} : null, sitAmt: st.sitAmt, lieAmt: st.lie || 0, pickT: 0, petAmt: st.petAmt || 0, skating: false }, dt, { act: '', ground: st.ground || 0, emote: st.cheerT > 0 ? 'cheer' : null });
+    followFigure(friendChar, { x: st.x, y: st.y, z: st.z, rot: st.rot, move: st.move, seat: st.sitAmt > 0.6 ? {} : null, sitAmt: st.sitAmt, lieAmt: st.lie || 0, pickT: 0, petAmt: st.petAmt || 0, skating: false }, dt, { act: '', ground: st.ground || 0, emote: st.cheerT > 0 ? 'cheer' : null });
   }
   sky.position.copy(camera.position);
   sunAim.set(camTarget.x, camTarget.y - 1.55, camTarget.z);
@@ -365,11 +365,28 @@ advanceTime(0);
 applySky();
 updateBoat(0, 0, cur.eve, cur.day);
 updatePlayer(0, updatePetting);
-// the imported character (?hero=kaykit): shown to the owner before anything is rewired to it
-let rigged = null;
-let riggedGirl = null;
-if (RIGGED) loadRigged('Rogue').then((r) => { if (!r) return; rigged = r; hero.root.visible = false; window.__meadow.rigged = { clips: r.clips }; });
-if (RIGGED) loadRigged('Mage').then((r) => { if (r) riggedGirl = r; });
+// the characters (characters/vroid.js): who you and your friend are, chosen in Settings ('classic':
+// the code-built figures). Only the two chosen are loaded; choosing another swaps it in.
+let youChar = null, friendChar = null;
+const charsWant = { you: null, friend: null };
+const showClassic = (who) => { if (who === 'you') hero.root.visible = true; else if (friend && friend.k) friend.k.root.visible = true; };
+function chooseCharacter(who, id) {
+  if (CLASSIC_ONLY) id = 'classic';
+  if (charsWant[who] === id) return;
+  charsWant[who] = id;
+  const old = who === 'you' ? youChar : friendChar;
+  if (id === 'classic') { dropCharacter(old); if (who === 'you') youChar = null; else friendChar = null; showClassic(who); return; }
+  loadCharacter(id).then((c) => {
+    if (!c || charsWant[who] !== id) { dropCharacter(c); return; } // (another was chosen meanwhile)
+    dropCharacter(who === 'you' ? youChar : friendChar);
+    if (who === 'you') youChar = c; else friendChar = c;
+  });
+}
+store.settings.you = store.settings.you || DEFAULT_YOU;
+store.settings.friend = store.settings.friend || DEFAULT_FRIEND;
+chooseCharacter('you', store.settings.you);
+chooseCharacter('friend', store.settings.friend);
+initCharacterPicker(CHARACTERS, (who, id) => { store.settings[who] = id; saveSoon(); chooseCharacter(who, id); });
 updateCamera(0, player);
 updateDetail(camera, camTarget);
 settleGround(camera.position.x, camera.position.z);
@@ -417,6 +434,7 @@ window.__meadow = {
   shrines: (r = 1500) => shrineSitesNear(player.x, player.z, r), rawHeight,
   seaShown, seaDrawnAt,
   wild: () => wildView(),
+  characters: () => ({ you: youChar && youChar.id, friend: friendChar && friendChar.id, youBones: youChar ? Object.keys(youChar.bones).length : 0, youBlink: youChar ? youChar.blink.length : 0, heroShown: hero.root.visible, legX: youChar ? youChar.bones.lLeg.rotation.x : 0 }),
   countries: (x = player.x, z = player.z) => nearestCountries(x, z),
   wilds: { stats: wildStats, settle: settleWilds, square: growSquare, rocks: growRocks, small: (ix, iz) => growSmall(ix, iz, growSquare(ix, iz)), picks: growPicks, picksNear, biome: growBiome },
   /** The biomes at a spot (core/biome.js): their weights, and the strongest. */

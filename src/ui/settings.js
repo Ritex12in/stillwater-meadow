@@ -7,6 +7,17 @@ import { store, saveSoon, onSave, resetSave } from '../systems/save.js';
 
 const $ = (id) => document.getElementById(id);
 
+/** Who you and your friend are: two lists of the characters (and the code-built 'Classic' ones). `pick(who, id)` on a change. */
+export function initCharacterPicker(list, pick) {
+  for (const who of ['you', 'friend']) {
+    const sel = $(who === 'you' ? 'charYou' : 'charFriend');
+    if (!sel) continue;
+    for (const c of [...list, { id: 'classic', name: 'Classic (the old figure)' }]) { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); }
+    sel.value = store.settings[who];
+    sel.addEventListener('change', () => pick(who, sel.value));
+  }
+}
+
 export function initSettings() {
   const s = store.settings;
   Object.entries(s.volumes || {}).forEach(([k, v]) => setVolume(k, v));

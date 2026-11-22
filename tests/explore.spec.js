@@ -1,5 +1,5 @@
 // Exploring: places found and gone back to, postcards, your own camp and lanterns, skating, the
-// floating islands' updraft, the flower journal, the view distance, and the imported character.
+// floating islands' updraft, the flower journal, the view distance, and the characters.
 import { test, expect } from './harness.js';
 import { open, step, teleport, press, actions, noErrors } from './helpers.js';
 
@@ -134,11 +134,33 @@ test('the flower journal keeps each kind you pick, and where; the view distance 
   noErrors(errors);
 });
 
-test('the imported character (?hero=kaykit) loads, rigged and animated, and walks with you', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer&hero=kaykit', '#12');
-  await page.waitForFunction(() => window.__meadow.rigged, null, { timeout: 60000 });
-  const clips = await page.evaluate(() => window.__meadow.rigged.clips);
-  for (const c of ['Idle', 'Walking_A', 'Running_A', 'Sit_Chair_Idle', 'Lie_Idle', 'Cheer']) expect(clips).toContain(c);
+test('the characters: you and your friend are VRoid characters, posed as you move; any of the seven can be chosen in Settings, or the classic figures', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  await page.waitForFunction(() => { const c = window.__meadow.characters(); return c.you && c.friend; }, null, { timeout: 90000 });
+  let c = await page.evaluate(() => window.__meadow.characters());
+  expect(c.you).toBe('fumiriya');
+  expect(c.friend).toBe('e');
+  expect(c.youBones, 'the bones it is posed by').toBe(15);
+  expect(c.heroShown, 'the old figure is hidden under it').toBe(false);
+  // walking moves the legs
+  const legs = () => page.evaluate(() => window.__meadow.characters().legX);
+  const still = await legs();
+  await page.keyboard.down('KeyW'); await step(page, 0.6);
+  const moving = await legs();
+  await page.keyboard.up('KeyW');
+  expect(Math.abs(moving - still), 'the legs stride').toBeGreaterThan(0.1);
+  // another, chosen in Settings, and kept
+  await page.locator('[data-panel="settingsPanel"]').click();
+  expect(await page.locator('#charYou option').count(), 'seven, and the classic figure').toBe(8);
+  await page.locator('#charYou').selectOption('g');
+  await page.waitForFunction(() => window.__meadow.characters().you === 'g', null, { timeout: 60000 });
+  expect(await page.evaluate(() => window.__meadow.store.settings.you)).toBe('g');
+  // the classic figure
+  await page.locator('#charYou').selectOption('classic');
+  await page.waitForFunction(() => window.__meadow.characters().you === null, null, { timeout: 10000 });
+  await step(page, 0.2);
+  c = await page.evaluate(() => window.__meadow.characters());
+  expect(c.heroShown).toBe(true);
   noErrors(errors);
 });
 

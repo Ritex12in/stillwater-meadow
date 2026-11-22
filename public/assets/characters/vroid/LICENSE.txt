@@ -1,0 +1,8 @@
+VRoid sample characters (pixiv Inc., the VRoid project), from OpenGameArt's "VRoid Studio CC0 models".
+Each file carries its own licence in its VRM metadata (VRoid Hub licence, version 1):
+  allowed to use: everyone; characterization: everyone; personal and corporate commercial use: allowed;
+  redistribution: allowed; modification: allowed; credit: unnecessary.
+  https://hub.vroid.com/license?allowed_to_use_user=everyone&characterization_allowed_user=everyone&corporate_commercial_use=allow&credit=unnecessary&modification=allow&personal_commercial_use=profit&redistribution=allow&sexual_expression=allow&version=1&violent_expression=allow
+Files here: d (Sendagaya Shibu), d-dark (AvatarSample_D, darkness), e (Bibi), f (Vita), g (Victoria Rubin),
+fumiriya (Sakurada Fumiriya), shino (Sendagaya Shino). Their textures were shrunk and re-encoded as WebP
+(tools/shrink-vrm.mjs); nothing else was changed.

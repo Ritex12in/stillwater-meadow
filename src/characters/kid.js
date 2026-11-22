@@ -112,8 +112,8 @@ function makeFace(head, C, surfAt) {
     lump(brow, browMat, [cap(0.0115, 0.044, 0, 0, 0.004, { r: [0, 0, Math.PI / 2 + sd * 0.14], s: [1, 1, 0.5] })], true);
     return { e, ball: ballG, lash, arc, brow, sd };
   });
-  lump(head, tone(C.skin, 0.94), [ball(0.009, 0, 0.158, surf(0, 0.158) + 0.001, { s: [1.3, 0.8, 0.5] })], true); // nose: barely there
-  const mouths = {}, my = 0.112, mz = surf(0, 0.112) + 0.003;
+  lump(head, tone(C.skin, 0.94), [ball(0.009, 0, 0.152, surf(0, 0.152) + 0.001, { s: [1.3, 0.8, 0.5] })], true); // nose: barely there
+  const mouths = {}, my = 0.104, mz = surf(0, 0.104) + 0.003;
   // a gentle curve: a short piece of a wide circle, `up` for a smile, down for a frown
   const curve = (R, arc, thick, up) => { const g = new THREE.TorusGeometry(R, thick, 5, 12, arc).rotateZ((up ? -Math.PI / 2 : Math.PI / 2) - arc / 2); return g.translate(0, up ? R : -R, 0).scale(1, 1, 0.5); };
   const mk = (name, mat, geos) => { const g = pivot(head, 0, my, mz); geos.forEach(([m, list]) => lump(g, m || mat, list, true)); g.visible = false; mouths[name] = g; };
@@ -164,22 +164,22 @@ function part(parent, layers, box, n, k = 0.02) {
 
 /**
  * The head's skin, shaped as the VRoid characters' faces are (measured from their meshes,
- * tools/face-profile.mjs): a rounded cranium; below it a lower face narrower than the cranium, set a
+ * tools/face-profile.mjs): an oval cranium; below it a lower face narrower than the cranium, set a
  * little forward, that tapers smoothly to a small soft chin, so the face is widest just below the
  * eyes and narrows to the chin (no cheeks bulging out at the sides, no wide jaw); a fairly flat
  * front for the eyes to sit on; ears at the eyes' height.
  */
 const headField = () => blend(0.018, blend(0.075,
-  ellipsoid(0, 0.285, -0.012, 0.29, 0.255, 0.272),                 // the cranium
-  ellipsoid(0, 0.165, 0.05, 0.222, 0.15, 0.205),                   // the lower face: narrower, set forward
-  ellipsoid(0, 0.062, 0.088, 0.085, 0.058, 0.088)),                // a small, soft chin
-  mirror(ellipsoid(0.284, 0.2, -0.02, 0.024, 0.048, 0.04)));      // ears, at the eyes' height
+  ellipsoid(0, 0.29, -0.012, 0.268, 0.268, 0.266),                // the cranium: an oval, as tall as it is wide
+  ellipsoid(0, 0.158, 0.05, 0.2, 0.165, 0.2),                      // the lower face: narrower, longer, set forward
+  ellipsoid(0, 0.05, 0.088, 0.078, 0.06, 0.086)),                  // a small, soft chin, a little lower
+  mirror(ellipsoid(0.262, 0.2, -0.02, 0.024, 0.048, 0.04)));      // ears, at the eyes' height
 
 // Hair is drawn the way the reference draws it: big flat locks shaped like leaves (wide in the
 // middle, pointed at the tip), layered over one another and radiating from the crown. Each lock is
 // its own strip of mesh following a curve over the head, arched across its width, lighter along
 // its middle. A smooth cap underneath closes any gaps.
-const HC = [0, 0.275, -0.014], HR = [0.325, 0.288, 0.302]; // a size up from the skull: the hair has volume
+const HC = [0, 0.285, -0.014], HR = [0.304, 0.298, 0.296]; // a size up from the (oval) skull: the hair has volume
 /** A point on the hair's surface at azimuth az (0 = front, + = the figure's left), elevation el, pushed out by k. */
 const onHead = (az, el, k = 1) => { const ce = Math.cos(el); return new THREE.Vector3(HC[0] + Math.sin(az) * ce * HR[0] * k, HC[1] + Math.sin(el) * HR[1] * k, HC[2] + Math.cos(az) * ce * HR[2] * k); };
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -318,7 +318,7 @@ function girlHair(L, r, bunAt) {
   [[-0.36, -0.75, 0.05, 0.26], [-0.34, -0.4, 0.28, 0.2]].forEach(([a0, sw, e1, W]) => L.over(a0, 1.3, e1, W, { sweep: sw, lift: 0.03, flick: 0.01, layer: 0.024, thick: 0.045, tone: v() }));
   // long loose strands in front of the ears, hanging past the chin and turning out at the ends
   [-1, 1].forEach((sd) => {
-    [[1.05, 0.085, 0.05, 0.11], [1.3, 0.06, 0.02, 0.09]].forEach(([az, W, endY, out]) => { // (ending just above the shoulders, not into them)
+    [[1.05, 0.085, 0.05, 0.055], [1.3, 0.06, 0.02, 0.045]].forEach(([az, W, endY, out]) => { // (ending just above the shoulders, not into them)
       const top = onHead(sd * az, 0.5, 1.03), mid = onHead(sd * az, -0.1, 1.06), low = onHead(sd * az, -0.6, 1.1);
       low.y = Math.min(low.y, 0.09);
       const tip = low.clone().add(new THREE.Vector3(sd * out, endY - low.y, 0.02));
@@ -484,7 +484,7 @@ export function makeKid(spec = KIDS.boy) {
   const skull = headField();
   const skin = part(head, [{ f: skull, color: C.skin }], [-0.36, -0.02, -0.29, 0.36, 0.56, 0.3], 44);
   const face = makeFace(head, C, (x, y) => frontOf(skull, x, y) || 0.25);
-  blushPaint(skin.material, face.blushU, 0.152, 0.14);
+  blushPaint(skin.material, face.blushU, 0.142, 0.138);
   const hairU = { uSway: { value: new THREE.Vector3() }, uHairT: { value: 0 }, uHairWind: { value: 0 } };
   const hair = pivot(head, 0, 0, 0), hairMat = () => swaying(painted({ side: THREE.DoubleSide, roughness: 0.8 }), hairU);
   const addLocks = (parent, build) => { const L = new Locks(C.hair); build(L); const m = new THREE.Mesh(L.geometry(), hairMat()); m.castShadow = true; m.receiveShadow = false; parent.add(m); return m; };

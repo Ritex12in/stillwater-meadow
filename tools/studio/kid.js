@@ -12,7 +12,16 @@ const sun = new THREE.DirectionalLight('#fff1dc', 0.75); sun.position.set(-3, 6,
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshLambertMaterial({ color: '#efe1d4' })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
 const cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 100);
 const kids = [];
-if (view === 'turn') {
+if (view === 'body') {
+  // close on the body, four ways round, standing or (?move=2.7) mid-stride: where clothes, hands and the pack meet
+  const mv = +(q.get('move') || 0), ph = +(q.get('phase') || 1.2);
+  [[0, -0.9], [Math.PI / 2, -0.3], [Math.PI, 0.3], [-Math.PI / 2, 0.9]].forEach(([ry, x]) => {
+    const k = makeKid(KIDS[who]); k.root.position.x = x * 0.95; k.root.rotation.y = ry; scene.add(k.root); kids.push(k);
+    const st = { t: 1, move: mv, phase: ph, sitAmt: 0, petAmt: 0, lie: 0, pickT: 0, ground: 0 };
+    for (let i = 0; i < 40; i++) poseKid(k, st, 1 / 30);
+  });
+  cam.position.set(0, 0.75, 3.0); cam.lookAt(0, 0.62, 0);
+} else if (view === 'turn') {
   [[0, -1.05], [Math.PI / 2, 0], [Math.PI, 1.05], [0.6, 2.1]].forEach(([ry, x]) => { const k = makeKid(KIDS[who]); k.root.position.x = x - 0.52; k.root.rotation.y = ry; scene.add(k.root); kids.push(k); });
   cam.position.set(0, 1.0, 5.0); cam.lookAt(0, 0.82, 0);
 } else if (view === 'motion') {

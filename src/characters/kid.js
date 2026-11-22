@@ -318,7 +318,7 @@ function girlHair(L, r, bunAt) {
   [[-0.36, -0.75, 0.05, 0.26], [-0.34, -0.4, 0.28, 0.2]].forEach(([a0, sw, e1, W]) => L.over(a0, 1.3, e1, W, { sweep: sw, lift: 0.03, flick: 0.01, layer: 0.024, thick: 0.045, tone: v() }));
   // long loose strands in front of the ears, hanging past the chin and turning out at the ends
   [-1, 1].forEach((sd) => {
-    [[1.05, 0.085, -0.02, 0.09], [1.3, 0.06, -0.08, 0.06]].forEach(([az, W, endY, out]) => {
+    [[1.05, 0.085, 0.05, 0.11], [1.3, 0.06, 0.02, 0.09]].forEach(([az, W, endY, out]) => { // (ending just above the shoulders, not into them)
       const top = onHead(sd * az, 0.5, 1.03), mid = onHead(sd * az, -0.1, 1.06), low = onHead(sd * az, -0.6, 1.1);
       low.y = Math.min(low.y, 0.09);
       const tip = low.clone().add(new THREE.Vector3(sd * out, endY - low.y, 0.02));
@@ -326,8 +326,8 @@ function girlHair(L, r, bunAt) {
     });
   });
   // a few short wisps at the nape
-  [[-0.75, 0.15, 0.14], [-0.3, 0.1, 0.17], [0.1, 0.12, 0.16], [0.5, 0.1, 0.17], [0.85, 0.15, 0.13]].forEach(([d, e0, W]) => L.over(Math.PI + d, e0, -0.72 + 0.12 * r(), W, { sweep: d * 0.15, lift: 0.0, flick: 0.035, up: 0.0, layer: -0.012, thick: 0.032, tone: v() * 0.92 }));
-  [-1, 1].forEach((sd) => L.over(sd * 1.75, 0.2, -0.55, 0.12, { sweep: sd * 0.1, lift: 0.0, flick: 0.04, up: 0.0, layer: -0.008, thick: 0.028, tone: v() * 0.92 }));
+  [[-0.75, 0.15, 0.14], [-0.3, 0.1, 0.17], [0.1, 0.12, 0.16], [0.5, 0.1, 0.17], [0.85, 0.15, 0.13]].forEach(([d, e0, W]) => L.over(Math.PI + d, e0, -0.6 + 0.1 * r(), W, { sweep: d * 0.15, lift: 0.0, flick: 0.035, up: 0.0, layer: -0.012, thick: 0.032, tone: v() * 0.92 }));
+  [-1, 1].forEach((sd) => L.over(sd * 1.75, 0.2, -0.48, 0.12, { sweep: sd * 0.1, lift: 0.0, flick: 0.04, up: 0.0, layer: -0.008, thick: 0.028, tone: v() * 0.92 }));
 }
 /** The bun: a few fat loops of hair folded over one another like petals, with two leaf-shaped wisps escaping. Built round the origin. */
 function bunHair(L, r) {
@@ -397,8 +397,8 @@ export function makeKid(spec = KIDS.boy) {
       ], [-0.2, F - 0.01, -0.19, 0.2, 0.13, 0.3], 44, 0.012);
     } else {
       part(knee, [
-        { f: capsule([0, 0, 0], [0, -0.13, 0.004], 0.104 * wide, 0.112 * wide), color: C.pants },
-        { f: ring(0, -0.155, 0.004, 0.085 * wide, 0.036), color: C.cuff },                                      // the rolled cuff
+        { f: both(capsule([0, 0, 0], [0, -0.13, 0.004], 0.104 * wide, 0.112 * wide), above(() => -0.16)), color: C.pants }, // (ends inside the cuff: its round end reached down into the shoe)
+        { f: ring(0, -0.142, 0.004, 0.082 * wide, 0.03), color: C.cuff },                                       // the rolled cuff, sitting above the shoe
         { f: capsule([0, -0.15, 0], [0, -0.21, 0.005], 0.06, 0.062), color: '#f6f1e6' },                         // sock
         { f: blend(0.03, ellipsoid(sd * 0.01, F + 0.1, 0.055, 0.1, 0.09, 0.175), ellipsoid(sd * 0.01, F + 0.125, -0.04, 0.088, 0.072, 0.088)), color: C.shoe }, // the sneaker's upper
         { f: both(union(ellipsoid(sd * 0.01, F + 0.024, 0.058, 0.108, 0.05, 0.2), ellipsoid(sd * 0.01, F + 0.074, 0.2, 0.088, 0.062, 0.068)), above(() => F + 0.002)), color: '#f6f1e6' }, // sole and toe cap

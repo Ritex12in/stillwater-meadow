@@ -101,8 +101,9 @@ export function frontOf(f, x, y, z0 = 0.6, zMin = -0.2) {
 export function sculpt(layers, box, n = 40, k = 0.02) {
   const fs = layers.map((l) => l.f);
   const f = fs.length === 1 ? fs[0] : (k > 0 ? blend(k, ...fs) : union(...fs));
-  const [x0, y0, z0] = box, h = max(box[3] - x0, box[4] - y0, box[5] - z0) / n;
-  const nx = Math.ceil((box[3] - x0) / h) + 2, ny = Math.ceil((box[4] - y0) / h) + 2, nz = Math.ceil((box[5] - z0) / h) + 2, nxy = nx * ny;
+  // (a margin of two cells all round: a surface within a cell of the box's edge would otherwise be left open)
+  const h = max(box[3] - box[0], box[4] - box[1], box[5] - box[2]) / n, x0 = box[0] - 2 * h, y0 = box[1] - 2 * h, z0 = box[2] - 2 * h;
+  const nx = Math.ceil((box[3] - x0) / h) + 4, ny = Math.ceil((box[4] - y0) / h) + 4, nz = Math.ceil((box[5] - z0) / h) + 4, nxy = nx * ny;
   const g = new Float32Array(nxy * nz);
   for (let kk = 0, p = 0; kk < nz; kk++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++, p++) g[p] = f(x0 + i * h, y0 + j * h, z0 + kk * h);
   // surface nets: one vertex in every cell the surface crosses, placed at the average of its edge crossings
@@ -131,6 +132,7 @@ export function sculpt(layers, box, n = 40, k = 0.02) {
   // snap each vertex onto the surface, take its normal from the gradient and its colour from the nearest layer
   const pos = new Float32Array(P), nor = new Float32Array(P.length), col = new Float32Array(P.length), e = h * 0.5, C = new THREE.Color();
   const colors = layers.map((l) => (typeof l.color === 'function' ? l.color : new THREE.Color(l.color)));
+  const lab = new Int32Array(P.length / 3);
   for (let q = 0; q < pos.length; q += 3) {
     let x = pos[q], y = pos[q + 1], z = pos[q + 2], gx = 0, gy = 1, gz = 0;
     for (let it = 0; it < 3; it++) {
@@ -142,14 +144,68 @@ export function sculpt(layers, box, n = 40, k = 0.02) {
     pos[q] = x; pos[q + 1] = y; pos[q + 2] = z; nor[q] = gx; nor[q + 1] = gy; nor[q + 2] = gz;
     let best = 0, bd = Infinity;
     for (let i = 0; i < fs.length; i++) { const d = fs[i](x, y, z); if (d < bd) { bd = d; best = i; } }
+    lab[q / 3] = best;
     const c = colors[best]; if (typeof c === 'function') C.set(c(x, y, z)); else C.copy(c);
     col[q] = C.r; col[q + 1] = C.g; col[q + 2] = C.b;
   }
+  if (fs.length > 1) return crispColours({ f, fs, colors, pos, nor, lab, I, h });
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geo.setIndex(new THREE.BufferAttribute(new Uint32Array(I), 1));
+  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  return geo;
+}
+
+/**
+ * Clean edges between colours: a triangle whose corners belong to two layers is cut along the line
+ * where the two layers meet (found on its edges, then laid on the surface), each side taking its own
+ * colour, so a sleeve ends at its cuff on a clean line instead of fading into it across a triangle.
+ * (Corners of three layers: the triangle takes its middle's.)
+ */
+function crispColours({ f, fs, colors, pos, nor, lab, I, h }) {
+  const P = [], N = [], Cc = [], C = new THREE.Color(), e = h * 0.5;
+  const colourOf = (L, x, y, z) => { const c = colors[L]; if (typeof c === 'function') C.set(c(x, y, z)); else C.copy(c); return C; };
+  const put = (x, y, z, nx, ny, nz, L) => { P.push(x, y, z); N.push(nx, ny, nz); const c = colourOf(L, x, y, z); Cc.push(c.r, c.g, c.b); };
+  const corner = (i, L) => put(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], nor[i * 3], nor[i * 3 + 1], nor[i * 3 + 2], L);
+  // the point on edge i->j where layers A and B are equally near, laid on the surface: [x, y, z, nx, ny, nz]
+  const meet = (i, j, A, B) => {
+    const ax = pos[i * 3], ay = pos[i * 3 + 1], az = pos[i * 3 + 2], bx = pos[j * 3], by = pos[j * 3 + 1], bz = pos[j * 3 + 2];
+    let lo = 0, hi = 1;
+    for (let it = 0; it < 7; it++) {
+      const t = (lo + hi) / 2, x = ax + (bx - ax) * t, y = ay + (by - ay) * t, z = az + (bz - az) * t;
+      if (fs[A](x, y, z) - fs[B](x, y, z) < 0) lo = t; else hi = t; // (A nearer at i's end)
+    }
+    const t = (lo + hi) / 2;
+    let x = ax + (bx - ax) * t, y = ay + (by - ay) * t, z = az + (bz - az) * t, gx = 0, gy = 1, gz = 0;
+    for (let it = 0; it < 3; it++) {
+      gx = f(x + e, y, z) - f(x - e, y, z); gy = f(x, y + e, z) - f(x, y - e, z); gz = f(x, y, z + e) - f(x, y, z - e);
+      const l = Math.sqrt(gx * gx + gy * gy + gz * gz) || 1; gx /= l; gy /= l; gz /= l;
+      if (it === 2) break;
+      const d = Math.max(-h, Math.min(h, f(x, y, z))); x -= gx * d; y -= gy * d; z -= gz * d;
+    }
+    return [x, y, z, gx, gy, gz];
+  };
+  const at = (q, L) => put(q[0], q[1], q[2], q[3], q[4], q[5], L);
+  for (let t = 0; t < I.length; t += 3) {
+    const v = [I[t], I[t + 1], I[t + 2]], L = [lab[v[0]], lab[v[1]], lab[v[2]]];
+    if (L[0] === L[1] && L[1] === L[2]) { for (let k = 0; k < 3; k++) corner(v[k], L[k]); continue; }
+    if (L[0] !== L[1] && L[1] !== L[2] && L[0] !== L[2]) { const mid = L[1]; for (let k = 0; k < 3; k++) corner(v[k], mid); continue; }
+    // the odd corner first, keeping the triangle's turn
+    const o = L[0] !== L[1] && L[0] !== L[2] ? 0 : L[1] !== L[0] && L[1] !== L[2] ? 1 : 2;
+    const vo = v[o], va = v[(o + 1) % 3], vb = v[(o + 2) % 3], B = lab[vo], A = lab[va];
+    const p1 = meet(va, vo, A, B), p2 = meet(vb, vo, A, B);
+    corner(vo, B); at(p1, B); at(p2, B);
+    at(p1, A); corner(va, A); corner(vb, A);
+    at(p1, A); corner(vb, A); at(p2, A);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(Cc, 3));
+  const n = P.length / 3, idx = new Uint32Array(n); for (let i = 0; i < n; i++) idx[i] = i;
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
   geo.computeBoundingBox(); geo.computeBoundingSphere();
   return geo;
 }

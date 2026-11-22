@@ -44,6 +44,7 @@ import { initPost, resizePost, renderFrame, post } from './systems/post.js';
 import { store, onSave, flush } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
 import { initWorldPanel, initPlaces } from './ui/world-panel.js';
+import { initCountries, nearestCountries } from './ui/countries.js';
 import { initBackpack, backpackView } from './ui/backpack.js';
 import { RIGGED, loadRigged, followPlayer } from './characters/rigged.js';
 import { initFoundPlaces, foundView } from './features/places.js';
@@ -178,6 +179,7 @@ function visitLake(id) {
   return false;
 }
 initPlaces({ list: () => lakesAbout(1500).slice(0, 7), go: visitLake });
+initCountries({ where: () => player, go: travelTo });
 initScreen();
 const resizers = [];
 const resize = () => {
@@ -415,6 +417,7 @@ window.__meadow = {
   shrines: (r = 1500) => shrineSitesNear(player.x, player.z, r), rawHeight,
   seaShown, seaDrawnAt,
   wild: () => wildView(),
+  countries: (x = player.x, z = player.z) => nearestCountries(x, z),
   wilds: { stats: wildStats, settle: settleWilds, square: growSquare, rocks: growRocks, small: (ix, iz) => growSmall(ix, iz, growSquare(ix, iz)), picks: growPicks, picksNear, biome: growBiome },
   /** The biomes at a spot (core/biome.js): their weights, and the strongest. */
   biomes: (x, z) => biomesAt(x, z, height(x, z)), biomeAt: (x, z) => biomeAt(x, z, height(x, z)),

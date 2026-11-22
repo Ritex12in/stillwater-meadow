@@ -472,6 +472,10 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   water is the lakes' shader on one wide sheet that follows you when the sea is near (`world/water.js`),
   drawn only where a mask of the sea field says there is sea, so lake bowls keep their own water.
   Travelling to a spot at sea (a ship found) lands you on the nearest shore, facing it.
+- **Kinds of country** (`ui/countries.js`, the World popover): every biome (16 kinds: the mood
+  board's twelve and the ordinary country) with the distance to the nearest stretch of it, searched
+  outward from you to 6 km (about 30 ms), and a Go button that takes you there (the wonders: to just
+  off the site, the volcano to the foot of its cone).
 - **Wind-bent trees**: on the windy cliffs the trees lean, all one way, more where it is windier.
 - **A fox by country** (`features/wildlife.js`): red in mild country, white in the snow, a big-eared
   fennec in the desert, none in the volcanic country; at the lake you are at, trotting, sitting,

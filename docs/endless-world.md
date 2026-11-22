@@ -478,6 +478,11 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   the sheet's calico (white with orange patches, pink inside its ears, a dark collar with a gold bell);
   the others are the same shapes in other coats. Same rigs (head, four legs, tail, eyes), so all their
   behaviour is unchanged. `tools/studio/pets.html` shows them beside the boy.
+- **The skipper** (2026-11-22, the owner: "redesign the skipper"): drawn as the children are
+  (`KIDS.skipper` in `characters/kid.js`, a little taller): an old boatman in a green knitted coat, a
+  mustard scarf, dark trousers and boots, short grey hair under his straw hat, a white moustache and
+  chin beard, smaller eyes and a round nose. Sculpted at 60% of the children's detail (he is mostly seen
+  far off on the boat): about 53,000 triangles. `tools/studio/kid.html?view=skipper` shows him.
 - **The sea** (`seaAt`, `SEA_DEPTH` in `core/shape.js`): a continent field, broad as the climate's,
   sinks the land under one sea at the lakes' level (0); lowland goes under first and hills stand out
   as islands and headlands. Sand where land meets sea (`beachAt`, shown through the desert's look),

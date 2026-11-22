@@ -8,7 +8,7 @@
 // the hand is on the arm, eye height) so nothing else hard-codes the body's measurements.
 import * as THREE from 'three';
 import { TAU, damp } from '../core/math.js';
-import { sculpt, sphere, ellipsoid, capsule, rbox, strand, ring, blend, union, carve, both, grow, mirror, above, frontOf } from '../core/sculpt.js';
+import { sculpt, sphere, ellipsoid, capsule, rbox, strand, ring, blend, union, carve, both, grow, mirror, turned, above, frontOf } from '../core/sculpt.js';
 
 /** Soft, drawn-looking shading: a warm glow round the edges and lifted shadows, on any standard material. */
 function soft(m) {
@@ -71,6 +71,12 @@ export const KIDS = {
 // (and for dancing on the ice). No backpacks.
 KIDS.boyWinter = Object.assign({}, KIDS.boy, { winter: true, coat: '#2c3e63', coatTrim: '#22304d', pants: '#3a3f4a', boot: '#6b4a32', bootTrim: '#e9dfcf', pocket: false, badge: null });
 KIDS.girlWinter = Object.assign({}, KIDS.girl, { winter: true, coat: '#c4323a', coatTrim: '#a3262e', pants: '#4a3a44', boot: '#f1ece4', bootTrim: '#ffffff', skirt: '#f6f2ec', scarf: '#fbf8f2', hat: '#fbf8f2', wideLegs: false, patch: null, motif: null });
+
+// The skipper (the owner: "redesign the skipper"), drawn as the children are: an old boatman in a green
+// knitted coat buttoned to the neck, a mustard scarf, dark trousers and boots, short grey hair under his
+// straw hat (the boat adds the hat), a white moustache and beard, smaller kindly eyes and a round nose.
+KIDS.skipper = Object.assign({}, KIDS.boy, { winter: true, coat: '#5d6b4c', coatTrim: '#4a563c', pants: '#3b3530', boot: '#4a3a2c', bootTrim: '#5c4a38', scarf: '#c49a52',
+  hair: '#c9c3ba', skin: '#e0ab86', hairStyle: 'old', badge: null, pocket: false, eyeScale: 0.72, browScale: 1.35, nose: 0.024, beard: '#ece7df', detail: 0.6 });
 
 // sizes, in metres (the figure stands about 1.6 m to the top of its hair)
 // (proportions after the owner's character sheets: the head about a third of the height, longer legs)
@@ -144,9 +150,11 @@ function makeFace(head, C, surfAt) {
     const arc = lump(e, hairMat, [new THREE.TorusGeometry(0.044, 0.0065, 5, 14, Math.PI * 0.8).rotateZ(Math.PI * 0.1).translate(0, -0.024, 0.006)], true);
     const brow = pivot(head, sd * EX, EY + 0.094, surf(EX, EY + 0.094) + 0.004); brow.rotation.y = sd * 0.3;
     lump(brow, browMat, [browGeo(sd)], true);
+    if (C.eyeScale) e.scale.setScalar(C.eyeScale);   // (the skipper's smaller, kindly eyes)
+    if (C.browScale) brow.scale.set(C.browScale, C.browScale * 1.2, 1);
     return { e, ball: ballG, iris, under, lash, arc, brow, sd };
   });
-  lump(head, tone(C.skin, 0.94), [ball(0.009, 0, 0.152, surf(0, 0.152) + 0.001, { s: [1.3, 0.8, 0.5] })], true); // nose: barely there
+  lump(head, tone(C.skin, 0.94), [ball(C.nose || 0.009, 0, 0.152, surf(0, 0.152) + 0.001, { s: C.nose ? [1.15, 0.9, 0.7] : [1.3, 0.8, 0.5] })], true); // nose: barely there (the skipper's round)
   const mouths = {}, my = 0.104, mz = surf(0, 0.104) + 0.003;
   // a gentle curve: a short piece of a wide circle, `up` for a smile, down for a frown
   const curve = (R, arc, thick, up) => { const g = new THREE.TorusGeometry(R, thick, 5, 12, arc).rotateZ((up ? -Math.PI / 2 : Math.PI / 2) - arc / 2); return g.translate(0, up ? R : -R, 0).scale(1, 1, 0.5); };
@@ -294,9 +302,10 @@ const painted = (extra) => cloth(soft(new THREE.MeshStandardMaterial(Object.assi
 /** Which kind of surface a colour is (see cloth), for layers that do not say: filled in by makeKid from the figure's colours. */
 const KIND = new Map();
 const shade = (hex, k) => '#' + new THREE.Color(hex).multiplyScalar(k).getHexString();
+let DETAIL = 1; // how finely the figure being built is sculpted (its spec's `detail`; the skipper, seen far off on his boat, is coarser)
 function part(parent, layers, box, n, k = 0.02, o = {}) {
   const L = layers.map((l) => Object.assign({}, l, { kind: o.plain ? 0 : l.kind !== undefined ? l.kind : typeof l.color === 'string' && KIND.has(l.color) ? KIND.get(l.color) : 1 }));
-  const m = new THREE.Mesh(sculpt(L, box, n, k, { ao: o.ao === undefined ? 0.32 : o.ao }), painted());
+  const m = new THREE.Mesh(sculpt(L, box, Math.max(12, Math.round(n * DETAIL)), k, { ao: o.ao === undefined ? 0.32 : o.ao }), painted());
   m.castShadow = m.receiveShadow = true;
   parent.add(m);
   return m;
@@ -492,6 +501,16 @@ function boyHair(L, r) {
   });
 }
 
+/** The skipper's hair: short, grey, combed back over the sides and the back (his hat covers the top). */
+function oldHair(L, r) {
+  const C3 = { ridges: 0, edge: 0.4, halo: 0.4, shape: 'flame' };
+  for (let i = 0; i < 9; i++) {
+    const az = 1.25 + (i / 8) * (TAU - 2.5), back = 1 - Math.min(1, Math.abs(Math.PI - az) / 1.7);
+    L.clump(az, 0.95, 0.1 - 0.4 * back, 0.34, { fa: 0.3, vol: 0.04, curl: 0.05, flick: 0.05 + 0.05 * back, layer: i % 2 ? 0.03 : 0.01, thick: 0.035, tone: 0.95 + 0.1 * r(), ...C3 });
+  }
+  [-1, 1].forEach((sd) => L.clump(sd * 1.05, 0.75, 0.05, 0.16, { fa: 0.35, vol: 0.03, curl: sd * 0.05, flick: 0.04, layer: 0.03, thick: 0.03, tone: 1.02, ...C3 })); // above the ears
+}
+
 function girlHair(L, r, bunAt) {
   const v = () => 0.94 + 0.12 * r();
   // swept up and back: broad tresses from the hairline to the bun, overlapping like tiles, each starting at
@@ -598,6 +617,7 @@ function blushPaint(mat, u, cx, cy) {
 /** Build a child from a spec (see KIDS). */
 export function makeKid(spec = KIDS.boy) {
   const C = Object.assign({}, KIDS.boy, spec);
+  DETAIL = C.detail || 1;
   let seed = C.hairStyle === 'bun' ? 71 : 37;
   const r = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
@@ -731,7 +751,18 @@ export function makeKid(spec = KIDS.boy) {
     ], [-0.46, 0.2, -0.46, 0.46, 0.82, 0.46], 46, 0.01);
   }
   let bun = null;
+  if (C.beard) { // a white moustache over the mouth and a short round beard along the jaw
+    // (laid on the front of the face, found from the skull: wrapped round the jaw it read as a collar)
+    const fz = (x, y) => frontOf(skull, x, y) || 0.2, mz = fz(0.05, 0.125), bz = fz(0, 0.05);
+    part(head, [{ f: blend(0.02,
+      ellipsoid(0, 0.045, bz - 0.035, 0.115, 0.072, 0.06),                                                       // the beard, on the chin
+      mirror(ellipsoid(0.1, 0.08, fz(0.1, 0.08) - 0.04, 0.05, 0.06, 0.045)),                                        // along the cheeks
+      mirror(turned(ellipsoid(0.048, 0.126, mz + 0.004, 0.058, 0.023, 0.024), 0, 0, -0.32, 0.048, 0.126, mz + 0.004))), // the moustache
+      color: C.beard, kind: 0 }],
+      [-0.2, -0.04, 0.0, 0.2, 0.18, 0.28], 44, 0.015, { ao: 0.25 });
+  }
   if (fluffy) addLocks(hair, (L) => boyHair(L, r));
+  else if (C.hairStyle === 'old') addLocks(hair, (L) => oldHair(L, r));
   else {
     const bunAt = C.hat ? new THREE.Vector3(-0.02, 0.45, -0.3) : new THREE.Vector3(-0.02, 0.555, -0.17); // (under a hat it sits low at the back)
     addLocks(hair, (L) => girlHair(L, r, bunAt));

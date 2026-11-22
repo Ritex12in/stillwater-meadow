@@ -5,7 +5,7 @@ import { TAU, clamp, lerp, damp, smooth, angDiff, rnd } from '../core/math.js';
 import { lakeT, lakePoint, dockAt, DOCK_A, DOCK_LEN, DOCK_Y, KIT } from '../core/shape.js';
 import { std, weatherize, glowTex } from '../core/materials.js';
 import { seasonState, hooks } from '../core/state.js';
-import { makePerson } from './rigs.js';
+import { makeKid, KIDS, KID_DIMS } from './kid.js';
 import { player, sitDown, standUp } from './player.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
@@ -84,14 +84,16 @@ export function buildBoat() {
   lanternLight.position.set(0.7, 1.2, 0.15);
   boat.add(lanternGlow, lanternPool, lanternLight);
 
-  skipper = makePerson({ skin: '#d6a27c', knit: '#5d6b4c', pants: '#3b3530', shoe: '#2a2522', hair: '#9a958e', scarf: '#b88b4a' });
-  const hat = new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.26, 12).translate(0, 0.2, 0), weatherize(std('#d9c07e'), 'std'));
+  // the skipper, drawn as the children are (characters/kid.js: KIDS.skipper), a little taller, under a straw hat
+  skipper = makeKid(KIDS.skipper);
+  skipper.root.scale.setScalar(1.1);
+  const hat = new THREE.Mesh(new THREE.ConeGeometry(0.58, 0.3, 14).translate(0, 0.6, -0.02), weatherize(std('#d9c07e'), 'std'));
   hat.castShadow = true;
   skipper.head.add(hat);
   const pm = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.032, 4.6, 6).translate(0, -1.3, 0), std('#a8924e'));
   pm.castShadow = true;
   skPole.add(pm);
-  skPole.position.set(0.1, 1.15, 0.3);
+  skPole.position.set(0.1, 0.9, 0.42); // (where his hands are, the arms raised to pole)
   skipper.body.add(skPole);
   skipper.root.position.set(0, BOAT_DECK, -1.85);
   boat.add(skipper.root);
@@ -191,7 +193,7 @@ export function updateBoat(dt, t, eve, dayLevel) {
   const sn = Math.sin(sk.phase), push = 0.5 + 0.5 * sn;
   const lookTarget = dPlayer < 10 ? clamp(angDiff(yaw, Math.atan2(dxp, dzp)), -1.1, 1.1) : Math.sin(t * 0.3) * 0.5;
   sk.look = damp(sk.look, aboard ? 0 : lookTarget, 3, dt);
-  poseSkipper(push, t);
+  poseSkipper(push, t, dt);
 
   if (ferry.state === 'touring' && ferry.speed > 0.3) {
     if (sk.prevSin <= 0 && sn > 0) { // the pole bites the water
@@ -213,13 +215,13 @@ export function updateBoat(dt, t, eve, dayLevel) {
   lanternLight.intensity = eve * 1.4;
 }
 
-function poseSkipper(push, t) {
+function poseSkipper(push, t, dt) {
   const S = skipper, s = sk.sit, st = 1 - s, pp = sk.pole * st;
   S.legs[0].rotation.x = lerp(0.2 - pp * push * 0.15, -1.5, s);
   S.legs[1].rotation.x = lerp(-0.25 + pp * push * 0.1, -1.45, s);
   S.knees[0].rotation.x = lerp(0.12 + pp * 0.2, 1.5, s);
   S.knees[1].rotation.x = lerp(0.18, 1.45, s);
-  S.body.position.y = lerp(-0.03 * pp * push, 0.40 + 0.07 - 0.86, s);
+  S.body.position.y = lerp(-0.03 * pp * push, 0.40 + 0.07 - KID_DIMS.hip, s);
   S.body.rotation.x = lerp(0.06 + pp * (0.1 + push * 0.22), -0.04, s);
   S.arms[0].rotation.x = lerp(lerp(-0.25, -1.25 + push * 0.55, sk.pole), -0.55, s);
   S.arms[1].rotation.x = lerp(lerp(-0.2, -0.95 + push * 0.55, sk.pole), -0.5, s);
@@ -233,4 +235,6 @@ function poseSkipper(push, t) {
   skPole.rotation.x = 0.12 + push * 0.5 * sk.pole;
   S.head.rotation.x = sk.nod > 0 ? Math.sin(((0.9 - sk.nod) / 0.9) * TAU) * 0.35 : 0;
   S.head.rotation.y = sk.look;
+  S.face.update(dt, t); // (blinking; his face stays kindly)
+  S.sway(dt, t, 0);      // his hair after the head
 }

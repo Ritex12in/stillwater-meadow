@@ -141,6 +141,15 @@ if (view === 'body') {
     for (let n = 0; n < 90; n++) { if (i === 3 && n >= 84) { k.root.rotation.y += 0.25; k.root.updateMatrixWorld(true); } k.sway(1 / 60, n / 60, 0); }
   });
   cam.position.set(0, 1.35, 4.4); cam.lookAt(0, 1.22, 0);
+} else if (view === 'skipper') {
+  // the skipper under his straw hat, four ways round, and standing as if poling
+  const hat = () => new THREE.Mesh(new THREE.ConeGeometry(0.58, 0.3, 14).translate(0, 0.6, -0.02), new THREE.MeshStandardMaterial({ color: '#d9c07e', roughness: 0.9 }));
+  [[0, -1.65], [Math.PI / 2, -0.55], [Math.PI, 0.55], [0.6, 1.65]].forEach(([ry, x], i) => {
+    const k = makeKid(KIDS.skipper); k.root.scale.setScalar(1.1); k.root.position.x = x; k.root.rotation.y = ry; scene.add(k.root); kids.push(k);
+    if (q.get('hat') !== '0') { const h = hat(); h.castShadow = true; k.head.add(h); }
+    if (i === 3) { k.arms[0].rotation.set(-1.25, 0, 0.38); k.arms[1].rotation.set(-0.95, 0, -0.3); }
+  });
+  cam.position.set(0, 1.15, 6.2); cam.lookAt(0, 0.9, 0);
 } else if (view === 'head') {
   [[0, -0.75], [0.75, 0], [Math.PI / 2, 0.75], [Math.PI, 1.5]].forEach(([ry, x]) => { const k = makeKid(KIDS[who]); k.root.position.x = x - 0.38; k.root.rotation.y = ry; scene.add(k.root); kids.push(k); });
   cam.position.set(0, 1.42, 3.6); cam.lookAt(0, 1.3, 0);

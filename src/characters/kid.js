@@ -460,14 +460,20 @@ function boyHair(L, r) {
   // the back and sides: eight, evenly round, longest at the nape
   for (let i = 0; i < 8; i++) {
     const az = 1.25 + (i / 7) * (TAU - 2.5), back = 1 - Math.min(1, Math.abs(Math.PI - az) / 1.7);
-    L.clump(az, 1.15, 0.08 - 0.36 * back, 0.38, { fa: 0.3, vol: 0.09, curl: 0.2 * SW, flick: 0.15 + 0.1 * back, layer: i % 2 ? 0.06 : 0.02, thick: 0.07, tone: v() * 0.9, ...C3 }); // (broad from near the root, to cover the head; not fewer and wider: a wide flat piece does not wrap the head)
+    L.clump(az, 1.15, 0.08 - 0.36 * back, 0.38, { fa: 0.3, vol: 0.14, curl: 0.07 * SW, flick: 0.22 + 0.12 * back, layer: i % 2 ? 0.08 : 0.03, thick: 0.07, // (radiating from the crown, only the tips bending: bent hard sideways they read as scales)
+      tone: v() * 0.9, ...C3 }); // (broad from near the root, to cover the head; not fewer and wider: a wide flat piece does not wrap the head)
+  }
+  // the nape: five short flames under the back ones, their points hanging below and flicking out (the hem was a straight line)
+  for (let i = 0; i < 5; i++) {
+    const az = Math.PI + (i - 2) * 0.42;
+    L.clump(az, 0.35, -0.62 + 0.06 * Math.abs(i - 2), 0.2, { fa: 0.4, vol: 0.04, curl: 0.06 * SW, flick: 0.1, layer: 0.0, thick: 0.045, tone: v() * 0.88, ...C3 });
   }
   // a tuft in front of each ear
   [-1, 1].forEach((sd) => L.clump(sd * 0.98, 0.95, -0.02, 0.17, { vol: 0.06, curl: -sd * 0.14, flick: 0.06, layer: 0.04, thick: 0.045, tone: v() * 0.95, ...C3 }));
   // over them, over their gaps: six, standing off the head, their points out past the outline
   for (let i = 0; i < 6; i++) {
     const az = 1.0 + ((i + 0.5) / 6) * (TAU - 2.0), side = Math.min(1, Math.max(0, (Math.abs(Math.PI - az) - 1.6) / 0.5)); // (1 beside the face)
-    L.clump(az, 1.45, 0.46, 0.42, { fa: 0.35, vol: 0.15, curl: 0.24 * SW * (1 - side), flick: 0.22 * (1 - 0.8 * side) + 0.03, layer: i % 2 ? 0.15 : 0.11, thick: 0.08, tone: v(), ...C3 });
+    L.clump(az, 1.45, 0.4, 0.42, { fa: 0.35, vol: 0.2, curl: 0.09 * SW * (1 - side), flick: 0.3 * (1 - 0.6 * side) + 0.05, layer: i % 2 ? 0.17 : 0.12, thick: 0.08, tone: v(), ...C3 });
   }
   // on the crown: three cowlicks, evenly round the whorl, each rising off the head in an arc and leaning the whorl's way
   [0.9, 3.0, 5.1].forEach((az) => {

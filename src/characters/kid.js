@@ -57,12 +57,12 @@ function lump(parent, mat, geos, small = false) {
 
 export const KIDS = {
   boy: {
-    skin: '#f3c9a5', hair: '#4b2d21', eye: '#4a2c1e',
+    skin: '#f3c9a5', hair: '#3f251b', eye: '#4a2c1e',
     top: '#f2e8d8', jacket: '#5f7d4a', pants: '#c9a878', cuff: '#d8bd92', shoe: '#6a8a58', pack: '#8a5a3c', packTrim: '#6e4530',
     hairStyle: 'fluffy', badge: '#e8c25a', pocket: true,
   },
   girl: {
-    skin: '#f3c4a2', hair: '#4b2d22', eye: '#4a2c1e',
+    skin: '#f3c4a2', hair: '#3f251c', eye: '#4a2c1e',
     top: '#f3e9da', jacket: null, pants: '#5f7fa8', cuff: '#8fa6c6', shoe: '#ee9aa4', pack: '#e58d95', packTrim: '#cf747e',
     hairStyle: 'bun', lashes: true, pocket: false, scrunchie: '#f2a0ad', motif: 'cat', wideLegs: true, patch: '#d98a5a',
   },
@@ -443,33 +443,41 @@ const capField = (line) => both(ellipsoid(HC[0], HC[1], HC[2], HR[0] * 1.0, HR[1
  */
 function boyHair(L, r) {
   const v = () => 0.94 + 0.12 * r(), alt = (i) => (i % 2 ? 1 : -1), sign = Math.sign, C3 = { ridges: 2, groove: 0.2, halo: 0.4, shape: 'spike', taper: 0.2 }; // (sharp spikes that curve, the owner's words: smooth, two soft strands each, narrowing to a point)
-  // (the curls are open hooks, pointed at the tip, as the sheet draws them: not ringlets)
-  // underneath, the back and sides: clumps from the crown to the nape, their tips hooking out and up
+  // (compared with the sheet part by part: its outline is points sticking out all round, cowlicks standing on
+  // the crown, a fringe swept to one side down to the brows, the nape's tips flicking out; ours was a round mop)
+  // underneath, the back and sides: clumps from the crown to the nape, their points flicking out, most at the nape
   for (let i = 0; i < 11; i++) {
     const az = 1.0 + (i / 10) * (TAU - 2.0), back = 1 - Math.min(1, Math.abs(Math.PI - az) / 1.6);
-    L.clump(az, 1.2, 0.12 - 0.42 * back + 0.08 * r(), 0.32, { vol: 0.08, wave: 0.07 * alt(i), curl: 0.2 * alt(i) * (0.6 + 0.6 * r()), flick: 0.12 + 0.05 * r(), up: 0.02, layer: 0.03, thick: 0.07, spiral: (0.3 + 0.7 * Math.min(1, back * 2.5)) * (1.0 + 0.4 * r()), rc: 0.16, tilt: -1.0 * alt(i), tone: v() * 0.88, ...C3 });
+    L.clump(az, 1.2, 0.1 - 0.42 * back + 0.08 * r(), 0.3, { vol: 0.08, wave: 0.07 * alt(i), curl: 0.22 * alt(i) * (0.6 + 0.6 * r()), flick: 0.09 + 0.13 * back + 0.04 * r(), layer: 0.03, thick: 0.065, spiral: (0.3 + 0.5 * Math.min(1, back * 2.5)) * (0.8 + 0.4 * r()), rc: 0.12, tilt: -(1.0 - 0.5 * Math.min(1, back * 2.5)) * alt(i), tone: v() * 0.86, ...C3 });
   }
   // a tuft in front of each ear, its tip hooking forward
   [-1, 1].forEach((sd) => L.clump(sd * 0.98, 0.95, -0.02, 0.17, { vol: 0.06, curl: -sd * 0.14, flick: 0.06, layer: 0.04, thick: 0.045, spiral: 0.6, rc: 0.1, tilt: sd * 1.2, tone: v() * 0.95, ...C3 }));
-  // the middle layer, all round but the face: big, standing well off the head, each tip a hook: the mop's outline
+  // the middle layer, all round but the face: standing well off the head, each point sticking out: the outline
   for (let i = 0; i < 10; i++) {
     const az = 0.9 + (i / 9) * (TAU - 1.8) + (r() - 0.5) * 0.1, calm = 1 - 0.75 * Math.min(1, Math.max(0, (Math.abs(Math.PI - az) - 1.7) / 0.5)); // (quieter beside the face)
-    L.clump(az, 1.4, 0.42 + 0.24 * r(), 0.3, { vol: 0.15, wave: 0.09 * alt(i + 1), curl: 0.28 * alt(i) * (0.6 + 0.6 * r()), flick: (0.1 + 0.05 * r()) * calm, up: 0.0, layer: 0.07, thick: 0.08, spiral: (1.0 + 0.5 * r()) * calm, rc: 0.17, tilt: 1.45 * alt(i + 1), // (the curve lies along the head: lifting outward, the side ones stood up like horns)
+    L.clump(az, 1.4, 0.4 + 0.24 * r(), 0.28, { vol: 0.15, wave: 0.09 * alt(i + 1), curl: 0.28 * alt(i) * (0.6 + 0.6 * r()), flick: (0.15 + 0.08 * r()) * calm + 0.02, layer: 0.07, thick: 0.075, spiral: (0.5 + 0.35 * r()) * calm, rc: 0.14,
+      tilt: (calm > 0.6 ? 0.65 : 1.45) * alt(i + 1), // (out from the head; beside the face the curve lies along it: lifting outward there, they stood up like horns)
       tone: v(), ...C3 });
   }
-  // the top: clumps turning round the crown, piled up, their tips lifting
+  // the top: clumps turning round the crown, piled up
   for (let i = 0; i < 7; i++) {
     const az = (i / 7) * TAU + 0.5;
-    L.clump(az, 1.5, 0.62 + 0.18 * r(), 0.3, { vol: 0.14, sweep: 0.55, curl: 0.36 * alt(i), flick: 0.03, up: 0.0, layer: 0.1, thick: 0.08, spiral: 1.0 + 0.4 * r(), rc: 0.15, tilt: -1.45 * alt(i), tone: v() * 1.06, ...C3 });
+    L.clump(az, 1.5, 0.62 + 0.18 * r(), 0.3, { vol: 0.14, sweep: 0.55, curl: 0.36 * alt(i), flick: 0.06, layer: 0.1, thick: 0.08, spiral: 0.9 + 0.4 * r(), rc: 0.15, tilt: -1.2 * alt(i), tone: v() * 1.06, ...C3 });
   }
-  // the fringe: big clumps from a parting, falling over the forehead to just above the brows and standing off it,
-  // their tips hooking aside; shorter ones over them
-  const part = 0.1;
-  [[-0.76, 0.42, 0.2, -0.3], [-0.38, 0.3, 0.21, -0.26], [0.0, 0.42, 0.19, 0.2], [0.36, 0.32, 0.21, 0.3], [0.74, 0.44, 0.19, 0.34]].forEach(([az, e1, W, curl]) => {
+  // cowlicks: short points standing up and out of the crown
+  for (let i = 0; i < 5; i++) {
+    const az = 0.3 + i * 1.3 + r() * 0.4;
+    L.clump(az, 1.5, 0.98 + 0.14 * r(), 0.23, { vol: 0.07, curl: 0.3 * alt(i), flick: 0.16 + 0.08 * r(), up: 0.03 + 0.03 * r(), layer: 0.12, thick: 0.06, spiral: 0.35, rc: 0.12, tilt: 1.0 * alt(i), // (broad points: thin hooked ones read as little horns)
+      tone: v() * 1.08, ...C3 });
+  }
+  // the fringe: from a parting over his left brow, big pointed clumps swept across the forehead to just above the
+  // brows and standing off it, a short one going the other way; shorter ones over them
+  const part = 0.45;
+  [[-0.82, 0.22, 0.2, -0.3], [-0.46, 0.19, 0.22, -0.28], [-0.1, 0.23, 0.2, -0.24], [0.28, 0.32, 0.18, -0.2], [0.84, 0.28, 0.18, 0.3]].forEach(([az, e1, W, curl]) => {
     const a0 = part + (az - part) * 0.35;
     L.clump(a0, 1.34, e1, W, { sweep: az - a0, vol: 0.1, wave: 0.05 * sign(curl), curl: curl * 0.5, flick: 0.05, layer: 0.06, thick: 0.06, spiral: 0.7, rc: 0.12, tilt: -1.4 * sign(curl), tone: v() * 1.03, ...C3 });
   });
-  [[-0.55, 0.72, 0.2, -0.3], [-0.14, 0.76, 0.2, 0.28], [0.5, 0.74, 0.19, 0.3]].forEach(([az, e1, W, curl]) => {
+  [[-0.58, 0.6, 0.2, -0.3], [-0.12, 0.64, 0.2, -0.26], [0.6, 0.68, 0.19, 0.3]].forEach(([az, e1, W, curl]) => {
     const a0 = part + (az - part) * 0.35;
     L.clump(a0, 1.42, e1, W, { sweep: az - a0, vol: 0.12, curl: curl * 0.5, flick: 0.08, layer: 0.1, thick: 0.06, spiral: 0.9, rc: 0.13, tilt: -1.1 * sign(curl), tone: v() * 1.06, ...C3 });
   });
@@ -493,20 +501,21 @@ function girlHair(L, r, bunAt) {
   }
   // baby hairs at the temples
   [-1, 1].forEach((sd) => [0, 1, 2].forEach((j) => L.over(sd * (0.98 + 0.07 * j), 0.62, 0.22 - 0.07 * j, 0.035, { sweep: sd * 0.05, lift: 0.012, flick: 0.02, layer: 0.008, thick: 0.008, tone: v() * 1.06 })));
-  // the fringe and the locks beside the face (the owner: sharp and long, with a curve): big pointed
-  // spikes, as the boy's are. Parted a little to one side and drawn aside like curtains: on each side a
-  // long one down past the eye to the cheek and a shorter one over it, the forehead open between
+  // the fringe and the locks beside the face (the owner: sharp and long, with a curve; and, compared with the
+  // sheet part by part, thin: hers are wisps that leave the forehead and the ears showing, not a bob). Pointed
+  // spikes, as the boy's are. Parted a little to one side and drawn aside like curtains: on each side a long
+  // one down past the eye to the jaw and a shorter one over it, the forehead open between
   const part = 0.12, sign = Math.sign, S3 = { ridges: 2, groove: 0.2, halo: 0.4, shape: 'spike', taper: 0.2 };
-  [[-1.02, -0.62, 0.2, -0.3], [-0.72, -0.12, 0.19, -0.26], [-0.42, 0.34, 0.15, -0.22], [1.0, -0.58, 0.19, 0.3], [0.7, -0.06, 0.18, 0.28], [0.44, 0.38, 0.14, 0.22]].forEach(([az, e1, W, curl]) => {
+  [[-1.0, -0.62, 0.115, -0.3], [-0.62, 0.0, 0.105, -0.26], [0.98, -0.58, 0.11, 0.3], [0.6, 0.06, 0.1, 0.28]].forEach(([az, e1, W, curl]) => {
     const a0 = part + (az - part) * 0.3;
-    L.clump(a0, 1.32, e1, W, { sweep: az - a0, ease: 0.45, vol: 0.1, wave: 0.06 * sign(curl), curl: curl * 0.5, flick: 0.05, layer: 0.06, thick: 0.05, spiral: 1.3, rc: 0.06, tilt: 1.15 * sign(curl), tone: v() * 1.03, ...S3 });
+    L.clump(a0, 1.32, e1, W, { sweep: az - a0, ease: 0.45, vol: 0.08, wave: 0.06 * sign(curl), curl: curl * 0.5, flick: 0.06, layer: 0.05, thick: 0.03, spiral: 1.3, rc: 0.06, tilt: 1.15 * sign(curl), tone: v() * 1.03, ...S3 });
   });
-  // long sharp locks in front of the ears, hanging past the jaw, their points curving forward
-  [-1, 1].forEach((sd) => [[1.1, 0.15, -1.02, 0.3], [1.3, 0.13, -0.8, -0.26]].forEach(([az, W, e1, curl]) => L.clump(sd * az, 0.7, e1, W, { vol: 0.05, wave: 0.07 * sd, curl: sd * curl * 0.5, flick: 0.07, layer: 0.04, thick: 0.04, spiral: 1.4, rc: 0.06, tilt: -sd * sign(curl) * 1.15, tone: v(), ...S3 })));
+  // thin sharp locks in front of the ears, hanging past the jaw, their points curving forward
+  [-1, 1].forEach((sd) => [[1.12, 0.07, -1.02, 0.3], [1.3, 0.055, -0.7, -0.26]].forEach(([az, W, e1, curl]) => L.clump(sd * az, 0.7, e1, W, { vol: 0.04, wave: 0.07 * sd, curl: sd * curl * 0.5, flick: 0.07, layer: 0.03, thick: 0.02, spiral: 1.4, rc: 0.06, tilt: -sd * sign(curl) * 1.15, tone: v(), ...S3 })));
   // a few thin strands escaping on top
   for (let i = 0; i < 4; i++) L.clump(1.3 + i * 1.2 + r() * 0.3, 1.05, 0.55 + 0.25 * r(), 0.06, { vol: 0.12, curl: 0.3 * (i % 2 ? 1 : -1), flick: 0.08, layer: 0.08, thick: 0.01, halo: 0.4, spiral: 2.0, rc: 0.04, tilt: 0.9 * (i % 2 ? 1 : -1), tone: 1.08 });
-  // sharp locks at the nape, long, their points turning out
-  [[-0.8, 0.15, 0.17], [-0.4, 0.1, 0.19], [0.0, 0.12, 0.2], [0.4, 0.1, 0.19], [0.8, 0.15, 0.17]].forEach(([dd, e0, W], i) => L.clump(Math.PI + dd, e0, -0.82 + 0.1 * r(), W, { sweep: dd * 0.15, vol: 0.04, wave: 0.05 * (i % 2 ? 1 : -1), curl: 0.24 * (i % 2 ? 1 : -1), flick: 0.1, layer: 0.0, thick: 0.045, spiral: 1.4, rc: 0.06, tilt: 0.5 * (i % 2 ? 1 : -1), tone: v() * 0.92, ...S3 }));
+  // short sharp wisps at the nape, their points turning out
+  [[-0.7, 0.1, 0.085], [-0.25, 0.06, 0.09], [0.25, 0.06, 0.09], [0.7, 0.1, 0.085]].forEach(([dd, e0, W], i) => L.clump(Math.PI + dd, e0, -0.6 + 0.1 * r(), W, { sweep: dd * 0.15, vol: 0.03, wave: 0.05 * (i % 2 ? 1 : -1), curl: 0.24 * (i % 2 ? 1 : -1), flick: 0.09, layer: 0.0, thick: 0.022, spiral: 1.2, rc: 0.05, tilt: 0.5 * (i % 2 ? 1 : -1), tone: v() * 0.92, ...S3 }));
   [-1, 1].forEach((sd) => L.over(sd * 1.75, 0.2, -0.48, 0.12, { sweep: sd * 0.1, lift: 0.0, flick: 0.04, up: 0.0, layer: -0.008, thick: 0.028, tone: v() * 0.92 }));
 }
 /** The bun: a few fat loops of hair folded over one another like petals, with two leaf-shaped wisps escaping. Built round the origin. */
@@ -514,9 +523,9 @@ function bunHair(L, r) {
   const c = new THREE.Vector3(0, 0.155, 0), R = 0.136;
   // fat locks wound round the ball from its base to its top, each a little off the last, so it reads as coiled hair
   for (let i = 0; i < 12; i++) {
-    const a0 = (i / 12) * TAU + r() * 0.2, pts = [];
+    const a0 = (i / 12) * TAU + r() * 0.5, pts = [], dir = i % 3 === 0 ? -1 : 1, turn = 1.8 + 1.6 * r(), eA = -0.85 + 0.3 * r(), eB = 1.5 + 0.9 * r(); // (a messy knot: every coil its own turn, some wound the other way)
     for (let k = 0; k <= 6; k++) {
-      const a = a0 + (k / 6) * 2.9, e = -0.85 + (k / 6) * 2.2, m = R * (1 + 0.1 * Math.sin(i * 2.4 + k)); // (not a neat ball)
+      const a = a0 + dir * (k / 6) * turn, e = eA + (k / 6) * eB, m = R * (1 + 0.16 * Math.sin(i * 2.4 + k)); // (not a neat ball)
       pts.push(new THREE.Vector3(c.x + Math.sin(a) * Math.cos(e) * m, c.y + Math.sin(e) * m * 0.86, c.z + Math.cos(a) * Math.cos(e) * m));
     }
     L.add(pts, 0.15, 0.046, { centre: c, shape: 'band', still: true, halo: false, ridges: 2, groove: 0.3, tone: 0.93 + 0.17 * r() });
@@ -527,6 +536,7 @@ function bunHair(L, r) {
     L.add([s0, s0.clone().addScaledVector(d, reach * 0.45).add(new THREE.Vector3(0, rise * 0.7, 0)), s0.clone().addScaledVector(d, reach * 0.85).add(new THREE.Vector3(0, rise, 0)), s0.clone().addScaledVector(d, reach * 1.1).add(new THREE.Vector3(0, rise * 0.75, 0))], W, 0.03, { centre: c, tone: 1.06 });
   };
   wisp(0.9, 0.0, 0.015, 0.085, 0.08); wisp(4.0, -0.06, -0.025, 0.1, 0.08); wisp(2.4, -0.02, -0.035, 0.09, 0.07); // (stray ends, drooping)
+  wisp(1.6, 0.06, -0.02, 0.07, 0.035); wisp(5.0, 0.02, -0.03, 0.07, 0.03); // (two more, thin, lying out of the knot: standing up they read as antennae)
   // loops: strands that leave the bun and come back to it
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * TAU + r(), e = -0.3 + 1.3 * r(), d = new THREE.Vector3(Math.sin(a) * Math.cos(e), Math.sin(e), Math.cos(a) * Math.cos(e));
@@ -715,7 +725,7 @@ export function makeKid(spec = KIDS.boy) {
     bun = pivot(hair, bunAt.x, bunAt.y, bunAt.z); bun.rotation.set(-0.4, 0, 0.18);
     addLocks(bun, (L) => bunHair(L, r));
     lump(bun, smooth(shade(C.hair, 0.8)), [ball(0.12, 0, 0.155, 0)]);                                                   // fills the middle of the bun
-    lump(bun, smooth(C.scrunchie), Array.from({ length: 9 }, (_, i) => ball(0.038, Math.sin((i / 9) * TAU) * 0.09, 0.0, Math.cos((i / 9) * TAU) * 0.09, { s: [1, 0.8, 1] }))); // scrunchie: a ring of soft gathers
+    lump(bun, smooth(C.scrunchie), Array.from({ length: 9 }, (_, i) => ball(0.046, Math.sin((i / 9) * TAU) * 0.108, 0.012, Math.cos((i / 9) * TAU) * 0.108, { s: [1, 0.8, 1] }))); // scrunchie: a ring of soft gathers
   }
   // Hair, bun and backpack follow the head a beat late: a point on a spring chases the head, and how far
   // it trails behind is how far the hair is thrown. Call once a frame, after posing the figure.

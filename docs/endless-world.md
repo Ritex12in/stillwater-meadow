@@ -339,7 +339,7 @@ Picking weather in the World panel overrides it where you stand; Auto is the lan
 **5. Then.** The World panel says what it is like where you stand ("Here: early spring, light
 rain"); dark skies and rain curtains in the direction of a far storm come after.
 
-## Plan: a fantasy world of biomes (decided 2026-11-22, not started)
+## Plan: a fantasy world of biomes (decided 2026-11-22; most built overnight, see the next section)
 
 The owner shared a mood board of twelve biomes, saved as
 [reference/biomes-moodboard.png](reference/biomes-moodboard.png) (a guide to the look and variety,
@@ -442,11 +442,23 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   wanders a little and keeps off lakes; bare earth on the ground, no trees or grass on it; a
   signpost where a trail leaves a place names the place at its other end and how far
   (`world/signposts.js`). Islands in big lakes were left out (the boat only tours the home lake).
+- **Verdant plains** (`plainsAt`): broad, mild country, neither wet nor dry, out of the hills; the
+  land there lies flatter and the woods thin to lone trees. About 7% of world 1's land.
+- **Windy cliffs** (`cliffsAt`): in mild foothills the hills rise higher and step into plateaus about
+  16 m apart with steep risers (`terrace` in `land()`), kept below the snow; standing high in that
+  country you see a sea of cloud drifting in the valleys below (`world/cloudsea.js`, one soft
+  layer at 26 m following the camera). Windmills take to the cliffs. About 4% of world 1's land.
 - **Flower journal**: each kind picked, how many, and the country where first found.
 - **View distance** (Settings): near (about 0.7 km of land), medium (1.4 km), far (2.3 km).
-- **Imported character** (`characters/rigged.js`, `?hero=kaykit`): KayKit's Rogue (CC0, licence in
-  `public/assets/characters/kaykit/`), 76 animations, following the player with walk, run, sit, lie,
-  cheer, pick-up and petting animations. Off unless asked for, for the owner to judge first.
+- **Imported characters** (`characters/rigged.js`, `?hero=kaykit`): KayKit's Rogue for the boy
+  and KayKit's Mage for the girl (CC0, licence in `public/assets/characters/kaykit/`), 76
+  animations each, following the code-made children with walk, run, sit, lie, cheer, pick-up and
+  petting animations; the code-made children are hidden under them. Off unless asked for, for the
+  owner to judge first.
+- **Left for later** from the mood board: the ocean and Coastal Isles (beaches, palms, beach huts,
+  ships), rivers and waterfalls (frozen ones too), wind-bent trees, hanging moss, dunes, mesas and
+  sea arches, a sky city on the floating islands, cave interiors; and new animals (deer, foxes,
+  owls). See the milestone table.
 
 ## How seasons and weather work (built 2026-11-22)
 

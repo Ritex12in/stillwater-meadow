@@ -138,7 +138,7 @@ test('an older save moves what you carried into the backpack: the rod, the fish 
   await page.reload();
   await page.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });
   const got = await page.evaluate(() => window.__meadow.pack.view().filter(Boolean).map((it) => `${it.type}:${it.key || ''}:${it.n}:${(it.list || []).join('/')}`));
-  expect(got).toEqual(['rod::1:', 'fish:perch:2:20/24', 'fish:carp:1:41', 'cone::3:']);
+  expect(got).toEqual(['rod::1:', 'fish:perch:2:20/24', 'fish:carp:1:41', 'cone::3:', 'tent::1:', 'lantern::8:']); // (and the camp kit everyone is given)
   expect(await page.evaluate(() => window.__meadow.rod())).toMatchObject({ rod: true, cones: 3 });
   noErrors(errors);
 });

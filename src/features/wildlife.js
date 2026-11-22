@@ -1,5 +1,5 @@
 // Wildlife: a heron in the reeds, fish jumping at dusk and dawn, an owl at night, frogs on the
-// lily pads, and a shy deer at the forest edge.
+// lily pads, a shy deer at the forest edge and a fox by country, both at the lake you are at.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, lerp, damp, smooth, rnd } from '../core/math.js';
@@ -15,6 +15,7 @@ import { treeSpots } from '../world/vegetation.js';
 import { spawnRipple } from '../world/effects.js';
 import { lifeLake, lifeOf } from '../world/lakelife.js';
 import { hoot, croak, kraak, snort, plop } from './voices.js';
+import { biomesAt } from '../core/biome.js';
 
 const frozen = () => lakeIce(world.lifeLake || HOME) > 0.5; // (the lake the creatures are at)
 
@@ -117,10 +118,16 @@ export function initWildlife() {
 
   // deer
   const deerSpots = [];
-  for (let i = 0; i < 60 && deerSpots.length < 8; i++) {
-    const a = rnd() * TAU, r = HOME.rmax * rnd(2.1, 3.2), x = HOME.x + Math.cos(a) * r, z = HOME.z + Math.sin(a) * r;
-    if (walkable(x, z) && heightAt(x, z) < 14 && lakeT(x, z) > 1.5) deerSpots.push({ x, z });
-  }
+  const findDeerSpots = (L) => {
+    deerSpots.length = 0;
+    const b = biomesAt(L.x, L.z, 2);
+    if (b.desert > 0.4 || b.volcanic > 0.4) return; // (no deer in the desert)
+    for (let i = 0; i < 60 && deerSpots.length < 8; i++) {
+      const a = rnd() * TAU, r = L.rmax * rnd(2.1, 3.2), x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r;
+      if (walkable(x, z) && heightAt(x, z) > 0.4 && heightAt(x, z) < 40 && lakeT(x, z) > 1.5) deerSpots.push({ x, z });
+    }
+  };
+  findDeerSpots(HOME);
   const deer = (() => {
     const g = new THREE.Group();
     const coat = std('#9a6a3e'), light = std('#e9dcc6'), dark = std('#3a2a1c');
@@ -154,6 +161,58 @@ export function initWildlife() {
     deer.x = best.x; deer.z = best.z; deer.heading = rnd() * TAU; deer.state = 'graze'; deer.g.visible = true;
   };
   placeDeer();
+  const placeDeerAt = (L) => { findDeerSpots(L); placeDeer(); };
+
+  // a fox, by country: red in mild country, white in the snow, a sandy fennec with great ears in
+  // the desert. It trots about the lake you are at, sits now and then, and slips away if you come
+  // close. (None in the volcanic country.)
+  const COATS = { red: ['#c8642c', '#f1e6d6', 1], snow: ['#e9eef1', '#ffffff', 1], sand: ['#d6ac74', '#f3e6cc', 1.7] };
+  const fox = (() => {
+    const g = new THREE.Group(), coat = std('#c8642c'), pale = std('#f1e6d6'), dark = std('#2a211b');
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.62), coat); body.position.y = 0.44;
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.16), pale); chest.position.set(0, 0.4, 0.3);
+    const head = new THREE.Group(); head.position.set(0, 0.56, 0.38);
+    const snout = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.2, 4).rotateX(Math.PI / 2).rotateZ(Math.PI / 4), pale); snout.position.set(0, -0.03, 0.17);
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.03, 0.03), dark); nose.position.set(0, -0.03, 0.27);
+    head.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.17, 0.18), coat), snout, nose);
+    const ears = [-1, 1].map((s) => { const e = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.13, 4).translate(0, 0.065, 0), coat); e.position.set(s * 0.065, 0.08, -0.02); e.rotation.z = -s * 0.2; head.add(e); return e; });
+    [-1, 1].forEach((s) => { const eye = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.025, 0.01), dark); eye.position.set(s * 0.055, 0.02, 0.092); head.add(eye); });
+    const tail = new THREE.Group(); tail.position.set(0, 0.48, -0.3);
+    tail.add(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.42, 6).translate(0, -0.21, 0).rotateX(Math.PI), coat));
+    const tip = new THREE.Mesh(new THREE.IcosahedronGeometry(0.075, 0), pale); tip.position.set(0, 0, -0.43); tail.add(tip);
+    tail.children[0].rotation.x = -Math.PI / 2;
+    const legs = [[-0.08, 0.22], [0.08, 0.22], [-0.08, -0.22], [0.08, -0.22]].map(([x, z]) => {
+      const p = new THREE.Group(); p.position.set(x, 0.34, z);
+      p.add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.34, 0.05).translate(0, -0.17, 0), dark));
+      g.add(p); return p;
+    });
+    g.add(body, chest, head, tail);
+    enableShadows(g);
+    g.visible = false;
+    scene.add(g);
+    return { g, coat, pale, head, ears, tail, legs, kind: 'red', state: 'gone', x: 0, z: 0, cx: 0, cz: 0, heading: 0, t: 0, next: 8, away: 0, phase: 0 };
+  })();
+  let foxLake = null;
+  /** The country a lake lies in, for its fox: 'snow', 'sand', 'red' or null (none). */
+  const foxCountry = (L) => { const b = biomesAt(L.x, L.z, 2); return b.volcanic > 0.4 ? null : L.clime && L.clime.snow > 0.5 ? 'snow' : b.desert > 0.4 ? 'sand' : 'red'; };
+  const placeFox = (L) => {
+    foxLake = L;
+    const kind = foxCountry(L);
+    fox.g.visible = false; fox.state = 'gone'; fox.away = 0;
+    if (!kind) return;
+    for (let i = 0; i < 40; i++) {
+      const a = rnd() * TAU, r = L.rmax * rnd(1.7, 2.8), x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r;
+      if (!walkable(x, z) || heightAt(x, z) < 0.4 || Math.hypot(x - player.x, z - player.z) < 22) continue;
+      const c = COATS[kind];
+      fox.kind = kind; fox.coat.color.set(c[0]); fox.pale.color.set(c[1]); fox.ears.forEach((e) => e.scale.set(c[2], c[2], c[2]));
+      fox.x = fox.cx = x; fox.z = fox.cz = z; fox.heading = rnd() * TAU; fox.state = 'trot'; fox.t = 0; fox.next = rnd(6, 12);
+      fox.g.visible = true;
+      return;
+    }
+  };
+  placeFox(lifeLake);
+  wildView = () => ({ fox: { kind: fox.kind, shown: fox.g.visible, state: fox.state, x: fox.x, z: fox.z }, deer: { shown: deer.g.visible, spots: deerSpots.length } });
+  hooks.lake.push((L) => { placeFox(L); placeDeerAt(L); });
 
   hooks.frame.push((dt, t) => {
     // heron
@@ -257,6 +316,39 @@ export function initWildlife() {
       }
     }
 
+    // fox
+    const f = fox;
+    if (f.state === 'gone') { if (f.away > 0) { f.away -= dt; if (f.away <= 0) placeFox(foxLake || lifeLake); } }
+    else {
+      const fp = Math.hypot(player.x - f.x, player.z - f.z);
+      if (f.state !== 'flee' && fp < 9) { f.state = 'flee'; f.t = 3.5; f.heading = Math.atan2(f.x - player.x, f.z - player.z); }
+      let speed = 0;
+      if (f.state === 'trot') {
+        f.t += dt; speed = 1.4;
+        f.heading += Math.sin(f.t * 0.7) * dt * 0.9;
+        if (Math.hypot(f.x - f.cx, f.z - f.cz) > 26) f.heading = Math.atan2(f.cx - f.x, f.cz - f.z); // (it keeps about its own patch)
+        if (f.t > f.next) { f.state = 'sit'; f.t = 0; f.next = rnd(3, 6); }
+      } else if (f.state === 'sit') {
+        f.t += dt;
+        f.head.rotation.y = Math.sin(f.t * 0.8) * 0.6;
+        if (f.t > f.next) { f.state = 'trot'; f.t = 0; f.next = rnd(6, 12); f.head.rotation.y = 0; }
+      } else {
+        f.t -= dt; speed = 6.5;
+        if (f.t <= 0) { f.state = 'gone'; f.away = 50; f.g.visible = false; }
+      }
+      if (speed > 0) {
+        const nx = f.x + Math.sin(f.heading) * speed * dt, nz = f.z + Math.cos(f.heading) * speed * dt;
+        if (walkable(nx, nz) && heightAt(nx, nz) > 0.35) { f.x = nx; f.z = nz; } else f.heading += 1.1;
+        f.phase += dt * speed * 4.2;
+      }
+      const sit = f.state === 'sit';
+      f.legs.forEach((l, i) => { l.rotation.x = sit ? (i < 2 ? 0 : -1.2) : (i % 3 === 0 ? 1 : -1) * Math.sin(f.phase) * 0.6; });
+      f.tail.rotation.x = sit ? -0.5 : f.state === 'flee' ? 0.25 : 0.05 * Math.sin(f.phase * 0.5);
+      f.g.position.set(f.x, heightAt(f.x, f.z) - (sit ? 0.1 : 0) + (f.state === 'flee' ? Math.abs(Math.sin(f.phase)) * 0.08 : 0), f.z);
+      f.g.rotation.x = sit ? -0.25 : 0;
+      f.g.rotation.y = f.heading;
+    }
+
     // deer
     const d = deer;
     if (d.state === 'gone') { d.away -= dt; if (d.away <= 0) placeDeer(); return; }
@@ -282,3 +374,5 @@ export function initWildlife() {
     d.g.rotation.y = d.heading;
   });
 }
+/** For tests: the fox and the deer just now. */
+export let wildView = () => null;

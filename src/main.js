@@ -57,7 +57,7 @@ import { updateAnchor, moveAnchor, anchorId, settledAbout } from './systems/anch
 import { initSettings } from './ui/settings.js';
 import { initPetVoices } from './features/voices.js';
 import { initDucks, duckState } from './features/ducks.js';
-import { initWildlife } from './features/wildlife.js';
+import { initWildlife, wildView } from './features/wildlife.js';
 import { initSeasons } from './features/seasons.js';
 import { initFlowers, flowerView } from './features/flowers.js';
 import { initRod, rodView } from './features/rod.js';
@@ -414,6 +414,7 @@ window.__meadow = {
   /** The shrine sites within `r` metres of you (the shrine stands at `shrine`, one of them). */
   shrines: (r = 1500) => shrineSitesNear(player.x, player.z, r), rawHeight,
   seaShown, seaDrawnAt,
+  wild: () => wildView(),
   wilds: { stats: wildStats, settle: settleWilds, square: growSquare, rocks: growRocks, small: (ix, iz) => growSmall(ix, iz, growSquare(ix, iz)), picks: growPicks, picksNear, biome: growBiome },
   /** The biomes at a spot (core/biome.js): their weights, and the strongest. */
   biomes: (x, z) => biomesAt(x, z, height(x, z)), biomeAt: (x, z) => biomeAt(x, z, height(x, z)),

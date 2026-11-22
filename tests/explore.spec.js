@@ -201,3 +201,31 @@ test('the sea: never near home, not to be walked on, sand and palms by it, ships
   expect(r.lost, 'nothing is dropped for want of a slot').toBe(0);
   noErrors(errors);
 });
+
+test('a fox by country at the lake you are at (red, white in the snow), slipping away when you come close; the deer come too', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const r = await page.evaluate(() => {
+    const m = window.__meadow, out = {};
+    for (let i = 0; i < 5; i++) m.tick(1 / 30);
+    out.home = m.wild();
+    const frozen = m.lakes(3000).find((L) => L.frozen && L.id !== 'home');
+    m.visitLake(frozen.id); for (let i = 0; i < 10; i++) m.tick(1 / 30);
+    out.snow = m.wild();
+    // walk up to it: it runs
+    const f = out.snow.fox; m.player.x = f.x + 5; m.player.z = f.z; m.player.slide = null;
+    for (let i = 0; i < 6; i++) m.tick(1 / 30);
+    out.near = m.wild();
+    for (let i = 0; i < 150; i++) m.tick(1 / 30);
+    out.after = m.wild();
+    out.moved = Math.hypot(out.after.fox.x - f.x, out.after.fox.z - f.z);
+    return out;
+  });
+  expect(r.home.fox.shown, 'a fox by the home lake').toBe(true);
+  expect(r.home.fox.kind).toBe('red');
+  expect(r.home.deer.spots, 'deer by the home lake').toBeGreaterThan(0);
+  expect(r.snow.fox.kind, 'white in the snow country').toBe('snow');
+  expect(r.snow.deer.spots, 'the deer come to the lake you are at').toBeGreaterThan(0);
+  expect(r.near.fox.state).toBe('flee');
+  expect(r.after.fox.shown, 'and is gone a while').toBe(false);
+  noErrors(errors);
+});

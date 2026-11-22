@@ -2,7 +2,7 @@
 // glinting in it at night, and winter ice.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
-import { LAKE, lakesNear, lakeIce } from '../core/shape.js';
+import { LAKE, lakesNear, lakeIce, seaAt } from '../core/shape.js';
 import { skyU } from './sky.js';
 import { GRADE_GLSL, HAZE_GLSL } from '../core/atmosphere.js';
 
@@ -170,12 +170,28 @@ export function buildWater() {
     scene.add(mesh);
     sheets.push({ mesh, u, lake: null });
   }
+  // the sea: the same water, without a shore of its own (the land makes its shore), a little bluer
+  const su = Object.assign({}, waterU, { lakeC: { value: new THREE.Vector2() }, lakeShape: { value: new THREE.Vector4(1e6, 0, 0, 0) }, lakePhase: { value: new THREE.Vector3() }, lakeStretch: { value: new THREE.Vector2() }, lakeTint: { value: new THREE.Vector3(0.78, 1.02, 1.12) }, uIce: { value: 0 } });
+  sea = make(su);
+  sea.scale.set(64, 1, 64); // (about 3 km round)
+  sea.position.y = -0.04;
+  sea.visible = false;
+  sea.frustumCulled = false;
+  scene.add(sea);
   updateWater(LAKE.x, LAKE.z);
+}
+let sea = null, seaIn = 0;
+/** Whether there is sea within about 3 km of a spot. */
+function seaNear(x, z) {
+  for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) if (seaAt(x + i * 900, z + j * 900) > 0.08) return true;
+  return false;
 }
 
 const SHEETS = 4, WATER_REACH = 620, sheets = [];
 /** Once a frame: the sheets of water go to the lakes nearest (x, z). */
 export function updateWater(x, z) {
+  if (sea && --seaIn <= 0) { seaIn = 60; sea.visible = seaNear(x, z); }
+  if (sea && sea.visible) sea.position.set(x, -0.04, z);
   const near = lakesNear(x, z, WATER_REACH).slice(0, SHEETS);
   for (const s of sheets) if (s.lake && !near.includes(s.lake)) s.lake = null;
   for (const L of near) {
@@ -193,4 +209,5 @@ export function updateWater(x, z) {
   for (const s of sheets) { s.mesh.visible = !!s.lake; if (s.lake) s.u.uIce.value = lakeIce(s.lake); }
 }
 /** For tests: which lakes have water drawn just now. */
+export const seaShown = () => !!(sea && sea.visible);
 export const waterLakes = () => sheets.filter((s) => s.lake).map((s) => s.lake.id);

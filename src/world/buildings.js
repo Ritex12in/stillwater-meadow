@@ -156,6 +156,31 @@ export function stiltHut(variant = 0) {
   return { group: k.build(), radius: Math.max(W, D) / 2 + 2, height: lift + H + roofH };
 }
 
+// ───────────── a ship at anchor (the coast) ─────────────
+/** A sailing ship riding at anchor: a pointed hull, a deck and a cabin aft, one or two masts with sails. About 15 m long. */
+export function ship(variant = 0) {
+  const R = mulberry32(9100 + variant * 37), m = buildingMats(), k = new Kit();
+  const L = 13 + R() * 4, W = 3.6 + R() * 0.8, masts = variant % 2 ? 2 : 1;
+  const hull = new THREE.Shape();
+  hull.moveTo(-W / 2, -L / 2); hull.lineTo(W / 2, -L / 2); hull.quadraticCurveTo(W / 2 + 0.3, L * 0.2, 0, L / 2); hull.quadraticCurveTo(-W / 2 - 0.3, L * 0.2, -W / 2, -L / 2);
+  // the hull's outline, extruded: the hull itself, a red band round it, and the deck inside it
+  const slab = (sc, depth, top) => new THREE.ExtrudeGeometry(hull, { depth, bevelEnabled: false }).rotateX(Math.PI / 2).scale(sc, 1, sc).translate(0, top, 0);
+  k.add(m.darkWood, slab(1, 2.4, 1.3));
+  k.add(m.red, slab(1.025, 0.28, 0.95));
+  k.add(m.wood, slab(0.93, 0.12, 1.36));
+  k.add(m.wood, box(W * 0.8, 1.6, L * 0.2, 0, 1.4, -L * 0.36));
+  k.add(m.glass, box(0.6, 0.5, 0.08, 0, 2.2, -L * 0.26 + 0.02), false);
+  for (let i = 0; i < masts; i++) {
+    const z = masts === 1 ? L * 0.05 : (i ? L * 0.22 : -L * 0.1), H = 9 + R() * 2 - i * 1.5;
+    k.add(m.darkWood, cyl(0.16, 0.11, H, 6, 0, 1.3, z));
+    k.add(m.darkWood, box(W * 1.1, 0.12, 0.12, 0, 1.3 + H * 0.82, z));
+    k.add(m.darkWood, box(W * 0.9, 0.1, 0.1, 0, 1.3 + H * 0.4, z));
+    k.add(m.cloth, new THREE.PlaneGeometry(W * 1.05, H * 0.4).translate(0, 1.3 + H * 0.61, z + 0.15), false);
+  }
+  k.add(m.red, new THREE.PlaneGeometry(0.9, 0.5).translate(0.45, 1.3 + 10.2, L * 0.05 + 0.05), false);
+  return { group: k.build(), radius: W / 2 + 1, height: 12 };
+}
+
 // ───────────── a windmill (the windy heights) ─────────────
 /** A windmill: a tapering stone tower, a turning cap of thatch, four sails. `sails` is the part that turns. */
 export function windmill(variant = 0) {

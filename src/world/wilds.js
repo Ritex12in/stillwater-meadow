@@ -18,7 +18,7 @@
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
 // walk.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
-import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt } from '../core/shape.js';
+import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt, seaAt, coldBase } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -233,17 +233,19 @@ export function picksNear(x, z, r) {
  * mushrooms in the enchanted wood. From a stream of its own, so nothing else moves.
  */
 export function growBiome(ix, iz) {
-  const R = seedOf(ix, iz, 0x6B10E), x0 = ix * S, z0 = iz * S, out = { cacti: [], crystals: [], mushrooms: [], pools: [], lotus: [] };
+  const R = seedOf(ix, iz, 0x6B10E), x0 = ix * S, z0 = iz * S, out = { palms: [], cacti: [], crystals: [], mushrooms: [], pools: [], lotus: [] };
   const mx = x0 + S / 2, mz = z0 + S / 2, B = biomesAt(mx, mz, height(mx, mz));
-  if (B.desert < 0.05 && B.enchanted < 0.05 && B.swamp < 0.05) return out;
+  if (B.desert < 0.05 && B.enchanted < 0.05 && B.swamp < 0.05 && !(seaAt(mx, mz) > 0)) return out;
+  const PALM = ['#4f8a3a', '#5b9440', '#46803a'].map(col);
   const MUSH = [0xb8f4ff, 0x9fffd0, 0xffa6f0, 0xc7b0ff].map((c) => col('#' + c.toString(16).padStart(6, '0')));
   const CRYS = [0x7fe3ff, 0xb48cff, 0xff8fd6, 0x8fffd9].map((c) => col('#' + c.toString(16).padStart(6, '0')));
   const CACT = ['#5f8a3e', '#6d9645', '#557d38'].map(col), LOTUS = ['#ffd6ec', '#ffffff', '#f6b8ff', '#c9e8ff'].map(col);
   for (let k = 0; k < 60; k++) {
     const x = x0 + R() * S, z = z0 + R() * S, roll = R(), size = R(), turn = R(), v = Math.floor(R() * 4), tint = R();
-    if (lakeT(x, z) < 1.15 || clearingAt(x, z)) continue;
+    if (lakeT(x, z) < 1.15 || clearingAt(x, z, false)) continue;
     const h = height(x, z), b = biomesAt(x, z, h);
     if (rockAmt(h, slopeOf(x, z), feltAt(x, z, h)) > 0.4) continue;
+    if (b.beach > 0.3 && roll < 0.12 * (1 - Math.abs(coldBase(x, z)) * 2)) { out.palms.push({ x, z, y: h - 0.1, s: 0.85 + size * 0.4, ry: turn * TAU, v, color: PALM[Math.floor(tint * PALM.length)] }); continue; }
     if (roll < b.desert * 0.12) out.cacti.push({ x, z, y: h - 0.1, s: 0.8 + size * 0.6, ry: turn * TAU, v, color: CACT[Math.floor(tint * CACT.length)] });
     else if (roll > 1 - b.enchanted * 0.5) {
       if (size < 0.3) out.crystals.push({ x, z, y: h - 0.05, s: 0.6 + size * 2.4, ry: turn * TAU, v, color: CRYS[Math.floor(tint * CRYS.length)] });
@@ -314,9 +316,9 @@ export function updateWilds(cx, cz, all = false) {
     rockCount = rocks.length;
     lostRocks = world.setWildRocks ? world.setWildRocks(rocks) : 0;
     // the biomes' own things, with the boulders
-    const things = { cacti: [], crystals: [], mushrooms: [], pools: [], lotus: [] };
+    const things = { palms: [], cacti: [], crystals: [], mushrooms: [], pools: [], lotus: [] };
     squares.forEach((q) => { if (q.near && q.biome) for (const k in things) for (const it of q.biome[k]) things[k].push(it); });
-    biomeCount = things.cacti.length + things.crystals.length + things.mushrooms.length + things.pools.length + things.lotus.length;
+    biomeCount = things.palms.length + things.cacti.length + things.crystals.length + things.mushrooms.length + things.pools.length + things.lotus.length;
     lostRocks += world.setBiomeThings ? world.setBiomeThings(things) : 0;
   }
   if (smallDirty) {

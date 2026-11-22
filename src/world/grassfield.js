@@ -33,7 +33,7 @@ function grassy(x, z, h, north, base) {
   return smooth(1.02 + 0.1 * b, 1.1 + 0.12 * b, lake.t(x, z)) * (1 - smooth(0.15, 0.5, lake.path(x, z))) * (1 - trailAt(x, z) * 0.85) * (1 - rockAmt(h, slopeAt(x, z), feltHeight(x, z, h, north, base)));
 }
 /** How much grass a biome lets grow: none on the desert's sand, sparse in the swamp's peat (its pools show). */
-const biomeGrass = (b) => (1 - 0.9 * b.desert) * (1 - 0.65 * b.swamp);
+const biomeGrass = (b) => (1 - 0.9 * Math.max(b.desert, b.beach)) * (1 - 0.65 * b.swamp);
 /** Work the whole map out again at the next update (the jetty, the fire or the bench has moved, and it remembers where they were). */
 export function resetGrassMap() { mapIx = null; }
 /** Keep the map round (cx, cz). Call once a frame; it only does work when the camera has moved on. */

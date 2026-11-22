@@ -5,10 +5,10 @@
 import * as THREE from 'three';
 import { std, weatherize, bothSides, slotSet, neonAtNight } from '../core/materials.js';
 import { world } from '../core/state.js';
-import { cactus, crystalCluster, glowMushroom, poolDisc, lotus } from './makers.js';
+import { cactus, crystalCluster, glowMushroom, poolDisc, lotus, palm } from './makers.js';
 
 /** How many of each can be drawn at once. */
-const SLOTS = { cacti: 160, crystals: 220, mushrooms: 320, pools: 120, lotus: 260 };
+const SLOTS = { palms: 220, cacti: 160, crystals: 220, mushrooms: 320, pools: 120, lotus: 260 };
 const V = 4; // variants of each
 
 export function buildBiomeThings() {
@@ -16,8 +16,10 @@ export function buildBiomeThings() {
   const glowMat = neonAtNight(std('#ffffff', { vertexColors: true, flatShading: true, roughness: 0.25, metalness: 0.1 }), 1.2);
   const stemMat = std('#e8e2d4', { vertexColors: true, flatShading: true });
   const capMat = neonAtNight(bothSides(new THREE.MeshLambertMaterial({ vertexColors: true })), 1.1);
-  const shrooms = Array.from({ length: V }, (_, i) => glowMushroom(i));
+  const shrooms = Array.from({ length: V }, (_, i) => glowMushroom(i)), palms = Array.from({ length: V }, (_, i) => palm(i));
   const sets = {
+    palmTrunks: slotSet(palms.map((p) => p.trunk), weatherize(std('#8a6a4a', { vertexColors: true, flatShading: true }), 'std'), SLOTS.palms, { cast: true }),
+    palmCrowns: slotSet(palms.map((p) => p.crown), bothSides(weatherize(new THREE.MeshLambertMaterial({ vertexColors: true }), 'lam')), SLOTS.palms, { cast: true, colored: true }),
     cacti: slotSet(Array.from({ length: V }, (_, i) => cactus(i)), cactusMat, SLOTS.cacti, { cast: true, colored: true }),
     crystals: slotSet(Array.from({ length: V }, (_, i) => crystalCluster(i)), glowMat, SLOTS.crystals, { cast: true, colored: true }),
     stems: slotSet(shrooms.map((m) => m.stem), stemMat, SLOTS.mushrooms),
@@ -29,12 +31,14 @@ export function buildBiomeThings() {
   const kind = (it) => it.v % V;
   /** Draw these, and no others. Returns how many found no slot (it should be none). */
   world.setBiomeThings = (list) => {
+    sets.palmTrunks.setItems(list.palms || [], kind);
+    sets.palmCrowns.setItems(list.palms || [], kind);
     sets.cacti.setItems(list.cacti, kind);
     sets.crystals.setItems(list.crystals, kind);
     sets.stems.setItems(list.mushrooms, kind);
     sets.caps.setItems(list.mushrooms, kind);
     sets.pools.setItems(list.pools || [], (it) => it.v % 2);
     sets.lotus.setItems(list.lotus || [], (it) => it.v % 2);
-    return sets.cacti.dropped + sets.crystals.dropped + sets.stems.dropped + sets.caps.dropped + sets.pools.dropped + sets.lotus.dropped;
+    return sets.palmTrunks.dropped + sets.palmCrowns.dropped + sets.cacti.dropped + sets.crystals.dropped + sets.stems.dropped + sets.caps.dropped + sets.pools.dropped + sets.lotus.dropped;
   };
 }

@@ -96,7 +96,7 @@ const NAME_COLD = ['Frost', 'Snow', 'White', 'Winter', 'Crystal', 'Pale'], NAME_
 function cellSpot(cx, cz) {
   const R = mulberry32((Math.floor(hash(cx * 11 + 7, cz * 17 - 3) * 4294967296) ^ Math.imul(WORLD.seed, 0x85EBCA6B)) | 0);
   const there = R() < 0.62, x = (cx + 0.2 + R() * 0.6) * LAKE_CELL, z = (cz + 0.2 + R() * 0.6) * LAKE_CELL;
-  return { R, x, z, there: there && rangeAt(x, z) < 0.3 };
+  return { R, x, z, there: there && rangeAt(x, z) < 0.3 && seaAt(x, z) < 0.01 };
 }
 // Settled lakes are the ones with things built beside them: a jetty, a fire, a bench (see kitOf).
 /**
@@ -206,6 +206,10 @@ export let LAKE = HOME, lakeR = HOME.r;
 export const EROSION = 1.0;
 const gH = [0, 0, 0], gC = [0, 0, 0];
 function land(x, z, open) {
+  const sea = seaAt(x, z), h = landShape(x, z, open);
+  return sea > 0 ? h - sea * SEA_DEPTH : h;
+}
+function landShape(x, z, open) {
   const u = x + SX * 31, v = z + SZ * 31;
   const meadow = 0.6 + fbm(u * 0.018 + 3.1, v * 0.018 - 7.4) * 7.5;
   if (open <= 0) return meadow;
@@ -243,6 +247,20 @@ export function cliffsAt(x, z) {
 function terrace(h) {
   const S = 16, k = h / S, i = Math.floor(k), f = k - i;
   return (i + smooth(0.72, 0.95, f)) * S;
+}
+// ── The sea ────────────────────────────────────────────────────
+// A continent field, broad as the climate's: where it runs low the land sinks under one sea, its
+// level the lakes' own (0). Lowland goes under first; hills and mountains stand out of it as
+// islands and headlands (the coastal isles). Never within 2 km of home.
+export const SEA_DEPTH = 26;
+let OSX = null;
+/** How much a spot is out at sea (0 land .. 1 open sea): how far the land there is sunk. */
+export function seaAt(x, z) {
+  const d = Math.hypot(x - HOME.x, z - HOME.z);
+  if (d < 2000) return 0;
+  if (OSX === null) OSX = hash(WORLD.seed, 109) * 20000;
+  const c = fbm((x + OSX) * 0.00021 + 7.7, (z - OSX) * 0.00021 - 3.1);
+  return smooth(0.44, 0.32, c) * smooth(2000, 3200, d);
 }
 /** How much a spot is in the mountains (0 none .. 1 the heart of a range). */
 export function rangeAt(x, z) { return smooth(0.5, 0.72, fbm((x + SX * 31) * 0.0014 + 41.3, (z + SZ * 31) * 0.0014 - 17.9)); }
@@ -493,10 +511,11 @@ const marksOf = (lake) => lake.marks || (lake.marks = landmarksOf(lake));
  * the shrine's ground. The rule is the lake's own (its spots, not where the single set of
  * landmarks happens to be), so a square of land always grows the same things.
  */
-export function clearingAt(x, z) {
+export function clearingAt(x, z, strand = true) {
   if (shrineSiteAt(x, z, SHRINE_R + 7)) return true;
   if (sitesReady && siteAt(x, z, -1)) return true; // (and a building's ground)
   if (sitesReady && trailAt(x, z) > 0.25) return true; // (and the trails)
+  if (seaAt(x, z) > 0) { const h = height(x, z); if (h < 1 || (strand && beachAt(x, z, h) > 0.4)) return true; } // (and the sea, and its sand but for the palms: `strand` false)
   const L = lakeAt(x, z);
   if (!L.settled) return false;
   const dx = x - L.x, dz = z - L.z, d = Math.hypot(dx, dz), r = L.r(Math.atan2(dz, dx));
@@ -618,6 +637,11 @@ export function plainsAt(x, z, base = coldBase(x, z), rain = rainAt(x, z)) {
   const f = smooth(0.5, 0.58, fbm((x + BSZ) * 0.0007 + 2.2, (z - BSX) * 0.0007 - 9.4)) * awayFromHome(x, z);
   return f > 0 ? f * (1 - smooth(0.06, 0.18, rangeAt(x, z))) * (1 - smooth(0.12, 0.25, Math.abs(base))) * (1 - smooth(0.08, 0.14, Math.abs(rain - 0.5))) : 0;
 }
+/** A beach (0..1): low ground by the sea. */
+export function beachAt(x, z, h) {
+  const sea = seaAt(x, z);
+  return sea > 0 ? smooth(0.005, 0.04, sea) * smooth(3.4, 1.6, h) : 0;
+}
 /** The biomes' weights at a spot (0..1 each): desert, swamp, enchanted, volcanic. `base` and `rain` may be passed when known. */
 export function biomesAt(x, z, h, base = coldBase(x, z), rain = rainAt(x, z)) {
   const away = awayFromHome(x, z), wonder = wonderAt(x, z), range = rangeAt(x, z);
@@ -628,6 +652,8 @@ export function biomesAt(x, z, h, base = coldBase(x, z), rain = rainAt(x, z)) {
     volcanic: wonder.b * smooth(0.2, 0.5, range),
     // open grassland with lone trees: flat, mild, neither wet nor dry, in broad stretches
     plains: plainsAt(x, z, base, rain),
+    // sand where the land meets the sea
+    beach: beachAt(x, z, h),
   };
 }
 /** The strongest biome at a spot and its weight, or null in ordinary country. */
@@ -665,6 +691,9 @@ const SITE_KINDS = {
   // a volcano: a great cone with a crater, raised in a wonder in the mountains (no levelled ground: its cone, see height())
   volcano: { cell: 2200, flat: 0, out: 0, cone: 430, salt: 0xB01C, tries: 10, rule: (x, z, h) => wonderAt(x, z).b > 0.55 && rangeAt(x, z) > 0.2 },
   // floating islands over a wonder in the hills, an updraft below to ride up
+  // by the sea: a hut on stilts on the beach, and ships riding at anchor offshore (on the water, no levelled ground)
+  beachhut: { cell: 700, flat: 5, out: 9, salt: 0xBEAC4, tries: 14, chance: 0.6, rule: (x, z, h) => h > 1.2 && h < 4.5 && seaAt(x, z) > 0.03 && snowOf(coldAt(x, z, h)) < 0.3 },
+  ship: { cell: 1500, flat: 0, out: 0, ship: true, salt: 0x5419, tries: 12, chance: 0.7, rule: (x, z, h) => h < -6 && seaAt(x, z) > 0.5 },
   skyisle: { cell: 1900, flat: 6, out: 11, salt: 0x5C15, tries: 12, rule: (x, z, h) => h > 4 && h < 90 && wonderAt(x, z).a > 0.3 && rangeAt(x, z) < 0.45 },
 };
 /** The volcano's cone: how much it raises the land (m) at a distance `r` from its middle; a crater at the top. */
@@ -697,6 +726,7 @@ function siteOfCell(kind, cx, cz) {
       const x = (cx + 0.25 + R() * 0.5) * K.cell, z = (cz + 0.25 + R() * 0.5) * K.cell, turn = R(), variant = R();
       if (Math.hypot(x - HOME.x, z - HOME.z) < 600 || Math.hypot(x - home.x, z - home.z) < 120) continue;
       const h = rawHeight(x, z);
+      if (!K.ship && h < 1 && seaAt(x, z) > 0) continue; // (nothing but ships out at sea)
       if (!K.rule(x, z, h)) continue;
       if (K.flat > 0 && !clearOfLakes(x, z)) continue;
       if (K.flat === 0 && lakeAt(x, z).t(x, z) < (K.cone ? 12 : 2.2)) continue;
@@ -706,7 +736,7 @@ function siteOfCell(kind, cx, cz) {
       if (near.length) continue;
       if (!best || relief < best.relief) best = { x, z, h, relief, turn, variant };
     }
-    if (best) site = { id: key, kind, x: best.x, z: best.z, y: best.h - (K.sink || 0), turn: best.turn * TAU, variant: Math.floor(best.variant * 1000), flat: K.flat, out: K.out };
+    if (best) site = { id: key, kind, x: best.x, z: best.z, y: K.ship ? 0 : best.h - (K.sink || 0), turn: best.turn * TAU, variant: Math.floor(best.variant * 1000), flat: K.flat, out: K.out };
   }
   siteCells.set(key, site);
   return site;
@@ -838,7 +868,7 @@ export const nearReserved = (x, z, r) => chairSpots.some((c) => Math.hypot(x - c
 // either side of the straight line (by a slow sine, fixed by its two ends), and keeps off lakes.
 // Worked out per square of TRAIL_CELL metres (the trails that pass near it), and kept.
 const TRAIL_CELL = 800, TRAIL_REACH = 1400, TRAIL_W = 2.2;
-const TRAIL_KINDS = new Set(['pagoda', 'castle', 'ruin', 'hut', 'windmill', 'circle', 'cairn', 'spring', 'icecastle', 'grotto', 'skyisle']);
+const TRAIL_KINDS = new Set(['beachhut', 'pagoda', 'castle', 'ruin', 'hut', 'windmill', 'circle', 'cairn', 'spring', 'icecastle', 'grotto', 'skyisle']);
 const trailCells = new Map();
 function placesAbout(x, z, r) {
   const out = [];

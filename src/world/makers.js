@@ -84,6 +84,29 @@ export function cactus(variant) {
   return b.build();
 }
 
+// ───────────── palms (the beaches) ─────────────
+/** A palm: a leaning, ringed trunk (`trunk`) and a crown of drooping fronds (`crown`, tinted by its instance). About 6-8 m. */
+export function palm(variant) {
+  const R = mulberry32(9900 + variant * 47), t = new Builder(), c = new Builder();
+  const H = 5.2 + R() * 2.4, lean = 0.8 + R() * 1.0, la = R() * TAU, lx = Math.cos(la), lz = Math.sin(la);
+  const pts = Array.from({ length: 8 }, (_, i) => { const q = i / 7; return [lx * lean * q * q, q * H, lz * lean * q * q]; });
+  tube(t, pts, pts.map((_, i) => 0.2 - i * 0.014), 7, (q) => 0.62 + 0.38 * q);
+  const top = pts[7], n = 7 + Math.floor(R() * 3);
+  for (let k = 0; k < n; k++) {
+    const a = (k / n) * TAU + R() * 0.4, dx = Math.cos(a), dz = Math.sin(a), L = 2.6 + R() * 1.0, sx = -dz, sz = dx, shade = 0.8 + R() * 0.2;
+    const at = (s) => [top[0] + dx * L * s, top[1] + 0.35 * L * s - 0.95 * L * s * s, top[2] + dz * L * s];
+    for (let i = 0; i < 6; i++) {
+      const s0 = i / 6, s1 = (i + 1) / 6, w0 = 0.5 * Math.sin(Math.PI * Math.max(s0, 0.08)), w1 = 0.5 * Math.sin(Math.PI * s1);
+      const p0 = at(s0), p1 = at(s1);
+      const l0 = [p0[0] + sx * w0, p0[1] - 0.05, p0[2] + sz * w0], r0 = [p0[0] - sx * w0, p0[1] - 0.05, p0[2] - sz * w0];
+      const l1 = [p1[0] + sx * w1, p1[1] - 0.05, p1[2] + sz * w1], r1 = [p1[0] - sx * w1, p1[1] - 0.05, p1[2] - sz * w1];
+      c.tri(p0, l0, l1, shade, shade, shade, [0, 1, 0]); c.tri(p0, l1, p1, shade, shade, shade, [0, 1, 0]);
+      c.tri(p0, p1, r1, shade * 0.9, shade * 0.9, shade * 0.9, [0, 1, 0]); c.tri(p0, r1, r0, shade * 0.9, shade * 0.9, shade * 0.9, [0, 1, 0]);
+    }
+  }
+  return { trunk: t.build(), crown: c.build() };
+}
+
 // ───────────── the swamp's pools and lotus ─────────────
 /** A flat, irregular pool of still water, about 3 m across (scaled by its instance). */
 export function poolDisc(variant) {

@@ -10,7 +10,7 @@ import { sitesNear, VOLCANO } from '../core/shape.js';
 import { hooks, obstacles } from '../core/state.js';
 import { cur } from '../systems/time.js';
 import * as THREE from 'three';
-import { pagoda, castle, ruinArch, colonnade, stiltHut, windmill, stoneCircle, cairn, hotSpring, crystalGrotto, volcanoTop, skyIsles, buildingMats } from './buildings.js';
+import { pagoda, castle, ruinArch, colonnade, stiltHut, windmill, stoneCircle, cairn, hotSpring, crystalGrotto, volcanoTop, skyIsles, ship, buildingMats } from './buildings.js';
 import { player } from '../characters/player.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
@@ -32,10 +32,12 @@ const KINDS = {
   icecastle: { view: 1100, pool: 1, make: [0, 1].map((v) => () => castle(v, true)) },
   grotto: { view: 500, pool: 2, make: [0, 1].map((v) => () => crystalGrotto(v)) },
   volcano: { view: 2600, pool: 1, make: [() => volcanoTop()] },
+  beachhut: { view: 380, pool: 3, make: [0, 1, 2].map((v) => () => stiltHut(v + 3)) },
+  ship: { view: 1400, pool: 2, make: [0, 1, 2].map((v) => () => ship(v)) },
   skyisle: { view: 1400, pool: 1, make: [0, 1].map((v) => () => skyIsles(v)) },
 };
 /** The names the places are found by (world/landmarks.js placeName). */
-const KIND_NAMES = { skyisle: 'Floating islands', pagoda: 'Pagoda', castle: 'Castle', ruin: 'Ruins', hut: 'Stilt hut', windmill: 'Windmill', circle: 'Stone circle', cairn: 'Summit cairn', spring: 'Hot spring', icecastle: 'Ice castle', grotto: 'Crystal grotto', volcano: 'Volcano' };
+const KIND_NAMES = { beachhut: 'Beach hut', ship: 'Ship', skyisle: 'Floating islands', pagoda: 'Pagoda', castle: 'Castle', ruin: 'Ruins', hut: 'Stilt hut', windmill: 'Windmill', circle: 'Stone circle', cairn: 'Summit cairn', spring: 'Hot spring', icecastle: 'Ice castle', grotto: 'Crystal grotto', volcano: 'Volcano' };
 const NAME_A = ['Old', 'Grey', 'Silver', 'High', 'Quiet', 'Misty', 'Golden', 'Hollow', 'Wind', 'Star', 'Moss', 'Dawn', 'Ember', 'Frost', 'Willow', 'Raven'];
 /** A place's name, by rule from its site: "the Misty Stone circle". */
 export const placeName = (s) => `${NAME_A[s.variant % NAME_A.length]} ${KIND_NAMES[s.kind] ? KIND_NAMES[s.kind].toLowerCase() : s.kind}`.replace(/^./, (c) => c.toUpperCase());
@@ -140,6 +142,7 @@ export function initLandmarks() {
     mats.glass.emissiveIntensity = cur.eve * 1.6; // (windows lit at dusk)
     if (mats.rune) mats.rune.emissiveIntensity = cur.eve * 2.4; // (the stones' runes glow at night)
     for (const vs of made.windmill || []) if (vs) for (const c of vs.copies) if (c.site && c.sails) c.sails.rotation.z += dt * 0.5;
+    for (const vs of made.ship || []) if (vs) for (const c of vs.copies) if (c.site) { c.group.rotation.z = Math.sin(t * 0.6 + c.site.x) * 0.03; c.group.position.y = -0.05 + Math.sin(t * 0.8 + c.site.z) * 0.08; } // (riding the swell)
     for (const k of ['spring', 'volcano']) for (const vs of made[k] || []) if (vs) for (const c of vs.copies) if (c.site && c.steam) for (const sp of c.steam) {
       sp.userData.t = (sp.userData.t + dt * 0.12) % 1;
       const t = sp.userData.t, r = c.steamR * 0.6 * Math.sqrt(t);

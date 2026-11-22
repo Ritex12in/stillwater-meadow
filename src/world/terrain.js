@@ -175,7 +175,7 @@ function* fill(t) {
       if (pond) { pos[k * 3 + 1] = 0.02; nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }
       clm[k * 3] = cold; clm[k * 3 + 1] = dry; clm[k * 3 + 2] = pond;
       const bw = biomesAt(x, z, h, base, rain);
-      look[k * 4] = bw.desert; look[k * 4 + 1] = bw.swamp; look[k * 4 + 2] = bw.enchanted; look[k * 4 + 3] = bw.volcanic;
+      look[k * 4] = Math.max(bw.desert, bw.beach); look[k * 4 + 1] = bw.swamp; look[k * 4 + 2] = bw.enchanted; look[k * 4 + 3] = bw.volcanic;
       c.multiplyScalar(1 - lushOf(rain) * 0.16);
       if (textured) {
         // the grass patches become a tint around 1 (the texture brings the colour); weights go apart

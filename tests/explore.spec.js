@@ -140,7 +140,7 @@ test('the characters: you and your friend are VRoid characters, posed as you mov
   let c = await page.evaluate(() => window.__meadow.characters());
   expect(c.you).toBe('fumiriya');
   expect(c.friend).toBe('e');
-  expect(c.youBones, 'the bones it is posed by').toBe(15);
+  expect(c.youBones, 'the bones it is posed by').toBe(17);
   expect(c.heroShown, 'the old figure is hidden under it').toBe(false);
   // walking moves the legs
   const legs = () => page.evaluate(() => window.__meadow.characters().legX);

@@ -38,9 +38,9 @@ const gradient = (() => {
 })();
 function toon(m) {
   const alpha = m.transparent || m.alphaTest > 0 || (m.map && m.map.format === THREE.RGBAFormat && m.name && /Hair|Eye|Face|Brow|Lash|Line/i.test(m.name));
-  const t = new THREE.MeshToonMaterial({ map: m.map || null, color: m.map ? 0xffffff : m.color, gradientMap: gradient, side: m.side, alphaTest: alpha ? 0.45 : 0, transparent: false });
+  const t = new THREE.MeshToonMaterial({ map: m.map || null, color: m.color ? m.color.clone() : 0xffffff, gradientMap: gradient, side: m.side, alphaTest: alpha ? 0.45 : 0, transparent: false });
   t.skinning = !!m.skinning; t.morphTargets = !!m.morphTargets; t.morphNormals = !!m.morphNormals; // (three r128: a skinned or morphed mesh's material must say so)
-  if (m.emissiveMap) { t.emissiveMap = m.emissiveMap; t.emissive = new THREE.Color(0xffffff); }
+  if (m.emissiveMap && m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.01) { t.emissiveMap = m.emissiveMap; t.emissive = m.emissive.clone(); } // (only as much glow as the file gives it)
   if (t.map) t.map.encoding = THREE.sRGBEncoding;
   t.name = m.name;
   return t;
@@ -48,17 +48,19 @@ function toon(m) {
 
 const BONES = { hips: 'J_Bip_C_Hips', spine: 'J_Bip_C_Spine', chest: 'J_Bip_C_Chest', neck: 'J_Bip_C_Neck', head: 'J_Bip_C_Head',
   lArm: 'J_Bip_L_UpperArm', lFore: 'J_Bip_L_LowerArm', rArm: 'J_Bip_R_UpperArm', rFore: 'J_Bip_R_LowerArm',
-  lLeg: 'J_Bip_L_UpperLeg', lKnee: 'J_Bip_L_LowerLeg', rLeg: 'J_Bip_R_UpperLeg', rKnee: 'J_Bip_R_LowerLeg', lFoot: 'J_Bip_L_Foot', rFoot: 'J_Bip_R_Foot' };
+  lLeg: 'J_Bip_L_UpperLeg', lKnee: 'J_Bip_L_LowerLeg', rLeg: 'J_Bip_R_UpperLeg', rKnee: 'J_Bip_R_LowerLeg', lFoot: 'J_Bip_L_Foot', rFoot: 'J_Bip_R_Foot', lHand: 'J_Bip_L_Hand', rHand: 'J_Bip_R_Hand' };
+const FINGER = /^J_Bip_([LR])_(Index|Middle|Ring|Little|Thumb)([123])$/;
 
 /** Load a character by id: { id, root, set, ... }, or null if it cannot be loaded. */
 export async function loadCharacter(id) {
   const gltf = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}assets/characters/vroid/${id}.vrm`).catch((e) => { console.error('character', id, e); return null; });
   if (!gltf) return null;
   const model = gltf.scene;
-  const bones = {}, blink = [], toons = new Map();
+  const bones = {}, fingers = {}, blink = [], toons = new Map();
   const toonOf = (m) => { if (!toons.has(m)) toons.set(m, toon(m)); return toons.get(m); };
   model.traverse((o) => {
     for (const k in BONES) if (o.name === BONES[k]) bones[k] = o;
+    const f = FINGER.exec(o.name); if (f) fingers[f[1] + f[2] + (+f[3] - 1)] = o;
     if (o.isMesh) {
       o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
       o.material = Array.isArray(o.material) ? o.material.map(toonOf) : toonOf(o.material);
@@ -86,9 +88,9 @@ export async function loadCharacter(id) {
   root.updateMatrixWorld(true);
   const hipY = bones.hips.getWorldPosition(new THREE.Vector3()).y / SCALE; // (standing, in the model's own metres)
   const thigh = bones.lLeg.getWorldPosition(new THREE.Vector3()).distanceTo(bones.lKnee.getWorldPosition(new THREE.Vector3())) / SCALE;
-  const hips0 = bones.hips.position.clone();
+  const hips0 = bones.hips.position.clone(), legLen = hipY;
   const rest = {}; for (const k in bones) rest[k] = bones[k].rotation.clone();
-  return { id, root, inner, model, bones, rest, hips0, hipY, thigh, blink, phase: 0, t: 0, nextBlink: 2, blinkT: 0, w: {} };
+  return { id, root, inner, model, bones, fingers, rest, hips0, hipY, thigh, legLen, blink, phase: 0, t: 0, nextBlink: 2, blinkT: 0, w: {} };
 }
 /** Merge the skinned pieces under one parent that share a material and a skin. Returns old piece -> merged mesh. */
 function mergePieces(model) {
@@ -123,9 +125,35 @@ export function dropCharacter(c) {
   c.root.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); }); } });
 }
 
-// the pose: target angles per bone (x, y, z, in the model's own frame, facing -z) and a hip drop,
-// eased toward each frame
-const T = () => ({ hipsY: 0, hipsZ: 0, spine: [0, 0, 0], chest: [0, 0, 0], neck: [0, 0, 0], head: [0, 0, 0], lArm: [0, 0, 1.2], rArm: [0, 0, -1.2], lFore: [0, -0.25, 0], rFore: [0, 0.25, 0], lLeg: [0, 0, 0], rLeg: [0, 0, 0], lKnee: [0, 0, 0], rKnee: [0, 0, 0], lFoot: [0, 0, 0], rFoot: [0, 0, 0], lie: 0 });
+// The pose: target angles per bone (x, y, z, in the model's own frame: it faces -z, its left is -x),
+// a shift of the hips, how far the hands are closed, eased toward each frame. Angles: +x on a leg or
+// an arm swings it forward; on a shin, -x bends the knee; +x on a foot lifts the toes.
+const T = () => ({ hipsY: 0, hipsZ: 0, hipsX: 0, hips: [0, 0, 0], spine: [0, 0, 0], chest: [0, 0, 0], neck: [0, 0, 0], head: [0, 0, 0],
+  lArm: [0, 0, 1.42], rArm: [0, 0, -1.42], lFore: [0, -0.25, 0], rFore: [0, 0.25, 0], lHand: [0, 0, 0.04], rHand: [0, 0, -0.04],
+  lLeg: [0, 0, 0], rLeg: [0, 0, 0], lKnee: [0, 0, 0], rKnee: [0, 0, 0], lFoot: [0, 0, 0], rFoot: [0, 0, 0], grip: 0.15, lie: 0 });
+const POSED = ['hips', 'spine', 'chest', 'neck', 'head', 'lArm', 'rArm', 'lFore', 'rFore', 'lHand', 'rHand', 'lLeg', 'rLeg', 'lKnee', 'rKnee', 'lFoot', 'rFoot'];
+// a finger's three joints curl by these shares of the grip (index to little: the little finger curls most)
+const CURL = { Index: [0.55, 0.75, 0.5], Middle: [0.65, 0.85, 0.55], Ring: [0.7, 0.9, 0.6], Little: [0.75, 0.95, 0.65] };
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const bump = (a, w) => Math.exp(-(wrap(a) ** 2) / w); // (a soft peak where the phase reaches a point)
+
+/**
+ * One leg through the walking cycle, at phase `ph` (0: passing under the body going forward; PI/2:
+ * the heel strikes, as far forward as it goes; PI: passing under going back; -PI/2: the toes push off).
+ * Returns [thigh, knee bend, foot] in radians.
+ */
+function leg(ph, run, A) {
+  const s = Math.sin(ph), c = Math.cos(ph);
+  const thigh = A * s + (run ? 0.18 : 0.04);
+  // the knee bends most early in the swing (to clear the ground), a little as the heel takes the
+  // weight, and is nearly straight at the strike and under the body in the stance
+  const swing = Math.max(0, Math.cos(ph + (run ? 0.45 : 0.2))) ** 1.6;
+  const bend = (run ? 0.25 : 0.06) + (run ? 1.75 : 0.72) * swing + 0.22 * Math.max(0, s) * Math.max(0, -c) * 2;
+  // the foot stays level with the ground in the stance; the toes lift for the heel strike and point
+  // as they push off
+  const foot = -(thigh - bend) + 0.22 * bump(ph - Math.PI / 2, 0.12) - (run ? 0.7 : 0.5) * bump(ph + Math.PI / 2 - 0.15, 0.1);
+  return [thigh, bend, foot];
+}
 
 /**
  * Follow a figure each frame and pose to what it is doing. `p`: { x, y, z, rot, move (m/s),
@@ -138,63 +166,104 @@ export function followFigure(ch, p, dt, c) {
   ch.root.rotation.y = p.rot;
   const g = T(), s = Math.sin, t = ch.t;
   const speed = p.move || 0, run = speed > 3.2, sitting = p.seat && p.sitAmt > 0.5, ground = c.ground > 0.5;
+  let walking = false;
   if (p.lieAmt > 0.5) {
-    // lying on the back, looking up
-    g.lie = 1; g.lArm = [0, 0, 1.35]; g.rArm = [0, 0, -1.35];
+    // lying on the back, looking up, hands on the chest
+    g.lie = 1; g.lArm = [0.5, 0, 1.0]; g.rArm = [0.5, 0, -1.0]; g.lFore = [0, -1.6, 0]; g.rFore = [0, 1.6, 0];
   } else if (sitting) {
-    // on a seat: thighs level at the seat's height, shins down
+    // on a seat: thighs level at the seat's height, shins down, hands resting on the knees
     const top = (p.seat && p.seat.top) || 0.46;
     g.hipsY = -(ch.hipY - top / SCALE - 0.04);
-    g.lLeg = [1.5, 0, 0.05]; g.rLeg = [1.5, 0, -0.05]; g.lKnee = [-1.5, 0, 0]; g.rKnee = [-1.5, 0, 0];
-    g.lArm = [0.45, 0, 1.25]; g.rArm = [0.45, 0, -1.25]; g.lFore = [0, -0.7, 0]; g.rFore = [0, 0.7, 0];
-    g.spine = [0.05 * s(t * 1.4), 0, 0];
+    g.lLeg = [1.5, 0, 0.06]; g.rLeg = [1.5, 0, -0.06]; g.lKnee = [-1.45, 0, 0]; g.rKnee = [-1.45, 0, 0]; g.lFoot = [-0.05, 0, 0]; g.rFoot = [-0.05, 0, 0];
+    g.lArm = [0.55, 0, 1.22]; g.rArm = [0.55, 0, -1.22]; g.lFore = [0, -0.75, 0]; g.rFore = [0, 0.75, 0];
+    g.lHand = [0, 0, 0.35]; g.rHand = [0, 0, -0.35];
+    g.chest = [0.03 * s(t * 1.4), 0, 0]; g.head = [0.06, 0.2 * s(t * 0.21), 0];
   } else if (ground) {
-    // on the grass, legs out in front, leaning back on the hands
+    // on the grass, legs out in front with a knee up, leaning back on the hands
     g.hipsY = -(ch.hipY - 0.1 / SCALE); g.hipsZ = 0.25;
-    g.lLeg = [1.45, 0, 0.12]; g.rLeg = [1.45, 0, -0.12]; g.lKnee = [-0.25, 0, 0]; g.rKnee = [-0.25, 0, 0];
-    g.spine = [0.2, 0, 0]; g.lArm = [-0.5, 0, 1.05]; g.rArm = [-0.5, 0, -1.05];
+    g.lLeg = [1.4, 0, 0.12]; g.rLeg = [1.75, 0, -0.08]; g.lKnee = [-0.3, 0, 0]; g.rKnee = [-1.4, 0, 0];
+    g.spine = [0.2, 0, 0]; g.lArm = [-0.55, 0, 1.05]; g.rArm = [-0.55, 0, -1.05]; g.lFore = [0, -0.1, 0]; g.rFore = [0, 0.1, 0];
+    g.lHand = [0, 0, -0.9]; g.rHand = [0, 0, 0.9]; g.grip = 0.1;
   } else if (p.petAmt > 0.3 || p.pickT > 0) {
-    // crouching to pet an animal or pick something up
+    // crouching to pet an animal or pick something up, reaching out with the right hand
     const k = ch.thigh * 0.55;
-    g.hipsY = -k; g.lLeg = [1.3, 0, 0.1]; g.rLeg = [1.0, 0, -0.1]; g.lKnee = [-2.1, 0, 0]; g.rKnee = [-1.8, 0, 0];
-    g.spine = [-0.35, 0, 0]; g.rArm = [1.1 + 0.15 * s(t * 5), 0, -1.0]; g.rFore = [0, 0.4, 0];
+    g.hipsY = -k; g.lLeg = [1.3, 0, 0.12]; g.rLeg = [1.0, 0, -0.12]; g.lKnee = [-2.1, 0, 0]; g.rKnee = [-1.8, 0, 0]; g.lFoot = [0.75, 0, 0]; g.rFoot = [0.75, 0, 0];
+    g.spine = [-0.35, 0, 0]; g.rArm = [1.1 + 0.15 * s(t * 5), 0, -1.0]; g.rFore = [0, 0.3, 0]; g.rHand = [0.2 * s(t * 5), 0, 0]; g.grip = 0.1;
+    g.lArm = [0.5, 0, 1.2]; g.lFore = [0, -0.9, 0];
   } else if (c.act === 'fish') {
     // holding the rod out in front with both hands
-    g.lArm = [1.0, 0, 0.6]; g.rArm = [1.0, 0, -0.6]; g.lFore = [0, -0.9, 0]; g.rFore = [0, 0.9, 0];
+    g.lArm = [1.0, 0, 0.6]; g.rArm = [1.0, 0, -0.6]; g.lFore = [0, -0.9, 0]; g.rFore = [0, 0.9, 0]; g.grip = 1;
     g.spine = [-0.05, 0, 0];
   } else if (c.emote === 'cheer' || c.emote === 'dance') {
     const b = Math.abs(s(t * 7));
-    g.lArm = [0, 0, -1.1 + 0.2 * b]; g.rArm = [0, 0, 1.1 - 0.2 * b]; g.hipsY = 0.04 * b; g.head = [0.15, 0, 0];
+    g.lArm = [0, 0, -1.1 + 0.2 * b]; g.rArm = [0, 0, 1.1 - 0.2 * b]; g.lFore = [0, 0, 0]; g.rFore = [0, 0, 0]; g.hipsY = 0.04 * b; g.head = [0.15, 0, 0]; g.grip = 0.9;
   } else if (c.emote === 'wave') {
-    g.rArm = [0, 0, 1.2]; g.rFore = [0, 0, 0.5 * s(t * 9)];
+    g.rArm = [0.2, 0, 1.25]; g.rFore = [0, 0.2, 0.55 + 0.45 * s(t * 9)]; g.rHand = [0, 0, 0]; g.grip = 0.05;
   } else if (speed > 0.3) {
-    // walking or running: stride by distance, so the feet keep pace with the ground
-    const stride = run ? 1.5 : 0.95;
-    ch.phase += (speed * dt) / stride * Math.PI;
-    const ph = ch.phase, A = run ? 0.75 : 0.45, sw = s(ph);
-    g.lLeg = [A * sw, 0, 0]; g.rLeg = [-A * sw, 0, 0];
-    g.lKnee = [-(run ? 1.3 : 0.7) * Math.max(0, -s(ph - 0.6)), 0, 0]; g.rKnee = [-(run ? 1.3 : 0.7) * Math.max(0, s(ph - 0.6)), 0, 0];
-    g.lArm = [-(run ? 0.8 : 0.4) * sw, 0, 1.25]; g.rArm = [(run ? 0.8 : 0.4) * sw, 0, -1.25];
-    if (run) { g.lFore = [0, -1.2, 0]; g.rFore = [0, 1.2, 0]; }
-    g.hipsY = (run ? 0.05 : 0.025) * Math.abs(s(ph)) - (run ? 0.04 : 0);
-    g.spine = [run ? -0.18 : -0.04, 0.12 * sw, 0];
-    if (p.skating) { g.lArm = [0.2, 0, 0.7]; g.rArm = [0.2, 0, -0.7]; g.spine = [-0.25, 0, 0]; }
+    walking = true;
+    // the cycle goes by distance, a step at a time, so the feet keep pace with the ground
+    // (a step as long as the legs allow, and then a quicker pace: the meadow's walk is brisk)
+    const legW = ch.legLen * SCALE, step = Math.min(speed / (run ? 3.2 : 2.4), (run ? 1.5 : 1.15) * legW);
+    const A = run ? 0.78 : Math.min(0.6, Math.max(0.2, Math.asin(Math.min(0.95, step / (2 * legW))) * 0.95));
+    ch.phase += (speed * dt) / step * Math.PI;
+    const ph = ch.phase, L = leg(ph, run, A), R = leg(ph + Math.PI, run, A);
+    g.lLeg = [L[0], 0, 0.02]; g.lKnee = [-L[1], 0, 0]; g.lFoot = [L[2], 0, 0];
+    g.rLeg = [R[0], 0, -0.02]; g.rKnee = [-R[1], 0, 0]; g.rFoot = [R[2], 0, 0];
+    // the hips rise over the standing leg and dip as the weight passes from foot to foot, sway over
+    // the standing leg, turn with the leg going forward, and drop a little on the swinging side;
+    // the shoulders turn the other way, and the head keeps looking ahead
+    const yaw = (run ? 0.16 : 0.12) * s(ph);
+    const dip = ch.legLen * (1 - Math.cos(A)) * (run ? 0.7 : 0.9);
+    g.hipsY = -dip * (1 - Math.cos(2 * ph)) / 2 - (run ? 0.06 : 0.01);
+    g.hipsX = (run ? 0.012 : 0.022) * Math.cos(ph);
+    g.hips = [run ? -0.12 : -0.02, -yaw, 0.045 * Math.cos(ph)];
+    g.spine = [run ? -0.1 : 0.0, 0.55 * yaw, -0.03 * Math.cos(ph)];
+    g.chest = [0, 0.75 * yaw, 0];
+    g.neck = [run ? 0.12 : 0.03, -0.6 * yaw, 0]; g.head = [0.02, -0.5 * yaw, 0.02 * Math.cos(ph)];
+    // the arms swing with the other leg, a moment behind it, from the shoulder, the elbow bending
+    // more as the arm comes forward; when running they pump, bent at the elbow, hands loosely closed
+    const a = ph - 0.3, C = run ? 0.85 : 0.34, fwdL = Math.max(0, -s(a)), fwdR = Math.max(0, s(a));
+    g.lArm = [-C * s(a) + (run ? 0.15 : 0.02), 0.06 * s(a), run ? 1.25 : 1.4];
+    g.rArm = [C * s(a) + (run ? 0.15 : 0.02), 0.06 * s(a), run ? -1.25 : -1.4];
+    g.lFore = [0, -((run ? 1.45 : 0.22) + (run ? 0.25 : 0.42) * fwdL), 0];
+    g.rFore = [0, (run ? 1.45 : 0.22) + (run ? 0.25 : 0.42) * fwdR, 0];
+    g.lHand = [0, 0.08 * s(a), 0.06]; g.rHand = [0, 0.08 * s(a), -0.06];
+    g.grip = run ? 0.6 : 0.18;
+    if (p.skating) {
+      // gliding: a long push to one side, arms out for balance
+      g.lArm = [0.25, 0, 0.75 + 0.15 * s(ph)]; g.rArm = [0.25, 0, -0.75 + 0.15 * s(ph)]; g.spine = [-0.3, 0.2 * s(ph), 0]; g.hips = [-0.15, 0, 0];
+      g.lLeg = [0.25 + 0.3 * Math.max(0, s(ph)), 0, 0.15 * Math.max(0, -s(ph))]; g.rLeg = [0.25 + 0.3 * Math.max(0, -s(ph)), 0, -0.15 * Math.max(0, s(ph))];
+      g.lKnee = [-0.5, 0, 0]; g.rKnee = [-0.5, 0, 0]; g.lFoot = [0.25, 0, 0]; g.rFoot = [0.25, 0, 0]; g.hipsY = -0.06;
+    }
   } else {
-    // standing: breathing, and now and then a look about
+    // standing: breathing, the weight shifting slowly from foot to foot, now and then a look about
+    const shift = s(t * 0.45);
+    g.hipsX = 0.012 * shift; g.hips = [0, 0, 0.02 * shift]; g.spine = [0, 0, -0.02 * shift];
+    g.lKnee = [-0.04 - 0.05 * Math.max(0, shift), 0, 0]; g.rKnee = [-0.04 - 0.05 * Math.max(0, -shift), 0, 0];
     g.chest = [0.025 * s(t * 1.6), 0, 0];
-    g.head = [0, 0.25 * s(t * 0.23) * Math.max(0, s(t * 0.11)), 0];
-    g.lArm = [0, 0, 1.22 + 0.02 * s(t * 1.6)]; g.rArm = [0, 0, -1.22 - 0.02 * s(t * 1.6)];
+    g.head = [0.03, 0.25 * s(t * 0.23) * Math.max(0, s(t * 0.11)), 0];
+    g.lArm = [0.03, 0, 1.42 + 0.02 * s(t * 1.6)]; g.rArm = [0.03, 0, -1.42 - 0.02 * s(t * 1.6)];
   }
-  // ease the pose toward its targets
-  const k = Math.min(1, dt * 10);
-  for (const name of ['spine', 'chest', 'neck', 'head', 'lArm', 'rArm', 'lFore', 'rFore', 'lLeg', 'rLeg', 'lKnee', 'rKnee', 'lFoot', 'rFoot']) {
+  // ease toward the pose (quickly while walking, so the stride keeps its shape)
+  const k = Math.min(1, dt * (walking ? 22 : 9));
+  for (const name of POSED) {
     const b = ch.bones[name]; if (!b) continue;
     const r0 = ch.rest[name], v = g[name];
     b.rotation.set(b.rotation.x + (r0.x + v[0] - b.rotation.x) * k, b.rotation.y + (r0.y + v[1] - b.rotation.y) * k, b.rotation.z + (r0.z + v[2] - b.rotation.z) * k);
   }
   const hp = ch.bones.hips.position;
+  hp.x += (ch.hips0.x + g.hipsX - hp.x) * k;
   hp.y += (ch.hips0.y + g.hipsY - hp.y) * k;
   hp.z += (ch.hips0.z + g.hipsZ - hp.z) * k;
+  // the hands: fingers curled by the grip (relaxed, a loose fist, or closed on the rod), the thumb in toward them
+  ch.w.grip = (ch.w.grip === undefined ? g.grip : ch.w.grip) + (g.grip - (ch.w.grip === undefined ? g.grip : ch.w.grip)) * k;
+  const gr = 0.1 + 1.35 * ch.w.grip; // (relaxed: about 0.3 rad a joint; a fist: about 1.4)
+  for (const [side, sg] of [['L', 1], ['R', -1]]) {
+    for (const f in CURL) for (let i = 0; i < 3; i++) { const b = ch.fingers[side + f + i]; if (b) b.rotation.z = sg * CURL[f][i] * gr; }
+    const t1 = ch.fingers[side + 'Thumb0'], t2 = ch.fingers[side + 'Thumb1'];
+    if (t1) { t1.rotation.x = -0.25 * gr; t1.rotation.y = sg * -0.3 * gr; }
+    if (t2) t2.rotation.x = -0.25 * gr;
+  }
   // lying: the whole figure laid down on its back, feet where it stood
   ch.w.lie = damp(ch.w.lie || 0, g.lie, 5, dt);
   ch.inner.rotation.x = -ch.w.lie * Math.PI / 2;

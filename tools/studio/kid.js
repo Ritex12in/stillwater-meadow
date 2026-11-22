@@ -137,7 +137,7 @@ if (view === 'body') {
   cam.position.set(0, 1.42, 3.6); cam.lookAt(0, 1.3, 0);
 } else {
   // heads only, two rows of four
-  ['calm', 'happy', 'love', 'wow', 'think', 'sad', 'grit', 'sleepy'].forEach((name, i) => { const k = makeKid(KIDS[who]); k.face.set(name); k.head.position.set((i % 4 - 1.5) * 0.85, i < 4 ? 0.42 : -0.42, 0); k.head.rotation.y = (i % 2 ? -1 : 1) * 0.2; scene.add(k.head); kids.push(k); });
+  ['calm', 'happy', 'wow', 'think', 'worried', 'grit', 'sad', 'sleepy'].forEach((name, i) => { const k = makeKid(KIDS[who]); k.face.set(name); k.head.position.set((i % 4 - 1.5) * 0.85, i < 4 ? 0.42 : -0.42, 0); k.head.rotation.y = (i % 2 ? -1 : 1) * 0.2; scene.add(k.head); kids.push(k); });
   ground.visible = false;
   cam.position.set(0, 0.32, 4.2); cam.lookAt(0, 0.32, 0);
 }

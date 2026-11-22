@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, clamp, lerp, damp, rnd } from '../core/math.js';
-import { lakeT, lakeAt, lakeIce, onIce, waterAhead, animalWalkable, onDock } from '../core/shape.js';
+import { lakeT, lakeAt, lakeIce, lakeChill, groveAt, biomesAt, onIce, waterAhead, animalWalkable, onDock } from '../core/shape.js';
 import { std } from '../core/materials.js';
 import { clock } from '../core/clock.js';
 import { hooks, seasonState, world } from '../core/state.js';
@@ -49,7 +49,36 @@ export const SPECIES = [
   { id: 'minnow', name: 'Silver Minnow', color: '#c8d0d6', len: [5, 10], tier: 1, hint: 'Any time, near the shore', w: () => 1.5, fight: [[0.5, 1.6]], note: 'barely a flutter' },
   { id: 'koi', name: 'Golden Koi', color: '#f2a03a', len: [30, 62], tier: 3, hint: 'Rare, at dusk, deep water', w: () => (isDusk() ? 0.35 : 0.04), fight: [[1.4, 0.9], [0.7, 0.5], [1.4, 0.9], [2.0, 1.5]], note: 'graceful sweeps that quicken' },
   { id: 'burbot', name: 'Burbot', color: '#6a5a3a', len: [30, 60], tier: 2, hint: 'Through the winter ice', w: () => (icy() ? 4 : 0), fight: [[1.3, 1.1], [0.6, 0.9]], note: 'sluggish rolls' },
+  // fish of their own country (see countryOf)
+  { id: 'char', name: 'Arctic Char', color: '#c8604a', len: [25, 55], tier: 2, hint: 'Cold lakes of the north and the heights', w: () => 1.6, fight: [[0.8, 0.8], [1.4, 1.0]], note: 'cold, quick runs' },
+  { id: 'pupfish', name: 'Desert Pupfish', color: '#4f86d8', len: [4, 8], tier: 1, hint: 'Pools in the desert', w: () => 2.4, fight: [[0.4, 1.4]], note: 'a bright little flicker' },
+  { id: 'bowfin', name: 'Bowfin', color: '#55603e', len: [40, 80], tier: 3, hint: 'Dark swamp water', w: () => 1.8 + (isNight() ? 1 : 0), fight: [[2.0, 1.2], [0.6, 0.6], [2.4, 1.3]], note: 'thrashing, then heavy pulls' },
+  { id: 'glowfin', name: 'Moonlit Glowfin', color: '#7fe8ff', len: [18, 36], tier: 2, hint: 'Enchanted lakes, by night', w: () => (isNight() ? 3 : 0.1), fight: [[0.9, 0.7], [0.9, 0.7], [1.6, 1.2]], note: 'shimmering dashes' },
+  { id: 'ember', name: 'Ember Carp', color: '#e8502a', len: [35, 70], tier: 3, hint: 'Warm water by the volcano', w: () => 1.4, fight: [[2.4, 1.2], [1.2, 0.6]], note: 'hot-tempered runs' },
 ];
+/**
+ * How much a fish belongs to the lake you are fishing (its country): trout, pike and char in cold
+ * water; carp, catfish and bluegill in warm; bowfin and catfish in the swamp; koi by the blossom
+ * groves; the pupfish in desert pools; the glowfin and the ember carp only in their wonders.
+ */
+function countryOf(s, L) {
+  const c = Math.max(-0.6, Math.min(1, lakeChill(L))), cold = Math.max(0, c), warm = Math.max(0, -c) / 0.6, B = L.biomes || (L.biomes = biomesAt(L.x, L.z, 1)), grove = L.grove !== undefined ? L.grove : (L.grove = groveAt(L.x, L.z));
+  switch (s.id) {
+    case 'bluegill': return (1 - cold * 0.8) * (1 + warm * 0.5);
+    case 'perch': return 1 - cold * 0.4;
+    case 'carp': return (0.4 + warm * 1.2 + (L.clime ? L.clime.lush : 0)) * (1 - cold * 0.8);
+    case 'trout': return 0.5 + cold * 1.6 - warm * 0.4;
+    case 'catfish': return (1 + warm * 0.6 + B.swamp * 2) * (1 - cold * 0.8);
+    case 'pike': return 0.6 + cold * 1.2;
+    case 'koi': return 1 + grove * 6;
+    case 'char': return Math.max(0, cold - 0.25) * 3;
+    case 'pupfish': return B.desert > 0.3 ? 2 : 0;
+    case 'bowfin': return B.swamp > 0.3 ? 1.5 : 0;
+    case 'glowfin': return B.enchanted > 0.3 ? 2 : 0;
+    case 'ember': return B.volcanic > 0.3 ? 2 : 0;
+    default: return 1;
+  }
+}
 export const VALUE = { 1: 1, 2: 2, 3: 3 };           // trust a fish is worth to a cat or dog
 const BITE_WINDOW = { 1: 1.2, 2: 0.8, 3: 0.55 };    // seconds to strike once the float goes under
 const FIGHT_LEN = { 1: 5, 2: 10, 3: 18 };           // rough seconds to land, played well
@@ -74,7 +103,8 @@ function reelRateOf(sp) {
   return (1 / cycles + TAKE[sp.tier] * pull) / rest;
 }
 function pickSpecies(depthT) {
-  const ws = SPECIES.map((s) => (depthT > DEPTH[s.tier] ? 0 : Math.max(0, s.w()) * (icy() && s.id !== 'burbot' ? 0.4 : 1)));
+  const L = lakeAt(player.x, player.z);
+  const ws = SPECIES.map((s) => (depthT > DEPTH[s.tier] ? 0 : Math.max(0, s.w()) * Math.max(0, countryOf(s, L)) * (icy() && s.id !== 'burbot' ? 0.4 : 1)));
   let r = rnd() * ws.reduce((a, b) => a + b, 0);
   for (let i = 0; i < SPECIES.length; i++) { r -= ws[i]; if (r <= 0) return SPECIES[i]; }
   return SPECIES[6];

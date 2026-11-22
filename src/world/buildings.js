@@ -209,3 +209,55 @@ export function hotSpring(variant = 0) {
   for (let i = 0; i < 16; i++) { const a = (i / 16) * TAU + R() * 0.2, s = 0.45 + R() * 0.35; k.add(m.darkStone, new THREE.DodecahedronGeometry(s, 0).scale(1, 0.6, 1).translate(Math.cos(a) * (r + 0.3), 0.1, Math.sin(a) * (r + 0.3))); }
   return { group: k.build(), radius: r + 1, height: 1, steam: { r }, seats: [0, 1, 2].map((i) => ({ x: Math.cos(i * 2.1) * (r - 0.8), z: Math.sin(i * 2.1) * (r - 0.8), rot: i * 2.1 + Math.PI / 2, top: -0.15, warm: true })) };
 }
+
+// ───────────── wonders ─────────────
+/** A crystal grotto: great glowing crystal clusters round a sunken basin, and a pool at its heart. */
+export function crystalGrotto(variant = 0) {
+  const R = mulberry32(9500 + variant * 47), k = new Kit();
+  if (!M.crystal) M.crystal = new THREE.MeshStandardMaterial({ color: '#9fe8ff', roughness: 0.15, metalness: 0.2, emissive: '#5fd0ff', emissiveIntensity: 0.4, flatShading: true });
+  if (!M.crystalV) M.crystalV = new THREE.MeshStandardMaterial({ color: '#d6b0ff', roughness: 0.15, metalness: 0.2, emissive: '#b07cff', emissiveIntensity: 0.4, flatShading: true });
+  const n = 9 + Math.floor(R() * 5);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU + R() * 0.3, d = 9 + R() * 5, h = 3 + R() * 6, r = h * 0.16, tilt = 0.15 + R() * 0.35;
+    const g = new THREE.CylinderGeometry(0.001, r, h * 0.25, 6).translate(0, h * 1.125, 0);
+    const body = new THREE.CylinderGeometry(r, r * 1.1, h, 6).translate(0, h / 2, 0);
+    for (const q of [g, body]) { q.rotateZ(-tilt); q.rotateY(-a); q.translate(Math.cos(a) * d, -0.4, Math.sin(a) * d); }
+    const mat = R() < 0.6 ? M.crystal : M.crystalV;
+    k.add(mat, body); k.add(mat, g);
+  }
+  if (!M.pool) M.pool = new THREE.MeshStandardMaterial({ color: '#163a4a', roughness: 0.08, metalness: 0.4, emissive: '#1e6a8a', emissiveIntensity: 0.5 });
+  k.add(M.pool, new THREE.CircleGeometry(4.5, 20).rotateX(-Math.PI / 2).translate(0, 0.08, 0), false);
+  return { group: k.build(), radius: 15, height: 10 };
+}
+/** The volcano's top: a glowing lava lake in its crater (the cone itself is the land: core/shape.js), and smoke. */
+export function volcanoTop() {
+  const k = new Kit();
+  if (!M.lava) M.lava = new THREE.MeshStandardMaterial({ color: '#ff5a1f', emissive: '#ff3a0a', emissiveIntensity: 1.6, roughness: 0.6 });
+  k.add(M.lava, new THREE.CircleGeometry(30, 24).rotateX(-Math.PI / 2).translate(0, 1.5, 0), false);
+  return { group: k.build(), radius: 40, height: 10, steam: { r: 26 } };
+}
+
+/**
+ * Floating islands: a large one above an updraft (its flat grassy top is where you stand: `top`,
+ * local to the group) and smaller ones about it, rock beneath like an upturned cone, waterfalls
+ * pouring off their edges into the air; a ring of light on the ground marks the updraft.
+ */
+export function skyIsles(variant = 0) {
+  const R = mulberry32(9700 + variant * 53), k = new Kit(), m = buildingMats();
+  if (!M.isleGrass) M.isleGrass = weatherize(std('#7fb04e', { flatShading: true }), 'std');
+  if (!M.fall) M.fall = new THREE.MeshBasicMaterial({ color: '#dff3ff', transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+  if (!M.updraft) M.updraft = new THREE.MeshBasicMaterial({ color: '#bff4ff', transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false });
+  const isles = [{ x: 0, z: 0, y: 70 + R() * 25, r: 13 }];
+  for (let i = 0; i < 4; i++) { const a = R() * TAU, d = 28 + R() * 30; isles.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 55 + R() * 55, r: 4 + R() * 6 }); }
+  for (const is of isles) {
+    k.add(m.darkStone, new THREE.ConeGeometry(is.r, is.r * 1.9, 9).rotateX(Math.PI).translate(is.x, is.y - is.r * 0.95, is.z));
+    k.add(M.isleGrass, new THREE.CylinderGeometry(is.r * 1.02, is.r, 0.8, 12).translate(is.x, is.y - 0.4, is.z));
+    // a little tree or two
+    for (let t = 0; t < Math.round(is.r / 5); t++) { const a = R() * TAU, d = R() * is.r * 0.6, tx = is.x + Math.cos(a) * d, tz = is.z + Math.sin(a) * d; k.add(m.wood, new THREE.CylinderGeometry(0.15, 0.22, 2.2, 5).translate(tx, is.y + 1.1, tz)); k.add(M.isleGrass, new THREE.IcosahedronGeometry(1.4, 0).translate(tx, is.y + 2.8, tz)); }
+    // a waterfall off its edge: a long thin sheet hanging into the air
+    if (is.r > 5 || R() < 0.5) { const a = R() * TAU; k.add(M.fall, new THREE.PlaneGeometry(1.2 + is.r * 0.1, 40).translate(0, -20, 0).rotateY(-a + Math.PI / 2).translate(is.x + Math.cos(a) * is.r, is.y, is.z + Math.sin(a) * is.r), false); }
+  }
+  k.add(M.updraft, new THREE.RingGeometry(1.6, 2.4, 24).rotateX(-Math.PI / 2).translate(0, 0.15, 0), false);
+  k.add(M.updraft, new THREE.CylinderGeometry(2, 2, 14, 16, 1, true).translate(0, 7, 0), false);
+  return { group: k.build(), radius: 60, height: isles[0].y, top: { x: 0, z: 0, y: isles[0].y, r: isles[0].r - 1.2 } };
+}

@@ -16,12 +16,13 @@ export const OPTIONS = {
   grass: { label: 'Grass', choices: { low: ['Sparse', 0.35], medium: ['Medium', 0.65], high: ['Dense', 1] } },
   flowers: { label: 'Wildflowers', choices: { off: ['Off', false], on: ['On', true] } },
   forest: { label: 'Distant forest', choices: { off: ['Off', false], on: ['On', true] } },
+  view: { label: 'View distance', choices: { near: ['Near', 0], medium: ['Medium', 1], far: ['Far', 2] } }, // how far the land is drawn (about 0.7, 1.4 or 2.3 km)
 };
 export const PRESETS = {
-  low: { label: 'Low', resolution: 'low', shadows: 'low', effects: 'off', grass: 'low', flowers: 'off', forest: 'on' },
-  medium: { label: 'Medium', resolution: 'medium', shadows: 'medium', effects: 'off', grass: 'medium', flowers: 'on', forest: 'on' },
-  high: { label: 'High', resolution: 'high', shadows: 'high', effects: 'on', grass: 'high', flowers: 'on', forest: 'on' },
-  ultra: { label: 'Ultra', resolution: 'ultra', shadows: 'ultra', effects: 'on', grass: 'high', flowers: 'on', forest: 'on' },
+  low: { label: 'Low', resolution: 'low', shadows: 'low', effects: 'off', grass: 'low', flowers: 'off', forest: 'on', view: 'near' },
+  medium: { label: 'Medium', resolution: 'medium', shadows: 'medium', effects: 'off', grass: 'medium', flowers: 'on', forest: 'on', view: 'medium' },
+  high: { label: 'High', resolution: 'high', shadows: 'high', effects: 'on', grass: 'high', flowers: 'on', forest: 'on', view: 'medium' },
+  ultra: { label: 'Ultra', resolution: 'ultra', shadows: 'ultra', effects: 'on', grass: 'high', flowers: 'on', forest: 'on', view: 'far' },
 };
 const AUTO_ORDER = ['low', 'medium', 'high'];
 const KEYS = Object.keys(OPTIONS);

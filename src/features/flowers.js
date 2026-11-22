@@ -23,6 +23,8 @@ import { packActions } from '../ui/backpack.js';
 import { ICONS } from '../ui/icons.js';
 import { flowerName } from '../world/vegetation.js';
 import { flowersOut } from '../core/year.js';
+import { coldAt, height, moistAt, groveAt, biomesAt, snowCold } from '../core/shape.js';
+import { onPanel } from '../ui/hud.js';
 
 const MAX = 12, REGROW = 240;
 let debugView = () => [];
@@ -66,6 +68,21 @@ itemKind('bouquet', {
   icon: (it) => ICONS.bouquet(it.list.map((f) => String(f).split(':')[0])),
   detail: (it) => { const kinds = new Set(it.list.map((f) => String(f).split(':')[1])).size; return `${it.list.length} ${it.list.length === 1 ? 'flower' : 'flowers'} of ${kinds} ${kinds === 1 ? 'kind' : 'kinds'}. Hold it to give it: G by the skipper, your friend or the bench.`; },
 });
+
+/** A name for the kind of country at a spot, for the journals. */
+export function countryName(x, z) {
+  const h = height(x, z), c = coldAt(x, z, h), w = moistAt(x, z), B = biomesAt(x, z, h);
+  if (B.enchanted > 0.5) return 'the enchanted wood';
+  if (B.desert > 0.5) return 'the desert';
+  if (B.swamp > 0.5) return 'the swamp';
+  if (groveAt(x, z) > 0.6) return 'a blossom grove';
+  if (snowCold(c, w) > 0.55) return 'the snowfields';
+  if (c > 0.45) return 'the tundra';
+  if (c < -0.25) return w < 0.42 ? 'the warm dry hills' : 'the warm woods';
+  if (w < 0.4) return 'the heath';
+  if (w > 0.6) return 'the lush woods';
+  return 'the meadows';
+}
 
 export function initFlowers() {
   // `items`: the flowers of the squares near you (they change as you walk); `shown`: those of them
@@ -202,6 +219,20 @@ export function initFlowers() {
     nearDist = best;
   };
 
+  const flowerList = document.getElementById('flowerList');
+  if (flowerList) onPanel('journal', (open) => {
+    if (!open) return;
+    const fj = store.flowerJournal || {}, kinds = [0, 1, 2, 3, 4, 5, 6];
+    flowerList.replaceChildren(...kinds.map((k) => {
+      const j = fj[k], li = document.createElement('li');
+      li.className = j ? 'got' : '';
+      const sw = document.createElement('span'); sw.className = 'sw';
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = j ? flowerName(k) : 'Not yet picked';
+      const st = document.createElement('span'); st.className = 'st'; st.textContent = j ? `${j.n} picked · first in ${j.where}` : '';
+      li.append(sw, nm, st);
+      return li;
+    }));
+  });
   registerAction({
     id: 'give-friend', key: 'KeyG', keyLabel: 'G', score: () => 9,
     available: () => activity.free && !!giving() && friendNear(2.6),
@@ -257,6 +288,11 @@ export function initFlowers() {
     run: () => {
       const f = nearFlower;
       if (!f || !add('flower', f.kind, '#' + f.color.getHexString())) return;
+      // the flower journal: each kind, how many, and the country it was first found in
+      const fj = store.flowerJournal || (store.flowerJournal = {}), first = !fj[f.kind];
+      fj[f.kind] = fj[f.kind] || { n: 0, where: countryName(f.x, f.z) };
+      fj[f.kind].n++;
+      if (first) toast(`A new flower for your journal: ${flowerName(f.kind)}.`, 3);
       picked.set(f.id, clock.elapsed);
       redraw();
       player.pickT = 0.6;

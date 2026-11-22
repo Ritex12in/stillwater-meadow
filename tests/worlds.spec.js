@@ -86,19 +86,20 @@ test('the backpack holds what you carry in slots, and the compass points true: n
   const errors = await open(page, 'weather=clear&season=summer', '#12');
   await step(page, 0.5);
   // nothing carried yet
-  expect((await page.evaluate(() => window.__meadow.backpack())).every((x) => x === null)).toBe(true);
+  // (the backpack starts with a tent and lanterns: features/camp.js)
+  expect((await page.evaluate(() => window.__meadow.backpack())).filter(Boolean).map((t) => t.type)).toEqual(['tent', 'lantern']);
   await press(page, 'KeyI', 0.2);
   expect(await page.locator('#backpack').isVisible()).toBe(true);
   await expect(page.locator('#packGrid .slot')).toHaveCount(24);
-  await expect(page.locator('#packInfo')).toContainText('Nothing yet');
+  await expect(page.locator('#packInfo')).toContainText('Choose something');
   await press(page, 'KeyI', 0.2);
   // a rod and two fish of one kind: two slots, the fish stacked
   await page.evaluate(() => { const p = window.__meadow.pack; p.add('rod'); p.add('fish', 'perch', 20); p.add('fish', 'perch', 24); });
   const held = (await page.evaluate(() => window.__meadow.backpack())).filter(Boolean);
-  expect(held.map((t) => `${t.type} ${t.name} ${t.n}`)).toEqual(['rod Fishing rod 1', 'fish Yellow Perch 2']);
+  expect(held.map((t) => `${t.type} ${t.name} ${t.n}`)).toEqual(['tent Tent 1', 'lantern Lantern 8', 'rod Fishing rod 1', 'fish Yellow Perch 2']);
   await press(page, 'KeyI', 0.2);
-  await expect(page.locator('#packGrid .slot.full')).toHaveCount(2);
-  await page.locator('#packGrid .slot.full').nth(1).click();
+  await expect(page.locator('#packGrid .slot.full')).toHaveCount(4);
+  await page.locator('#packGrid .slot.full').nth(3).click();
   await expect(page.locator('#packInfo')).toContainText('20 cm, 24 cm');
   await press(page, 'KeyI', 0.2);
 
@@ -151,7 +152,7 @@ test('flowers go into the backpack: tie them into a bouquet there with the mouse
   // open the backpack, choose the flowers, tie a mixed bouquet
   await page.keyboard.press('KeyI');
   await step(page, 0.2);
-  await page.locator('#packGrid .slot.full').first().click();
+  await page.locator('#packGrid .slot.full:not([title="Tent"]):not([title="Lantern"])').first().click(); // (the flowers: past the tent and lanterns)
   await page.locator('#packInfo button', { hasText: 'Tie a mixed bouquet' }).click();
   const after = await page.evaluate(() => ({ flowers: window.__meadow.pack.count('flower'), held: window.__meadow.pack.held() }));
   expect(after.flowers, 'all four went into it').toBe(0);
@@ -163,12 +164,12 @@ test('flowers go into the backpack: tie them into a bouquet there with the mouse
   const b = await page.evaluate(() => window.__meadow.geo.bench());
   await teleport(page, b.x + Math.sin(b.rot) * 1.3, b.z + Math.cos(b.rot) * 1.3);
   await press(page, 'KeyG', 0.3);
-  expect(await page.evaluate(() => ({ bench: (window.__meadow.store.benchBouquet || []).length, left: window.__meadow.pack.view().filter(Boolean).length }))).toEqual({ bench: 4, left: 0 });
+  expect(await page.evaluate(() => ({ bench: (window.__meadow.store.benchBouquet || []).length, left: window.__meadow.pack.view().filter(Boolean).filter((it) => it.type !== 'tent' && it.type !== 'lantern').length }))).toEqual({ bench: 4, left: 0 });
   // a stack holds 32 flowers of a kind; a full backpack takes no more, and says so
   const full = await page.evaluate(() => {
     const p = window.__meadow.pack;
     for (let i = 0; i < 40; i++) p.add('flower', 0, '#ffffff');
-    const stacks = p.view().filter(Boolean).map((it) => it.n);
+    const stacks = p.view().filter((it) => it && it.type === 'flower').map((it) => it.n);
     for (let k = 0; k < 30; k++) p.add('cone');
     while (p.add('rod'));
     while (p.add('flower', 0, '#ffffff')); // (and the last stack of flowers)

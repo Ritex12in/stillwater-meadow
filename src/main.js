@@ -23,7 +23,7 @@ import { buildFarForest } from './world/farforest.js';
 import { chooseShrineSite, buildShrine, shrineNear } from './world/shrine.js';
 import { buildClouds, buildFireflies, buildButterflies, buildPollen, buildBirds, birds, birdMat, updateAmbientLife, tintClouds, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
 import { buildEffects, updateEffects } from './world/effects.js';
-import { player, buildPlayer, updatePlayer } from './characters/player.js';
+import { player, hero, buildPlayer, updatePlayer } from './characters/player.js';
 import { animals, buildAnimals, updateAnimal, separateAnimals, shakeDogs } from './characters/animals.js';
 import { registerPetting, updatePetting } from './characters/petting.js';
 import { buildBoat, updateBoat } from './characters/boat.js';
@@ -45,6 +45,10 @@ import { store, onSave, flush } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
 import { initWorldPanel, initPlaces } from './ui/world-panel.js';
 import { initBackpack, backpackView } from './ui/backpack.js';
+import { RIGGED, loadRigged, followPlayer } from './characters/rigged.js';
+import { initFoundPlaces, foundView } from './features/places.js';
+import { initCamp } from './features/camp.js';
+import { initLandmarks, landmarksView } from './world/landmarks.js';
 import * as pack from './systems/pack.js';
 import { initCompass, compassView } from './ui/compass.js';
 import { updateAnchor, moveAnchor, anchorId, settledAbout } from './systems/anchor.js';
@@ -152,6 +156,9 @@ function travelTo(x, z, faceX, faceZ) {
   updateLifeLake(0, x, z, true);
   shrineNear(x, z, true); // (and the shrine, if a site of its own is nearer here)
   settleGround(x, z); settleWilds(x, z); updateWater(x, z); updateLakeLife(x, z);
+  // your companions come with you: your friend if you walk together, and the dogs following you
+  if (friend && friend.st && friend.st.together) { friend.st.x = x + 1; friend.st.z = z + 0.5; friend.st.y = groundAt(x + 1, z + 0.5); }
+  for (const a of animals) if (a.state === 'follow') { const ang = Math.random() * Math.PI * 2; a.x = x + Math.cos(ang) * 2; a.z = z + Math.sin(ang) * 2; if (a.root) a.root.position.set(a.x, groundAt(a.x, a.z), a.z); }
   flush();
 }
 /** The lakes within reach, for the Places list and the tests. */
@@ -190,7 +197,7 @@ onQualityChange((o) => {
 window.addEventListener('resize', resize);
 
 // ── Features, each isolated so one failing can't take down the rest ──
-const features = { initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initWardrobe, initIceDance, initDanceCam, initDanceMusic, initFoley };
+const features = { initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initWardrobe, initIceDance, initDanceCam, initDanceMusic, initFoley };
 for (const [name, init] of Object.entries(features)) {
   try {
     const r = init();
@@ -299,6 +306,7 @@ export function tick(dt) {
   safe('time', () => { advanceTime(dt); applySky(); });
   safe('boat', () => updateBoat(dt, clock.elapsed, cur.eve, cur.day));
   safe('player', () => updatePlayer(dt, updatePetting));
+  if (rigged) safe('character', () => followPlayer(rigged, player, dt, { act: activity.current, ground: emoteState.ground, emote: emoteState.amt > 0.3 ? emoteState.shown : null }));
   safe('places', () => updateAnchor(dt));
   safe('lake life', () => updateLifeLake(dt, player.x, player.z));
   safe('camera', () => updateCamera(dt, player));
@@ -333,6 +341,7 @@ function frame(now) {
   // in the same frame; done after drawing, the cleared canvas would be shown for a frame as a black flicker)
   tickQuality(clamp(real, 0, 0.5));
   // the ground: choose the tiles round the camera, and spend a few milliseconds making new ones
+  const far = [1900, 3200, 3600][quality.opts.view === undefined ? 1 : quality.opts.view]; if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); } // (the view distance setting)
   updateGround(camera.position.x, camera.position.z);
   pumpGround(3);
   updateWilds(camera.position.x, camera.position.z);
@@ -345,6 +354,9 @@ advanceTime(0);
 applySky();
 updateBoat(0, 0, cur.eve, cur.day);
 updatePlayer(0, updatePetting);
+// the imported character (?hero=kaykit): shown to the owner before anything is rewired to it
+let rigged = null;
+if (RIGGED) loadRigged('Rogue').then((r) => { if (!r) return; rigged = r; hero.root.visible = false; window.__meadow.rigged = { clips: r.clips }; });
 updateCamera(0, player);
 updateDetail(camera, camTarget);
 settleGround(camera.position.x, camera.position.z);
@@ -364,6 +376,7 @@ window.__meadow = {
   geo: { get lakePoint() { return lakePoint; }, lakeT, walkable, dockAt, dockDir, onDock, FIRE_SPOT, BENCH_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') }, // (lakePoint: whichever lake the landmarks stand at)
   seed: WORLD.seed,
   backpack: backpackView,
+  found: foundView, landmarks: landmarksView,
   /** The backpack's contents and the ways to change them (systems/pack.js). */
   pack: { view: pack.packView, add: pack.add, addItem: pack.addItem, take: pack.take, count: pack.count, hold: pack.hold, held: pack.held, fish: () => pack.units('fish').map((u) => ({ id: u.key, cm: u.unit })), tie: (kinds) => world.tieBouquet(kinds) },
   compass: compassView,

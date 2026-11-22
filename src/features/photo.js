@@ -24,6 +24,10 @@ const FILTERS = [
 let on = false, filter = 0, saved = null;
 export const photoOn = () => on;
 
+const photoListeners = [];
+/** Call `fn(canvas)` with each photo saved (features/places.js makes postcards of them). */
+export const onPhoto = (fn) => photoListeners.push(fn);
+
 export function initPhoto(renderNow) {
   const bar = document.getElementById('photoBar');
   const nameEl = document.getElementById('photoFilter');
@@ -85,6 +89,7 @@ export function initPhoto(renderNow) {
       for (let i = 0; i < px.length; i += 4) { const n = (Math.random() - 0.5) * 18; px[i] += n; px[i + 1] += n; px[i + 2] += n; }
       g.putImageData(img, 0, 0);
     }
+    for (const fn of photoListeners) { try { fn(out); } catch (e) { console.error('photo', e); } }
     const d = new Date(), pad = (n) => String(n).padStart(2, '0');
     const name = `stillwater-meadow-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.png`;
     out.toBlob((blob) => {

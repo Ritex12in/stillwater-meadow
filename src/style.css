@@ -236,6 +236,12 @@ body.photo-mode > *:not(#world):not(.photo-bar):not(.photo-vignette):not(.photo-
 .pack-info { display: grid; gap: 6px; margin-top: 12px; min-height: 64px; font-size: 13px; color: var(--ink-soft); }
 .pack-info b { color: var(--ink); font-size: 14px; }
 .pack-info .row { display: flex; gap: 6px; flex-wrap: wrap; }
+.catches.places-found li { grid-template-columns: minmax(0, 1fr) auto auto; }
+.postcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.postcards figure { margin: 0; padding: 6px 6px 4px; background: #f4ecdc; border-radius: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); transform: rotate(-0.6deg); }
+.postcards figure:nth-child(even) { transform: rotate(0.8deg); }
+.postcards img { display: block; width: 100%; border-radius: 2px; }
+.postcards figcaption { font: italic 600 12px var(--font-display); color: #4a3c2c; padding-top: 4px; }
 .catches.pets li { grid-template-columns: 18px minmax(0, 1fr); row-gap: 2px; }
 .catches.pets .sw { width: auto; height: auto; border: 0; border-radius: 0; font-size: 14px; line-height: 1; }
 .catches.pets .st { grid-column: 2; text-align: left; }

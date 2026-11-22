@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { smooth, fbm } from '../core/math.js';
 import { SEASON_GLSL, seasonU } from '../core/year.js';
+import { quality } from '../systems/quality.js';
 import { biomesAt } from '../core/biome.js';
 import { wxU, neonU } from '../core/materials.js';
 import { height, lakeAt, setGroundSampler, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf } from '../core/shape.js';
@@ -220,13 +221,14 @@ function release(t) {
   tiles.delete(t.key);
 }
 
+/** How far the land is drawn (the view distance setting, systems/quality.js): 0 near (the second-largest tiles, 3 x 3), 1 (the largest, 3 x 3), 2 far (the largest, 5 x 5). */
 /** Once a frame: choose which tiles are on show round (x, z), and queue the ones still to be made. */
 export function updateGround(x, z) {
   frameNo++; camX = x; camZ = z;
   const next = new Set(), was = shown;
   shown = next;
-  const top = LEVELS - 1, s = tileSize(top), rx = Math.floor(x / s), rz = Math.floor(z / s);
-  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) select(tileAt(top, rx + dx, rz + dz));
+  const reach = quality.opts.view === undefined ? 1 : quality.opts.view, top = reach === 0 ? LEVELS - 2 : LEVELS - 1, n = reach === 2 ? 2 : 1, s = tileSize(top), rx = Math.floor(x / s), rz = Math.floor(z / s);
+  for (let dz = -n; dz <= n; dz++) for (let dx = -n; dx <= n; dx++) select(tileAt(top, rx + dx, rz + dz));
   was.forEach((t) => { if (!next.has(t) && t.part) t.part.mesh.visible = false; });
   next.forEach((t) => { t.part.mesh.visible = true; });
   // tiles nobody has asked about for a while go back to the pool (not the one being made)

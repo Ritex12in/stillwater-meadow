@@ -128,6 +128,37 @@ export function updatePlayer(dt, petting) {
     if ((!player.slide.rescue && mag > 0.05) || left < 0.05) { player.slide = null; rescued = false; }
   }
 
+  // on a floating island: walk its flat top, its edge stops you
+  if (player.floor) {
+    const f = player.floor;
+    if (mag > 0.05) {
+      const nx = player.x + dx * speed * dt, nz = player.z + dz * speed * dt;
+      if (Math.hypot(nx - f.x, nz - f.z) < f.r) { player.x = nx; player.z = nz; }
+      player.rot = turnTo(player.rot, Math.atan2(dx, dz), dt * 9);
+    }
+    player.move = damp(player.move, mag > 0.05 ? speed : 0, 8, dt);
+    player.y = damp(player.y, f.y, 14, dt);
+    poseHero(dt);
+    return;
+  }
+  // on a frozen lake you skate: you gather speed, and glide on when you let go
+  const skating = !player.slide && onIce(player.x, player.z);
+  player.skating = skating;
+  if (skating) {
+    const k = mag > 0.05 ? 1.4 : 0.35; // (pushing off, or gliding)
+    player.vx = damp(player.vx || 0, mag > 0.05 ? dx * speed * 1.4 : 0, k, dt);
+    player.vz = damp(player.vz || 0, mag > 0.05 ? dz * speed * 1.4 : 0, k, dt);
+    const v = Math.hypot(player.vx, player.vz), nx = player.x + player.vx * dt, nz = player.z + player.vz * dt;
+    if (walkable(nx, player.z)) player.x = nx; else player.vx *= -0.3;
+    if (walkable(player.x, nz)) player.z = nz; else player.vz *= -0.3;
+    if (v > 0.2) player.rot = turnTo(player.rot, Math.atan2(player.vx, player.vz), dt * 5);
+    player.move = damp(player.move, Math.min(v, 4), 6, dt);
+    const floor0 = player.slide ? player.slide.minY : -99;
+    player.y = damp(player.y, Math.max(groundAt(player.x, player.z), ICE_Y, floor0), 14, dt);
+    poseHero(dt);
+    return;
+  }
+  player.vx = 0; player.vz = 0;
   if (mag > 0.05 && !(player.slide && player.slide.rescue)) {
     const nx = player.x + dx * speed * dt, nz = player.z + dz * speed * dt;
     if (walkable(nx, player.z)) player.x = nx;

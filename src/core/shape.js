@@ -260,6 +260,7 @@ export function height(x, z) {
   if (shaped) return h;
   const s = shrineSiteAt(x, z, PAD_OUT);
   if (s) return h + (s.y - h) * (1 - smooth(PAD_FLAT, PAD_OUT, Math.hypot(x - s.x, z - s.z)));
+  if (sitesReady) { const v = volcanoAt(x, z); if (v) return h + coneRise(Math.hypot(x - v.x, z - v.z)); }
   const b = sitesReady ? siteAt(x, z) : null; // (a building's levelled ground)
   if (b && b.out > 0) return h + (b.y - h) * (1 - smooth(b.flat, b.out, Math.hypot(x - b.x, z - b.z)));
   return h;
@@ -614,16 +615,39 @@ export function biomeAt(x, z, h, min = 0.5) {
 // of every lake, of the shrines and of the start. `flat`/`out`: the levelled ground's radii.
 const SITE_KINDS = {
   // a pagoda in a blossom grove
-  pagoda: { cell: 560, flat: 10, out: 18, salt: 0x9A60D, tries: 10, rule: (x, z, h) => groveAt(x, z) > 0.6 && h > 1 && h < 45 },
+  pagoda: { cell: 700, flat: 10, out: 18, salt: 0x9A60D, tries: 10, chance: 0.6, rule: (x, z, h) => groveAt(x, z) > 0.6 && h > 1 && h < 45 },
   // a castle on a hilltop in mild, open country
-  castle: { cell: 1500, flat: 20, out: 34, salt: 0x2C451E, tries: 16, rule: (x, z, h) => Math.abs(coldBase(x, z)) < 0.2 && rangeAt(x, z) < 0.15 && h > 8 && h < 60 && hilltop(x, z, h) > 5 },
+  castle: { cell: 1500, flat: 20, out: 34, relief: 10, salt: 0x2C451E, tries: 16, chance: 0.6, rule: (x, z, h) => Math.abs(coldBase(x, z)) < 0.2 && rangeAt(x, z) < 0.15 && h > 8 && h < 60 && hilltop(x, z, h) > 5 },
   // ruins: in the plains, and sandstone ones in the desert
-  ruin: { cell: 760, flat: 7, out: 12, salt: 0x5017, tries: 10, chance: 0.6, rule: (x, z, h) => h > 1 && h < 50 && (biomesAt(x, z, h).desert > 0.5 || (rangeAt(x, z) < 0.2 && Math.abs(coldBase(x, z)) < 0.25)) },
+  ruin: { cell: 900, flat: 7, out: 12, salt: 0x5017, tries: 10, chance: 0.35, rule: (x, z, h) => h > 1 && h < 50 && (biomesAt(x, z, h).desert > 0.5 || (rangeAt(x, z) < 0.2 && Math.abs(coldBase(x, z)) < 0.25)) },
   // a hut on stilts in the swamp (no levelled ground: it stands over the water)
   hut: { cell: 420, flat: 0, out: 0, salt: 0x4D7, tries: 12, rule: (x, z, h) => h < 4 && biomesAt(x, z, h).swamp > 0.5 },
   // a windmill on an open, windy rise
   windmill: { cell: 980, flat: 6, out: 12, salt: 0x3111, tries: 12, chance: 0.7, rule: (x, z, h) => h > 14 && h < 70 && rangeAt(x, z) < 0.35 && Math.abs(coldBase(x, z)) < 0.3 && hilltop(x, z, h) > 3 },
+  // places to find: a ring of standing stones on a hilltop; a cairn on a summit; a hot spring in the snow
+  circle: { cell: 1250, flat: 9, out: 15, salt: 0x51C1E, tries: 14, chance: 0.75, rule: (x, z, h) => h > 10 && h < 90 && hilltop(x, z, h) > 7 },
+  cairn: { cell: 1100, flat: 3, out: 6, relief: 60, salt: 0xCA12, tries: 20, chance: 0.4, rule: (x, z, h) => h > 90 && hilltop(x, z, h) > 22 },
+  spring: { cell: 900, flat: 4, out: 8, salt: 0x5B21, tries: 14, chance: 0.4, rule: (x, z, h) => h > 2 && h < 90 && snowOf(coldAt(x, z, h)) > 0.5 },
+  // an ice castle on a snowy height
+  icecastle: { cell: 1700, flat: 20, out: 34, relief: 20, salt: 0x1CE, tries: 24, chance: 0.8, rule: (x, z, h) => h > 6 && h < 170 && snowOf(coldAt(x, z, h)) > 0.55 && hilltop(x, z, h) > 2 },
+  // a crystal grotto: a basin sunk into the ground and ringed with great glowing crystals (in a wonder)
+  grotto: { cell: 1300, flat: 11, out: 24, sink: 6, salt: 0x6207, tries: 12, rule: (x, z, h) => h > 3 && h < 80 && wonderAt(x, z).a > 0.35 },
+  // a volcano: a great cone with a crater, raised in a wonder in the mountains (no levelled ground: its cone, see height())
+  volcano: { cell: 2200, flat: 0, out: 0, cone: 430, salt: 0xB01C, tries: 10, rule: (x, z, h) => wonderAt(x, z).b > 0.55 && rangeAt(x, z) > 0.2 },
+  // floating islands over a wonder in the hills, an updraft below to ride up
+  skyisle: { cell: 1900, flat: 6, out: 11, salt: 0x5C15, tries: 12, rule: (x, z, h) => h > 4 && h < 90 && wonderAt(x, z).a > 0.3 && rangeAt(x, z) < 0.45 },
 };
+/** The volcano's cone: how much it raises the land (m) at a distance `r` from its middle; a crater at the top. */
+export const VOLCANO = { height: 160, radius: 430, crater: 58, deep: 46 };
+const coneRise = (r) => (r >= VOLCANO.radius ? 0 : VOLCANO.height * (1 - r / VOLCANO.radius) ** 1.6 - (r < VOLCANO.crater ? VOLCANO.deep * (1 - (r / VOLCANO.crater) ** 2) : 0));
+let lastVolcano = null;
+/** The volcano whose cone reaches a spot, or null. */
+function volcanoAt(x, z) {
+  const K = SITE_KINDS.volcano, cx = Math.floor(x / K.cell), cz = Math.floor(z / K.cell);
+  if (!lastVolcano || lastVolcano.cx !== cx || lastVolcano.cz !== cz) lastVolcano = { cx, cz, s: siteOfCell('volcano', cx, cz) };
+  const s = lastVolcano.s;
+  return s && (x - s.x) ** 2 + (z - s.z) ** 2 < VOLCANO.radius * VOLCANO.radius ? s : null;
+}
 /** How much higher a spot is than the ground about it (m, the mean of eight looks 70 m out). */
 function hilltop(x, z, h) {
   let s = 0;
@@ -645,14 +669,14 @@ function siteOfCell(kind, cx, cz) {
       const h = rawHeight(x, z);
       if (!K.rule(x, z, h)) continue;
       if (K.flat > 0 && !clearOfLakes(x, z)) continue;
-      if (K.flat === 0 && lakeAt(x, z).t(x, z) < 2.2) continue;
+      if (K.flat === 0 && lakeAt(x, z).t(x, z) < (K.cone ? 12 : 2.2)) continue;
       const relief = K.flat > 0 ? reliefAt(x, z, h) : 0;
-      if (relief > 6) continue;
+      if (relief > (K.relief || 6)) continue; // (how far the ground about may rise or fall: a summit's cairn allows a steep one)
       const near = shrineSitesNear(x, z, 80);
       if (near.length) continue;
       if (!best || relief < best.relief) best = { x, z, h, relief, turn, variant };
     }
-    if (best) site = { id: key, kind, x: best.x, z: best.z, y: best.h, turn: best.turn * TAU, variant: Math.floor(best.variant * 1000), flat: K.flat, out: K.out };
+    if (best) site = { id: key, kind, x: best.x, z: best.z, y: best.h - (K.sink || 0), turn: best.turn * TAU, variant: Math.floor(best.variant * 1000), flat: K.flat, out: K.out };
   }
   siteCells.set(key, site);
   return site;

@@ -45,6 +45,14 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
     two (like the gentle weather cycles of cosy games), not days. Fog goes by the time of day where
     you play (your clock), since day and night do.
   - Tests are held at summer unless they ask for a season (the year turns every 8 days).
+  - Biomes and buildings: buildings are rare enough to be finds (one castle in about 7 km2); the
+    start (450 m round home) is always ordinary country; the floating islands and grottos sit in
+    the enchanted wonder pockets, the volcano in the other kind.
+  - Characters: the CC0 KayKit Adventurers pack (on GitHub, so it could be fetched without the owner)
+    was chosen over code-made ones, the owner having disliked the code-made children's proportions,
+    face, hair and animation; it is behind `?hero=kaykit` until the owner has seen it, as the plan
+    for milestone 6 says. Its adventurers fit the fantasy world.
+  - The backpack starts with a tent and 8 lanterns (places you make need them).
 - **Worlds and carrying (2026-11-22):** seeds as in Minecraft: any text is a seed, the same text
   the same world, a new player gets a random one. The backpack is a real inventory of slots
   (flowers, later tools and other things); bouquets are tied from flowers in it.
@@ -391,6 +399,49 @@ fixed by the seed, on ground levelled for them (the shrine's method), kept clear
 **Risks.** Code-made buildings must reach the mood board's charm in the game's low-poly style: show
 the owner each new kind of piece early. Draw cost: biome edges, glow and far structures need
 budgets checked on the owner's machine. The scope is many milestones; each lands playable.
+
+## How the biomes, buildings and places work (built 2026-11-22, overnight)
+
+- **Biomes** (`core/biome.js`, functions in `core/shape.js`): `biomesAt(x, z, h)` gives desert,
+  swamp, enchanted and volcanic weights from the broad fields (temperature with its warm side,
+  moisture, ruggedness `rangeAt`, the rare `wonderAt` field: two kinds of pocket, a and b), none
+  within about 450 m of home. The ground carries them in a `look` vertex attribute and shows rippled
+  sand, dark peat, blue-green moss with glowing specks at night, black rock with lava cracks (no
+  snow lies on it). The grass keeps off sand and thins in the swamp. The wilds: no woods in the
+  desert, giants (a new family grown in code, 1.7 times the size) in the enchanted wood, willows (also
+  new) in the swamp; `growBiome` per near square gives cacti, crystals, glowing mushrooms, still
+  pools and lotus (`world/biomethings.js`, made in `world/makers.js`). Fish by country
+  (`features/fishing.js countryOf`): the old fish lean to their country, and five new ones live only
+  in theirs (Arctic char, desert pupfish, bowfin, moonlit glowfin, ember carp). In world 1 within 6 km:
+  desert about 6% of the land, swamp 3%, volcanic 2%, enchanted 1%.
+- **Sky**: the northern lights over cold country on clear nights (`world/sky.js auroraSky`);
+  petals drift in blossom groves; fireflies in the enchanted wood in any season.
+- **Building sites** (`SITE_KINDS` in `core/shape.js`): one or none to a square of each kind's
+  size, each kind by its own rule, on ground levelled for it (`height()`), clear of lakes, shrines
+  and the start, and kept clear of plants (`clearingAt`): pagodas (blossom groves), castles (mild
+  hilltops), ruins (plains; sandstone in the desert), stilt huts (swamp), windmills (open rises),
+  stone circles (hilltops, runes glow at night), summit cairns (with a bench), hot springs (snow
+  country, steaming, to sit in), ice castles (snowy heights), crystal grottos (a basin sunk 6 m, in a
+  wonder), floating islands (a wonder in the hills: an updraft lifts you onto the main island, its
+  edge stops you, glide back down from its middle), and the volcano (a 160 m cone with a crater and
+  a lava lake, raised in a volcanic wonder, smoking). World 1 within 5 km: 17 ruins, 14 springs, 12
+  cairns, 10 windmills, 9 castles, 9 pagodas, 8 ice castles, 4 grottos, 3 stilt huts, 3 floating
+  islands, 2 stone circles, 2 volcanoes. Buildings are made in code (`world/buildings.js`), a few
+  variants each, copies sharing their geometry, set down at the nearest sites (`world/landmarks.js`),
+  with blockers round their footprints and seats where there are seats.
+- **Places found** (`features/places.js`): coming within reach of a lake, a shrine, a building or
+  your camp finds it (per world, `store.found`); the journal lists them with a Go button (that is how
+  you find places again: milestone 5); a photo near one also makes a postcard for the album (the last
+  30, in the journal). When you travel, your friend (walking with you) and following dogs come too.
+- **Places you make** (`features/camp.js`): the backpack starts with a tent and 8 lanterns. Pitch the
+  tent from the backpack (one camp a world, on the compass and in the journal); set lanterns down to
+  mark a trail (they glow at night) and pick them up again (E).
+- **Skating**: on ice you gather speed and glide on (`characters/player.js`). Ice fishing was there.
+- **Flower journal**: each kind picked, how many, and the country where first found.
+- **View distance** (Settings): near (about 0.7 km of land), medium (1.4 km), far (2.3 km).
+- **Imported character** (`characters/rigged.js`, `?hero=kaykit`): KayKit's Rogue (CC0, licence in
+  `public/assets/characters/kaykit/`), 76 animations, following the player with walk, run, sit, lie,
+  cheer, pick-up and petting animations. Off unless asked for, for the owner to judge first.
 
 ## How seasons and weather work (built 2026-11-22)
 

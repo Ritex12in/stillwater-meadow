@@ -10,6 +10,7 @@ import { HOME, lakesNear, shrineSitesNear } from '../core/shape.js';
 import { hooks } from '../core/state.js';
 import { player } from '../characters/player.js';
 import { toast } from './hud.js';
+import { store } from '../systems/save.js';
 
 const $ = (id) => document.getElementById(id);
 const SPAN = 180;  // degrees of horizon across the strip
@@ -25,6 +26,7 @@ export function marksFrom(x, z) {
   const out = [];
   const home = Math.hypot(HOME.x - x, HOME.z - z);
   if (home > 60) out.push({ key: 'lake:home', name: HOME.name, x: HOME.x, z: HOME.z, kind: 'home' });
+  if (store.camp && Math.hypot(store.camp.x - x, store.camp.z - z) > 25) out.push({ key: 'camp', name: 'Your camp', x: store.camp.x, z: store.camp.z, kind: 'home' });
   const shrine = shrineSitesNear(x, z, 2500)[0];
   if (shrine && Math.hypot(shrine.x - x, shrine.z - z) > 30) out.push({ key: 'shrine:' + shrine.id, name: shrine.name, x: shrine.x, z: shrine.z, kind: 'shrine' });
   for (const L of lakesNear(x, z, 1500)) {

@@ -192,7 +192,7 @@ test('the shrine stands at the shrine site nearest you: level ground the land ke
     let lakeGap = 0, looked = 0;
     for (const L of m.lakes(3500)) for (let k = 0; k < 150; k++) {
       const a = k * 0.61, d = L.rmax * 1.9 * ((k % 15) + 1) / 15, x = L.x + Math.cos(a) * d, z = L.z + Math.sin(a) * d;
-      if (g.lakeT(x, z) > 1.65) continue;
+      if (g.lakeT(x, z) > 1.65 || g.riverNear(x, z)) continue; // (a river cuts its mouth into a lake's shore: that is rivers, not shrines)
       looked++; lakeGap = Math.max(lakeGap, Math.abs(g.height(x, z) - m.rawHeight(x, z)));
     }
     let apart = Infinity;

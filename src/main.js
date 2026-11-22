@@ -6,7 +6,7 @@ import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug, query } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU, updateDetail, neonU } from './core/materials.js';
-import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, moistAt, snowCold, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME, landNear } from './core/shape.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, moistAt, snowCold, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME, landNear, riverNear } from './core/shape.js';
 import { hooks, seasonState, seats, world, obstacles } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU } from './world/sky.js';
@@ -376,7 +376,7 @@ window.__meadow = {
   get undergrowth() { return world.undergrowth; }, trees: () => treeSpots, get shrine() { return world.shrine; }, get shrineStands() { return world.shrineStands; }, blockedAt: (x, z) => obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r), tick, player, animals, activity, wx, timeCtl, seasonState, store, ferry, boatSeat, BOARD_POINT, camState, fire, quality, audio, moonDir, sunDir, solar, rng, get renderer() { return renderer; },
   actions: () => evaluateActions().map((a) => ({ id: a.id, key: a.key, label: a.label(), disabled: !!(a.disabled && a.disabled()) })),
   fishing: fishingState, fishingInfo, ducks: duckState, season: seasonNow, photoSaves: photoSaveCount, flowers: flowerView, rod: rodView, pets: petsView, fetch: fetchView, friend: friendView, get friendSt() { return friend && friend.st; }, dance: danceView, snowman: snowmanView, emote: playEmote, emoteState, toast,
-  geo: { get lakePoint() { return lakePoint; }, lakeT, walkable, dockAt, dockDir, onDock, FIRE_SPOT, BENCH_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') }, // (lakePoint: whichever lake the landmarks stand at)
+  geo: { get lakePoint() { return lakePoint; }, lakeT, riverNear, walkable, dockAt, dockDir, onDock, FIRE_SPOT, BENCH_SPOT, height, heightAt, bench: () => seats.find((s) => s.name === 'bench') }, // (lakePoint: whichever lake the landmarks stand at)
   seed: WORLD.seed,
   backpack: backpackView,
   found: foundView, landmarks: landmarksView, signs: signsNear,

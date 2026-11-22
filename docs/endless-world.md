@@ -66,6 +66,12 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
 - **Testing:** run only new or affected tests after a change; full runs when asked, at 4c, and
   before merging to `main`.
   Last full run: 2026-11-22, after the sculpted children were redrawn and VRoid removed: 60 passed, 0 failed.
+  Full run 2026-11-23, after rivers, islands, bridges, stones, the new pets and skipper, the sheet extras and the
+  performance work: 61 passed, 3 failed, all three since fixed and passing by name: the shrine test assumed no lake
+  shore differs from the raw land (rivers now cut their mouths into shores: it skips river mouths); the rod-for-a-
+  bouquet test assumed every one of its twelve flower picks took (now it checks each and tries the next flower; it
+  had failed about one run in five, the skipper rightly refusing a bouquet short of twelve stems); the seasons test
+  timed out once clicking the World button (passed on its own).
 - **Planning round (2026-11-21, second):**
   - **Goals:** journals to complete (fish, flowers and places, a page per kind of country) and
     postcards (an album filled by finding kinds of place, taken with photo mode).

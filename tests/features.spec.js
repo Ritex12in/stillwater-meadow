@@ -67,21 +67,30 @@ test('the skipper trades his rod for a full bouquet of three kinds, not before',
   expect((await actions(page)).map((a) => a.id)).not.toContain('fish-cast');
   // (three kinds, chosen once: the three with the most flowers about)
   const kinds = await page.evaluate(() => { const by = {}; for (const f of window.__meadow.flowers()) if (f.shown) by[f.kind] = (by[f.kind] || 0) + 1; return Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => +k); });
-  for (let k = 0; k < 12; k++) {
-    const f = await page.evaluate((want) => {
-      const m = window.__meadow, all = m.flowers().filter((it) => it.shown);
+  // four of each kind; a pick that does not take (a flower where you cannot quite stand, an animal nudging you aside) is tried again on the next
+  const stems = () => page.evaluate(() => window.__meadow.pack.count('flower'));
+  const tried = new Set();
+  for (let k = 0, tries = 0; k < 12 && tries < 40; tries++) {
+    const f = await page.evaluate(([want, skip]) => {
+      const m = window.__meadow, all = m.flowers().filter((it) => it.shown && !skip.includes(it.id));
       return all.filter((it) => it.kind === want).sort((a, b) => Math.hypot(a.x - m.player.x, a.z - m.player.z) - Math.hypot(b.x - m.player.x, b.z - m.player.z))[0];
-    }, kinds[Math.floor(k / 4)]);
+    }, [kinds[Math.floor(k / 4)], [...tried]]);
+    tried.add(f.id);
+    const before = await stems();
     await teleport(page, f.x + 0.4, f.z);
     await press(page, 'KeyG', 0.7);
+    if ((await stems()) > before) k++;
   }
+  expect(await stems(), 'twelve stems picked').toBe(12);
   expect(await page.evaluate(() => window.__meadow.pack.tie()), 'tied into a bouquet in the backpack').toBe(true);
   const bp = await page.evaluate(() => window.__meadow.BOARD_POINT);
   await teleport(page, bp.x, bp.z);
   await press(page, 'KeyG', 0.5);
   // (when it fails now and then, say why: what the skipper said, and what was offered)
   const why = await page.evaluate(() => ({ toast: document.getElementById('toast').textContent, actions: window.__meadow.actions().map((a) => a.id), pack: JSON.stringify(window.__meadow.pack.items ? window.__meadow.pack.items() : '') }));
-  expect(await page.evaluate(() => window.__meadow.rod().rod), JSON.stringify(why)).toBe(true);
+  const gotRod = await page.evaluate(() => window.__meadow.rod().rod);
+  if (!gotRod) console.log('ROD TRADE FAILED: ' + JSON.stringify(why)); // (the harness drops an expectation's own message)
+  expect(gotRod).toBe(true);
   await teleport(page, p.x, p.z, s.x, s.z);
   await step(page, 0.4);
   expect((await actions(page)).map((a) => a.id)).toContain('fish-cast');

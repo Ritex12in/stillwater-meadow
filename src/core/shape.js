@@ -56,6 +56,45 @@ export function makeLake({ x, z, R0 = 30, A3 = 4, P3 = 0, A5 = 2.5, P5 = 1.3, A7
   };
   return L;
 }
+// ── Islands ───────────────────────────────────────────────────
+// Some of the bigger wild lakes (not home, nor a settled lake: the boat tours the home lake) have an
+// island: a low mound of land off the lake's middle, its shore wobbling, sand round its edge and grass
+// on top, a tree or two, reeds round it. Its height rises from the lake floor to `top` metres in its
+// middle; the water laps it where that is 0. Fixed by the seed from the lake's own square (from its
+// own draws, so the lake itself is as it was). You reach it only over the ice, when the lake freezes.
+/** How far out a spot is on an island, in its radii (its shore is at `I.shore`). */
+export function isleQ(I, x, z) {
+  const dx = x - I.x, dz = z - I.z, a = Math.atan2(dz, dx);
+  return Math.hypot(dx, dz) / (I.r * (1 + 0.16 * Math.sin(3 * a + I.p1) + 0.09 * Math.sin(5 * a + I.p2)));
+}
+/** The point at angle `a`, `q` island-radii out. */
+export function islePoint(I, a, q) {
+  const r = I.r * (1 + 0.16 * Math.sin(3 * a + I.p1) + 0.09 * Math.sin(5 * a + I.p2)) * q;
+  return { x: I.x + Math.cos(a) * r, z: I.z + Math.sin(a) * r };
+}
+/** The island's own ground at a spot (it is the lake floor wherever that is higher). */
+const isleH = (I, x, z) => { const q = isleQ(I, x, z); return I.top - (I.top + 0.9) * q * q; };
+/** A lake's island, or null. */
+function isleOf(L, cx, cz) {
+  const sd = WORLD.seed | 0, h = (k) => hash(cx * 53 + k * 101 + sd, cz * 71 + k * 37 + 907);
+  if (L.R0 < 20 || h(0) > 0.7) return null;
+  const a = h(1) * TAU, r = L.R0 * (0.2 + 0.1 * h(2)), top = 1.4 + 2.2 * h(3);
+  // off the middle (whose water stays deep), and well inside the shore on that side
+  const I = { x: 0, z: 0, r, top, shore: Math.sqrt(top / (top + 0.9)), p1: h(5) * TAU, p2: h(6) * TAU };
+  // with open water all round it (looked at all the way round, a little beyond its shore), moved in toward the middle if need be
+  for (let off = Math.min(L.R0 * (0.34 + 0.14 * h(4)), 0.8 * L.r(a) - r * 1.25); off >= r * 1.35; off *= 0.88) { // (the lake's middle stays a metre deep or more)
+    I.x = L.x + Math.cos(a) * off; I.z = L.z + Math.sin(a) * off;
+    let clear = true;
+    for (let k = 0; k < 16 && clear; k++) { const p = islePoint(I, (k / 16) * TAU, I.shore * 1.45); if (L.t(p.x, p.z) > 0.9) clear = false; }
+    if (clear) return I;
+  }
+  return null;
+}
+/** Is a spot on an island's dry land (`margin` island-radii in from its shore)? */
+export function onIsland(x, z, margin = 0) {
+  const I = lakeAt(x, z).isle;
+  return !!I && isleQ(I, x, z) < I.shore - margin;
+}
 /** The side of the squares the land is ruled into, one lake (or none) to a square. */
 export const LAKE_CELL = 420;
 /**
@@ -144,6 +183,7 @@ function lakeOfCell(cx, cz) {
       L.settled = settled;
       L.clime = { dry, lush, snow }; // (the country it lies in: what grows and lives at it follows from this)
       L.frozen = snow > 0.6;
+      if (!settled) L.isle = isleOf(L, cx, cz);
       const first = L.frozen ? NAME_COLD : NAME_A;
       L.name = first[Math.floor(n1 * first.length)] + NAME_B[Math.floor(n2 * NAME_B.length)];
     }
@@ -284,7 +324,8 @@ export function rawHeight(x, z) {
   const base = land(x, z, open);
   shaped = !!lake && t < lake.bowl + 0.1;
   if (!shaped) return base; // (beyond the bowl and the path)
-  const floor = t < 1 ? -3.2 * (1 - t * t) : (t - 1) * 2.0;
+  let floor = t < 1 ? -3.2 * (1 - t * t) : (t - 1) * 2.0;
+  if (lake.isle && t < 1) floor = Math.max(floor, isleH(lake.isle, x, z)); // (an island rising out of it)
   const k = smooth(0.8, lake.bowl, t);
   return floor * (1 - k) + base * k - lake.path(x, z) * 0.08;
 }

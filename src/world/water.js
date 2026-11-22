@@ -24,6 +24,8 @@ export const waterU = {
   lakePhase: { value: new THREE.Vector3(LAKE.P3, LAKE.P5, LAKE.P7) },
   lakeStretch: { value: new THREE.Vector2(LAKE.E, LAKE.TH) },
   lakeTint: { value: new THREE.Vector3(1, 1, 1) },   // the cast of this lake's water (turquoise on the heath, dark green in lush country)
+  lakeIsle: { value: new THREE.Vector4(0, 0, 0, 1) }, // the lake's island, if it has one: middle, radius (0: none), and where its shore is in its radii
+  lakeIsleP: { value: new THREE.Vector2() },         // (its shore's wobble)
   uRain: { value: 0 },
   uIce: { value: 0 },
   uIceLight: { value: 1 },
@@ -67,7 +69,7 @@ export function buildWater() {
       uniform float uTime; uniform float uRain; uniform float uIce; uniform float uIceLight; uniform float uSnowIce; uniform float uLight;
       uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyTop; uniform vec3 skyHorizon;
       uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun;
-      uniform float fogNear; uniform float fogFar; uniform vec2 lakeC; uniform vec4 lakeShape; uniform vec3 lakePhase; uniform vec2 lakeStretch; uniform vec3 lakeTint;
+      uniform float fogNear; uniform float fogFar; uniform vec2 lakeC; uniform vec4 lakeShape; uniform vec3 lakePhase; uniform vec2 lakeStretch; uniform vec3 lakeTint; uniform vec4 lakeIsle; uniform vec2 lakeIsleP;
       uniform vec3 lampW[12]; uniform float lampAmt; uniform float uStars;
       uniform float isSea; uniform sampler2D seaMask; uniform vec4 seaBox;
       varying vec3 vWP;
@@ -166,6 +168,12 @@ export function buildWater() {
         float l1 = 1.0 - abs(2.0 * vn(p * 1.6 + vec2(uTime * 0.12, -uTime * 0.09)) - 1.0);
         float l2 = 1.0 - abs(2.0 * vn(p * 3.7 - vec2(uTime * 0.2, uTime * 0.15) + 4.0) - 1.0);
         float lace = clamp(pow(l1, 7.0) + pow(l2, 9.0) * 0.7 + pow(l1 * l2, 2.5) * 0.5, 0.0, 1.0);
+        // and round an island's shore
+        if (lakeIsle.z > 0.0) {
+          vec2 di = p - lakeIsle.xy; float ai = atan(di.y, di.x);
+          float qi = length(di) / (lakeIsle.z * (1.0 + 0.16 * sin(3.0 * ai + lakeIsleP.x) + 0.09 * sin(5.0 * ai + lakeIsleP.y))) / lakeIsle.w;
+          band = max(band, smoothstep(1.32, 1.06, qi) * (1.0 - smoothstep(1.0, 0.94, qi)));
+        }
         c = mix(c, vec3(0.93, 0.95, 0.96) * uLight, band * clamp(lap * 0.45 + lace * 0.8, 0.0, 1.0) * 0.4 * (1.0 - uIce));
         // winter: pale ice, dusted with snow
         vec3 ice = mix(vec3(0.7, 0.8, 0.88), vec3(0.84, 0.9, 0.96), 0.45 + 0.18 * sin(p.x * 0.21 + sin(p.y * 0.13) * 2.0) + 0.12 * sin(p.y * 0.37 + p.x * 0.11)) * uIceLight;
@@ -182,7 +190,7 @@ export function buildWater() {
   // A few sheets of water, lent to whichever lakes are nearest. Each has its own lake outline and
   // ice (a lake in snow country is frozen whatever the season); everything else is shared.
   for (let i = 0; i < SHEETS; i++) {
-    const u = Object.assign({}, waterU, { lakeC: { value: new THREE.Vector2() }, lakeShape: { value: new THREE.Vector4() }, lakePhase: { value: new THREE.Vector3() }, lakeStretch: { value: new THREE.Vector2() }, lakeTint: { value: new THREE.Vector3(1, 1, 1) }, uIce: { value: 0 } });
+    const u = Object.assign({}, waterU, { lakeC: { value: new THREE.Vector2() }, lakeShape: { value: new THREE.Vector4() }, lakePhase: { value: new THREE.Vector3() }, lakeStretch: { value: new THREE.Vector2() }, lakeTint: { value: new THREE.Vector3(1, 1, 1) }, lakeIsle: { value: new THREE.Vector4(0, 0, 0, 1) }, lakeIsleP: { value: new THREE.Vector2() }, uIce: { value: 0 } });
     const mesh = make(u);
     mesh.receiveShadow = false;
     mesh.visible = false;
@@ -224,6 +232,7 @@ export function updateWater(x, z, now = false) {
     s.u.lakePhase.value.set(L.P3, L.P5, L.P7);
     s.u.lakeStretch.value.set(L.E, L.TH);
     s.u.lakeTint.value.fromArray(L.tint);
+    if (L.isle) { s.u.lakeIsle.value.set(L.isle.x, L.isle.z, L.isle.r, L.isle.shore); s.u.lakeIsleP.value.set(L.isle.p1, L.isle.p2); } else s.u.lakeIsle.value.set(0, 0, 0, 1);
   }
   for (const s of sheets) { s.mesh.visible = !!s.lake; if (s.lake) s.u.uIce.value = lakeIce(s.lake); }
 }

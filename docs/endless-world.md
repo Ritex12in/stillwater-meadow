@@ -55,7 +55,7 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
     within 6 km is sea, the nearest coast some 2 km from home. You cannot wade or swim (the shore
     stops you, as at the lakes); no fishing at sea yet.
   - Rivers and waterfalls were left out that night (they came later, at the owner's asking: see
-    "Rivers and waterfalls" below). Islands in lakes were left out too (the lakes are small, and the boat only tours the home lake).
+    "Rivers and waterfalls" below). Islands in lakes were left out too (they came later: see "Islands") (the lakes are small, and the boat only tours the home lake).
   - Animals: no CC0 rigged deer or fox could be fetched without a browser, so, as told ("whatever is
     best available"), the fox is made in code like the deer and owl; rigged ones can replace them later.
 - **Worlds and carrying (2026-11-22):** seeds as in Minecraft: any text is a seed, the same text
@@ -99,7 +99,7 @@ Each one leaves the game playable and tested.
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | | done: companions come with you when you travel; the journal's places found have a Go button |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | | started: the characters are the sculpted children, redrawn after the owner's character sheets (KayKit and then the VRoid characters were tried and removed by the owner).  Animals: a fox by country added and the deer travel with you, made in code (no CC0 rigged deer or fox could be fetched without a browser) |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | | view distance setting done (near, medium, far); tuning on the owner's GPU and a phone needs the owner |
-| 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; rivers and waterfalls done (see "Rivers and waterfalls"); islands in lakes not done |
+| 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; rivers and waterfalls done (see "Rivers and waterfalls"); islands in lakes done (see "Islands") |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
@@ -508,6 +508,16 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   into a lake. Rivers meet in 3 places within 6 km of home; at one their levels differ by 1.6 m,
   leaving a small step. Not done: rivers between lakes (every lake lies at the same level, so water
   cannot run from one to another), fishing in rivers, bridges where trails cross them.
+- **Islands** (2026-11-22, the owner: "add islands in lakes"; `core/shape.js` "Islands"). About 70% of
+  the wild lakes 20 m or more across have one (never home nor a settled lake, which the boat tours): a
+  low mound 1.4 to 3.6 m high and a fifth to a third of the lake's radius across, its shore wobbling,
+  set off the lake's middle (which stays a metre deep or more), with open water all round it (looked
+  at all the way round; moved in toward the middle, or left out, if it would come near the shore). Sand round its edge and grass on top; one to three trees on it
+  (pines in the cold); a few beds of reeds round it; foam where the water laps it. Ducks, lily pads and
+  a cast line keep off it. You reach one only over the ice when its lake freezes (no swimming, and the
+  boat tours only the home lake). Fixed by the seed from the lake's own square, from its own draws, so
+  the lake itself, its other reeds and its lilies are as they were. Seed 1 has 9 within 3 km of home
+  (of 61 lakes). Not done: a way across in summer (a boat of your own, or stepping stones).
 - **The skipper** (2026-11-22, the owner: "redesign the skipper"): drawn as the children are
   (`KIDS.skipper` in `characters/kid.js`, a little taller): an old boatman in a green knitted coat, a
   mustard scarf, dark trousers and boots, short grey hair under his straw hat, a white moustache and

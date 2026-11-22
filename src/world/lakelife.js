@@ -9,7 +9,7 @@
 // "The lake you are at" (`lifeLake`) changes only when you have left the old one out of sight;
 // whoever keeps creatures there is told through `hooks.lake` (core/state.js) and moves them.
 import { TAU, mulberry32, hash } from '../core/math.js';
-import { HOME, height, lakesNear, kitOf, lakeIce, lakeChill } from '../core/shape.js';
+import { HOME, height, lakesNear, kitOf, lakeIce, lakeChill, islePoint } from '../core/shape.js';
 import { flowersOut } from '../core/year.js';
 import { col } from '../core/materials.js';
 import { hooks, world, seasonState } from '../core/state.js';
@@ -47,6 +47,18 @@ export function lifeOf(lake) {
         if (height(p.x, p.z) > -0.3) continue; // (too near the shore to float)
         pads.push({ x: p.x, z: p.z, y: 0.05, s, ry, color });
         if (flower) blooms.push({ x: p.x + 0.15, z: p.z, y: 0.12, s: 1, color: tint });
+      }
+    }
+  }
+  // reeds round an island's shore (after everything else, so a lake's other reeds and lilies are as they were)
+  if (lake.isle) {
+    const I = lake.isle, cols2 = lake.frozen ? REED_STRAW : REED_GREENS;
+    for (let b = 0, beds = 2 + Math.floor(R() * 3); b < beds; b++) {
+      const ca = R() * TAU;
+      for (let i = 0; i < 9; i++) {
+        const p = islePoint(I, ca + r(-0.35, 0.35), I.shore * r(0.97, 1.12)), reed = { x: p.x, z: p.z, y: Math.max(height(p.x, p.z), -0.6), s: r(0.7, 1.2), rx: r(-0.12, 0.12), rz: r(-0.12, 0.12), ry: R() * TAU, color: cols2[Math.floor(R() * cols2.length)] };
+        reeds.push(reed);
+        if (i % 3 === 0) heads.push(reed);
       }
     }
   }

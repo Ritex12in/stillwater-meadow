@@ -146,3 +146,33 @@ test('every lake has its own reeds and lilies, and the ducks and the heron are a
   expect(both.every((L) => again.get(L.id) === L.key), 'the same reeds and lilies every time').toBe(true);
   noErrors(errors);
 });
+
+test('islands: some of the bigger wild lakes have one, dry land off the deep middle with grass and a tree on it, the same for the same seed', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const r = await page.evaluate(async () => {
+    const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
+    const SH = await import(url('/src/core/shape.js')), m = window.__meadow, H = m.home;
+    const lakes = SH.lakesNear(H.x, H.z, 3000), isles = lakes.filter((L) => L.isle);
+    let badMiddle = 0, notDry = 0, inShore = 0, onSettled = 0;
+    for (const L of isles) {
+      const I = L.isle;
+      if (SH.height(L.x, L.z) > -1) badMiddle++;                         // the lake's middle stays deep
+      if (SH.height(I.x, I.z) < 1 || !SH.onIsland(I.x, I.z)) notDry++;  // the island's middle is dry land
+      for (let a = 0; a < 6.28; a += 0.3) { const p = SH.islePoint(I, a, I.shore * 1.3); if (L.t(p.x, p.z) > 0.95) inShore++; } // water all round it
+      if (L.settled || L === SH.HOME) onSettled++;
+    }
+    // a tree on each (the woods of the square its middle is in)
+    const W = await import(url('/src/world/wilds.js')), S = 57.6;
+    let bare = 0;
+    for (const L of isles) if (!W.growSquare(Math.floor(L.isle.x / S), Math.floor(L.isle.z / S)).some((t) => Math.hypot(t.x - L.isle.x, t.z - L.isle.z) < L.isle.r)) bare++;
+    return { n: isles.length, of: lakes.length, badMiddle, notDry, inShore, onSettled, bare };
+  });
+  expect(r.n, 'islands within three kilometres').toBeGreaterThanOrEqual(4);
+  expect(r.n).toBeLessThan(r.of / 2);
+  expect(r.badMiddle).toBe(0);
+  expect(r.notDry).toBe(0);
+  expect(r.inShore, 'water all round each').toBe(0);
+  expect(r.onSettled, 'none at home or a settled lake').toBe(0);
+  expect(r.bare, 'a tree on each').toBe(0);
+  noErrors(errors);
+});

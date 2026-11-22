@@ -18,7 +18,7 @@
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
 // walk.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
-import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt, seaAt, coldBase, cliffsAt } from '../core/shape.js';
+import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt, seaAt, coldBase, cliffsAt, islePoint } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -86,6 +86,20 @@ export function growSquare(ix, iz) {
       }
     }
     trees.push(t);
+  }
+  // an island whose middle is in this square: a tree or two on it (pines in the cold)
+  for (const L of lakesNear(x0 + S / 2, z0 + S / 2, S)) {
+    const I = L.isle;
+    if (!I || I.x < x0 || I.x >= x0 + S || I.z < z0 || I.z >= z0 + S) continue;
+    const Q = seedOf(ix, iz, 7), n = 1 + Math.floor(Q() * 2.6 * Math.min(1, I.r / 6));
+    for (let k = 0; k < n; k++) {
+      const p = k ? islePoint(I, Q() * TAU, (0.25 + 0.3 * Q()) * I.shore) : islePoint(I, Q() * TAU, 0.12 * I.shore), h = height(p.x, p.z);
+      if (h < 0.6 || trees.some((t) => (t.x - p.x) ** 2 + (t.z - p.z) ** 2 < 9)) continue;
+      const cold = coldAt(p.x, p.z, h), type = Q() < 0.35 + cold * 0.8 ? 'pine' : 'round', cols = TREE_COLOURS[type], s = 0.75 + Q() * 0.5;
+      const t = { x: p.x, z: p.z, y: h - 0.15, type, s, ry: Q() * TAU, color: cols[Math.floor(Q() * cols.length)], top: (kit ? 6.2 : 5.2) * s, wild: true, chill: cold };
+      if (kit) t.family = treeFamily(t);
+      trees.push(t);
+    }
   }
   return trees;
 }

@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { TAU, clamp, lerp, damp, rnd } from '../core/math.js';
-import { lakeT, lakeAt, lakeIce, lakeChill, groveAt, biomesAt, onIce, waterAhead, animalWalkable, onDock } from '../core/shape.js';
+import { lakeT, lakeAt, lakeIce, lakeChill, groveAt, biomesAt, onIce, waterAhead, animalWalkable, onDock, heightAt } from '../core/shape.js';
 import { std } from '../core/materials.js';
 import { clock } from '../core/clock.js';
 import { hooks, seasonState, world } from '../core/state.js';
@@ -216,7 +216,7 @@ export function initFishing() {
   scene.add(line);
 
   const bob = new THREE.Vector3();
-  const isWater = (x, z) => lakeT(x, z) < 0.97 && !onDock(x, z);
+  const isWater = (x, z) => lakeT(x, z) < 0.97 && !onDock(x, z) && heightAt(x, z) < -0.05; // (not onto an island)
   /** Where a cast of this power lands (null if there's no water ahead). */
   const castSpot = (power = 0) => {
     if (icy()) {

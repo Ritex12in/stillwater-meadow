@@ -92,7 +92,7 @@ const FACES = {
 function makeFace(head, C, surfAt) {
   const dark = smooth(C.eye, { roughness: 0.6 }), white = smooth('#ffffff', { roughness: 0.5, emissive: '#ffffff', emissiveIntensity: 0.25 });
   const hairMat = smooth(C.hair), browMat = tone(C.hair, 0.95), lip = smooth('#b0685c'), inside = smooth('#8a4038'), tongue = smooth('#f0a09a');
-  const blushMat = new THREE.MeshStandardMaterial({ color: '#f58f86', transparent: true, opacity: 0.5, roughness: 1, depthWrite: false });
+  const blushU = { uBlush: { value: 0.5 } }; // (painted on the skin: see blushPaint)
   const surf = (x, y) => surfAt(Math.abs(x), y); // the sculpted face's front at (x, y)
   const EY = 0.215, EX = 0.122, Z = surf(EX, EY) + 0.004;
   const glow = smooth('#7d4a30', { roughness: 0.6 });
@@ -122,10 +122,9 @@ function makeFace(head, C, surfAt) {
   mk('oh', inside, [[null, [ball(0.014, 0, 0.002, 0, { s: [0.9, 1.15, 0.25] })]]]);
   mk('flat', lip, [[null, [cap(0.0042, 0.022, 0, 0.004, 0, { r: [0, 0, Math.PI / 2], s: [1, 1, 0.5] })]]]);
   mk('frown', lip, [[null, [curve(0.04, 1.2, 0.0055, false).translate(0, 0.004, 0)]]]);
-  const blush = [-1, 1].map((sd) => { const m = new THREE.Mesh(ball(0.048, sd * 0.152, 0.14, surf(0.152, 0.14) - 0.008, { s: [1, 0.58, 0.3], r: [0, sd * 0.62, 0] }), blushMat); m.renderOrder = 2; head.add(m); return m; });
   const st = { name: 'calm', until: 0, base: 'calm', open: 1, arc: 0, brow: 0, tilt: 0, lop: 0, blush: 0.55, mouth: 'smile', blinkT: 2 };
   return {
-    eyes, state: st,
+    eyes, state: st, blushU,
     /** The face it wears from now on. */
     set(name) { st.base = FACES[name] ? name : 'calm'; },
     /** A passing expression, for `secs`, then back to the standing one. */
@@ -148,8 +147,7 @@ function makeFace(head, C, surfAt) {
         q.brow.rotation.z = q.sd * st.tilt;
       });
       for (const k in mouths) mouths[k].visible = k === f.mouth;
-      blushMat.opacity = 0.36 * st.blush;
-      blush.forEach((b) => { b.visible = st.blush > 0.05; });
+      blushU.uBlush.value = 0.8 * st.blush;
     },
   };
 }
@@ -184,6 +182,7 @@ const headField = () => blend(0.018, blend(0.075,
 const HC = [0, 0.275, -0.014], HR = [0.325, 0.288, 0.302]; // a size up from the skull: the hair has volume
 /** A point on the hair's surface at azimuth az (0 = front, + = the figure's left), elevation el, pushed out by k. */
 const onHead = (az, el, k = 1) => { const ce = Math.cos(el); return new THREE.Vector3(HC[0] + Math.sin(az) * ce * HR[0] * k, HC[1] + Math.sin(el) * HR[1] * k, HC[2] + Math.cos(az) * ce * HR[2] * k); };
+const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 class Locks {
   constructor(color) { this.p = []; this.c = []; this.i = []; this.k = []; this.n = 0; this.base = new THREE.Color(color); }
   /**
@@ -206,7 +205,9 @@ class Locks {
         this.p.push(V.x, V.y, V.z);
         this.k.push(o.still ? 0 : t, phase, len);
         // darker at the root and along the edges, a lighter streak down the middle, a soft tip
-        const k = tone * (0.74 + 0.3 * Math.sin(Math.min(1, t * 1.3) * Math.PI * 0.6)) * (0.86 + 0.2 * (1 - u * u)) * (1 + 0.09 * crest);
+        let k = tone * (0.74 + 0.3 * Math.sin(Math.min(1, t * 1.3) * Math.PI * 0.6)) * (0.86 + 0.2 * (1 - u * u)) * (1 + 0.09 * crest);
+        // the halo (as anime hair, and the VRoid characters', is drawn): a band of light across the crown, its edges broken into points
+        if (side === 0 && o.halo !== false) { const dx = V.x - HC[0], dy = V.y - HC[1], dz = V.z - HC[2], ny = dy / Math.hypot(dx, dy, dz) + 0.035 * Math.sin(Math.atan2(dx, dz) * 15); k *= 1 + 0.34 * smoothstep(0.42, 0.5, ny) * (1 - smoothstep(0.66, 0.74, ny)); }
         col.copy(this.base).multiplyScalar(side === 0 ? k : k * 0.7);
         this.c.push(col.r, col.g, col.b);
       }
@@ -265,46 +266,41 @@ function swaying(mat, u) {
 const capField = (line) => both(ellipsoid(HC[0], HC[1], HC[2], HR[0] * 1.0, HR[1] * 1.0, HR[2] * 1.0), above(line), 0.02);
 
 function boyHair(L, r) {
-  const v = () => 0.95 + 0.1 * r(), T = 0.055;
+  const v = () => 0.95 + 0.1 * r(), T = 0.046;
   // the under layer, back and sides: long broad locks from the crown down past the hairline to the nape,
   // each curving out and up into a pointed tip
   for (let i = 0; i < 9; i++) {
     const az = 1.2 + (i / 8) * (TAU - 2.4), back = Math.abs(Math.PI - az) / Math.PI; // 0 at the back
-    L.over(az, 1.3, -0.62 + 0.22 * back + 0.08 * r(), 0.31, { sweep: 0.12 + 0.1 * r(), lift: 0.02, flick: 0.13, up: 0.05, thick: T, strands: 3, tone: v() * 0.94 });
+    L.over(az, 1.3, -0.62 + 0.22 * back + 0.08 * r(), 0.31, { sweep: 0.12 + 0.1 * r(), lift: 0.012, flick: 0.035, up: -0.01, thick: T, strands: 3, tone: v() * 0.94 });
   }
   // the wings: locks over the ears that flare outward and upward
   [-1, 1].forEach((sd) => {
-    L.over(sd * 1.22, 1.25, -0.22, 0.26, { sweep: sd * 0.1, lift: 0.04, flick: 0.2, up: 0.085, layer: 0.012, thick: T, strands: 3, tone: v() });
-    L.over(sd * 0.98, 1.25, -0.02, 0.2, { sweep: sd * 0.05, lift: 0.04, flick: 0.1, up: 0.03, layer: 0.02, thick: 0.045, strands: 2, tone: v() });
+    L.over(sd * 1.22, 1.25, -0.26, 0.26, { sweep: sd * 0.1, lift: 0.025, flick: 0.05, up: 0.0, layer: 0.012, thick: T, strands: 3, tone: v() });
+    L.over(sd * 0.98, 1.25, -0.06, 0.2, { sweep: sd * 0.05, lift: 0.025, flick: 0.03, up: 0.0, layer: 0.02, thick: 0.04, strands: 2, tone: v() });
   });
   // the fringe: three big locks falling to points between the brows and the eyes, the forehead showing between
   // them, and two shorter ones filling in above; all swept the same way
-  [[-0.5, 0.06, 0.29], [0.02, 0.0, 0.3], [0.52, 0.08, 0.28]].forEach(([az, e1, W]) => L.over(az - 0.14, 1.3, e1, W, { sweep: 0.26, lift: 0.045, flick: 0.02, layer: 0.03, thick: T, strands: 3, tone: v() }));
-  [[-0.26, 0.3, 0.24], [0.28, 0.32, 0.24]].forEach(([az, e1, W]) => L.over(az - 0.1, 1.34, e1, W, { sweep: 0.2, lift: 0.05, flick: 0.02, layer: 0.045, thick: T, strands: 3, tone: v() * 1.05 }));
+  [[-0.5, 0.06, 0.29], [0.02, 0.0, 0.3], [0.52, 0.08, 0.28]].forEach(([az, e1, W]) => L.over(az - 0.14, 1.3, e1, W, { sweep: 0.26, lift: 0.03, flick: 0.0, layer: 0.022, thick: T, strands: 3, tone: v() }));
+  [[-0.26, 0.3, 0.24], [0.28, 0.32, 0.24]].forEach(([az, e1, W]) => L.over(az - 0.1, 1.34, e1, W, { sweep: 0.2, lift: 0.035, flick: 0.0, layer: 0.032, thick: T, strands: 3, tone: v() * 1.05 }));
   // the top layer: shorter locks all turning one way round the crown, lifted clear of the layer below
   for (let i = 0; i < 7; i++) {
     const az = (i / 7) * TAU + 0.4;
-    L.over(az, 1.46, 0.36 + 0.14 * r(), 0.3, { sweep: 0.5, lift: 0.07, flick: 0.1, up: 0.06, layer: 0.06, thick: T, strands: 3, tone: v() * 1.07 });
+    L.over(az, 1.46, 0.3 + 0.14 * r(), 0.3, { sweep: 0.5, lift: 0.035, flick: 0.03, up: 0.005, layer: 0.04, thick: T, strands: 3, tone: v() * 1.07 });
   }
   // the cowlick: one big tuft rising from the crown and curling over to one side, a smaller one beside it
   const tuft = (az, h, reach, W) => {
     const a = onHead(az, 1.42, 1.04), d = new THREE.Vector3(Math.sin(az + 1.2), 0, Math.cos(az + 1.2));
     L.add([a, a.clone().add(new THREE.Vector3(0, h * 0.75, 0)).addScaledVector(d, reach * 0.2), a.clone().add(new THREE.Vector3(0, h, 0)).addScaledVector(d, reach * 0.6), a.clone().add(new THREE.Vector3(0, h * 0.72, 0)).addScaledVector(d, reach)], W, 0.045, { centre: new THREE.Vector3(HC[0], HC[1] + 0.22, HC[2]), strands: 2, tone: 1.1 });
   };
-  tuft(0.2, 0.15, 0.24, 0.2); tuft(-1.6, 0.09, 0.16, 0.15);
+  tuft(0.2, 0.085, 0.13, 0.1); // (one small cowlick, as anime hair has)
   // finer locks lying over the big ones, slightly off their line: the hair reads as many strands, not a few slabs
   for (let i = 0; i < 16; i++) {
     const az = (i / 16) * TAU + r() * 0.3;
     if (Math.cos(az) > 0.2) continue; // the fringe keeps its clean points
-    L.over(az, 1.38, -0.4 + 0.3 * r(), 0.1 + 0.04 * r(), { sweep: 0.25 + 0.35 * r(), lift: 0.05, flick: 0.09 + 0.05 * r(), up: 0.05, layer: 0.05 + 0.02 * r(), thick: 0.028, tone: 1.02 + 0.12 * r() });
+    L.over(az, 1.38, -0.4 + 0.3 * r(), 0.1 + 0.04 * r(), { sweep: 0.25 + 0.35 * r(), lift: 0.03, flick: 0.03 + 0.02 * r(), up: 0.0, layer: 0.035 + 0.015 * r(), thick: 0.026, tone: 1.02 + 0.12 * r() });
   }
   // thin slivers splitting off beside the wings: forked tips
-  [-1, 1].forEach((sd) => { L.over(sd * 1.38, 1.1, -0.34, 0.09, { sweep: sd * 0.14, lift: 0.05, flick: 0.2, up: 0.11, layer: 0.03, thick: 0.024, tone: 1.06 }); L.over(sd * 1.6, 1.1, -0.5, 0.09, { sweep: sd * 0.1, lift: 0.04, flick: 0.17, up: 0.08, layer: 0.025, thick: 0.024, tone: 1.0 }); });
-  // a few flyaways lifting off the top
-  [[1.0, 0.08, 0.14], [2.6, 0.07, 0.12], [-2.2, 0.075, 0.13], [-0.6, 0.06, 0.12]].forEach(([az, h, reach]) => {
-    const a = onHead(az, 1.05, 1.09), d = new THREE.Vector3(Math.sin(az + 0.9), 0, Math.cos(az + 0.9));
-    L.add([a, a.clone().add(new THREE.Vector3(0, h * 0.8, 0)).addScaledVector(d, reach * 0.4), a.clone().add(new THREE.Vector3(0, h, 0)).addScaledVector(d, reach)], 0.06, 0.018, { tone: 1.12 });
-  });
+  [-1, 1].forEach((sd) => { L.over(sd * 1.38, 1.1, -0.38, 0.09, { sweep: sd * 0.14, lift: 0.03, flick: 0.05, up: 0.01, layer: 0.03, thick: 0.022, tone: 1.06 }); L.over(sd * 1.6, 1.1, -0.52, 0.09, { sweep: sd * 0.1, lift: 0.025, flick: 0.05, up: 0.01, layer: 0.025, thick: 0.022, tone: 1.0 }); });
 }
 
 function girlHair(L, r, bunAt) {
@@ -318,8 +314,8 @@ function girlHair(L, r, bunAt) {
     L.add(pts, 0.36, 0.045, { shape: 'tress', tone: v() * (i % 2 ? 1.05 : 0.95) });
   }
   // the fringe: parted on one side, a big bang sweeping across the forehead, a smaller one the other way
-  [[-0.22, 0.95, 0.02, 0.3], [-0.2, 0.6, 0.1, 0.28], [-0.16, 0.25, 0.3, 0.2]].forEach(([a0, sw, e1, W]) => L.over(a0, 1.3, e1, W, { sweep: sw, lift: 0.045, flick: 0.03, layer: 0.03, thick: 0.05, tone: v() }));
-  [[-0.36, -0.75, 0.05, 0.26], [-0.34, -0.4, 0.28, 0.2]].forEach(([a0, sw, e1, W]) => L.over(a0, 1.3, e1, W, { sweep: sw, lift: 0.045, flick: 0.03, layer: 0.03, thick: 0.05, tone: v() }));
+  [[-0.22, 0.95, 0.02, 0.3], [-0.2, 0.6, 0.1, 0.28], [-0.16, 0.25, 0.3, 0.2]].forEach(([a0, sw, e1, W]) => L.over(a0, 1.3, e1, W, { sweep: sw, lift: 0.03, flick: 0.01, layer: 0.024, thick: 0.045, tone: v() }));
+  [[-0.36, -0.75, 0.05, 0.26], [-0.34, -0.4, 0.28, 0.2]].forEach(([a0, sw, e1, W]) => L.over(a0, 1.3, e1, W, { sweep: sw, lift: 0.03, flick: 0.01, layer: 0.024, thick: 0.045, tone: v() }));
   // long loose strands in front of the ears, hanging past the chin and turning out at the ends
   [-1, 1].forEach((sd) => {
     [[1.05, 0.085, -0.02, 0.09], [1.3, 0.06, -0.08, 0.06]].forEach(([az, W, endY, out]) => {
@@ -330,8 +326,8 @@ function girlHair(L, r, bunAt) {
     });
   });
   // a few short wisps at the nape
-  [[-0.75, 0.15, 0.14], [-0.3, 0.1, 0.17], [0.1, 0.12, 0.16], [0.5, 0.1, 0.17], [0.85, 0.15, 0.13]].forEach(([d, e0, W]) => L.over(Math.PI + d, e0, -0.72 + 0.12 * r(), W, { sweep: d * 0.15, lift: 0.0, flick: 0.1, up: 0.03, layer: -0.012, thick: 0.035, tone: v() * 0.92 }));
-  [-1, 1].forEach((sd) => L.over(sd * 1.75, 0.2, -0.55, 0.12, { sweep: sd * 0.1, lift: 0.0, flick: 0.12, up: 0.04, layer: -0.008, thick: 0.03, tone: v() * 0.92 }));
+  [[-0.75, 0.15, 0.14], [-0.3, 0.1, 0.17], [0.1, 0.12, 0.16], [0.5, 0.1, 0.17], [0.85, 0.15, 0.13]].forEach(([d, e0, W]) => L.over(Math.PI + d, e0, -0.72 + 0.12 * r(), W, { sweep: d * 0.15, lift: 0.0, flick: 0.035, up: 0.0, layer: -0.012, thick: 0.032, tone: v() * 0.92 }));
+  [-1, 1].forEach((sd) => L.over(sd * 1.75, 0.2, -0.55, 0.12, { sweep: sd * 0.1, lift: 0.0, flick: 0.04, up: 0.0, layer: -0.008, thick: 0.028, tone: v() * 0.92 }));
 }
 /** The bun: a few fat loops of hair folded over one another like petals, with two leaf-shaped wisps escaping. Built round the origin. */
 function bunHair(L, r) {
@@ -343,7 +339,7 @@ function bunHair(L, r) {
       const a = a0 + (k / 6) * 2.9, e = -0.85 + (k / 6) * 2.2;
       pts.push(new THREE.Vector3(c.x + Math.sin(a) * Math.cos(e) * R, c.y + Math.sin(e) * R * 0.92, c.z + Math.cos(a) * Math.cos(e) * R));
     }
-    L.add(pts, 0.17, 0.048, { centre: c, shape: 'band', still: true, tone: 0.93 + 0.17 * r() });
+    L.add(pts, 0.17, 0.048, { centre: c, shape: 'band', still: true, halo: false, tone: 0.93 + 0.17 * r() });
   }
   // two wisps: one curling up and over, one flicking out low on the other side
   const wisp = (az, y0, rise, reach, W) => {
@@ -351,6 +347,28 @@ function bunHair(L, r) {
     L.add([s0, s0.clone().addScaledVector(d, reach * 0.45).add(new THREE.Vector3(0, rise * 0.7, 0)), s0.clone().addScaledVector(d, reach * 0.85).add(new THREE.Vector3(0, rise, 0)), s0.clone().addScaledVector(d, reach * 1.1).add(new THREE.Vector3(0, rise * 0.75, 0))], W, 0.03, { centre: c, tone: 1.06 });
   };
   wisp(0.9, 0.05, 0.07, 0.1, 0.1); wisp(4.0, -0.07, 0.02, 0.11, 0.09);
+}
+
+/**
+ * Blush painted on the face's own skin (not a shape on top of it): a soft flush on each cheek, fading
+ * from its middle with no edge, as much as `u.uBlush` says (the expression eases it). Cheeks at
+ * (+-cx, cy) on the front of the head, in the head's own frame.
+ */
+function blushPaint(mat, u, cx, cy) {
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, r) => {
+    prev.call(mat, sh, r);
+    sh.uniforms.uBlush = u.uBlush;
+    sh.vertexShader = 'varying vec3 vHeadP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vHeadP = position;');
+    sh.fragmentShader = 'uniform float uBlush;\nvarying vec3 vHeadP;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        vec2 d = vec2((abs(vHeadP.x) - ${cx.toFixed(3)}) / 0.062, (vHeadP.y - ${cy.toFixed(3)}) / 0.04);
+        float flush = exp(-dot(d, d)) * step(0.0, vHeadP.z) * uBlush;
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.96, 0.52, 0.5), clamp(flush, 0.0, 1.0) * 0.55);
+      }`);
+  };
+  mat.customProgramCacheKey = () => 'kidskinblush';
+  return mat;
 }
 
 /** Build a child from a spec (see KIDS). */
@@ -464,8 +482,9 @@ export function makeKid(spec = KIDS.boy) {
   // head: the sculpted skull, the face on its surface, and hair that sways after it
   const head = pivot(chest, 0, NECK - HIP, 0); head.scale.setScalar(1.08);
   const skull = headField();
-  part(head, [{ f: skull, color: C.skin }], [-0.36, -0.02, -0.29, 0.36, 0.56, 0.3], 44);
+  const skin = part(head, [{ f: skull, color: C.skin }], [-0.36, -0.02, -0.29, 0.36, 0.56, 0.3], 44);
   const face = makeFace(head, C, (x, y) => frontOf(skull, x, y) || 0.25);
+  blushPaint(skin.material, face.blushU, 0.152, 0.14);
   const hairU = { uSway: { value: new THREE.Vector3() }, uHairT: { value: 0 }, uHairWind: { value: 0 } };
   const hair = pivot(head, 0, 0, 0), hairMat = () => swaying(painted({ side: THREE.DoubleSide, roughness: 0.8 }), hairU);
   const addLocks = (parent, build) => { const L = new Locks(C.hair); build(L); const m = new THREE.Mesh(L.geometry(), hairMat()); m.castShadow = true; m.receiveShadow = false; parent.add(m); return m; };

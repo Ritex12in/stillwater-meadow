@@ -8,6 +8,7 @@
 // the hand is on the arm, eye height) so nothing else hard-codes the body's measurements.
 import * as THREE from 'three';
 import { TAU, damp } from '../core/math.js';
+import { makeMarks } from './marks.js';
 import { sculpt, sphere, ellipsoid, capsule, rbox, strand, ring, blend, union, carve, both, grow, mirror, turned, above, frontOf } from '../core/sculpt.js';
 
 /** Soft, drawn-looking shading: a warm glow round the edges and lifted shadows, on any standard material. */
@@ -64,7 +65,7 @@ export const KIDS = {
   girl: {
     skin: '#f3c4a2', hair: '#3f251c', eye: '#4a2c1e',
     top: '#f3e9da', jacket: null, pants: '#5f7fa8', cuff: '#8fa6c6', shoe: '#ee9aa4', pack: '#e58d95', packTrim: '#cf747e',
-    hairStyle: 'bun', lashes: true, pocket: false, scrunchie: '#f2a0ad', motif: 'cat', wideLegs: true, patch: '#d98a5a',
+    hairStyle: 'bun', lashes: true, pocket: false, pocketPose: 'pouch', scrunchie: '#f2a0ad', motif: 'cat', wideLegs: true, patch: '#d98a5a',
   },
 };
 // Winter costumes for the same two: faces, hair and proportions unchanged, dressed for the snow
@@ -167,6 +168,7 @@ function makeFace(head, C, surfAt) {
   mk('gasp', inside, [[null, [ball(0.025, 0, -0.004, 0, { s: [1, 1.2, 0.25] })]], [tongue, [ball(0.013, 0, -0.02, 0.003, { s: [1.1, 0.6, 0.25] })]]]);
   mk('pout', lip, [[null, [curve(0.022, 1.5, 0.0065, false).translate(0, 0.006, 0)]]]);
   mk('frown', lip, [[null, [curve(0.04, 1.2, 0.0055, false).translate(0, 0.004, 0)]]]);
+  const marks = makeMarks(head); // (the little marks beside the head the sheets draw with each expression)
   const st = { name: 'calm', until: 0, base: 'calm', open: 1, arc: 0, brow: 0, tilt: 0, lop: 0, gx: 0, gy: 0, blush: 0.55, mouth: 'smile', blinkT: 2, smile: 0 };
   return {
     eyes, state: st, blushU,
@@ -203,6 +205,7 @@ function makeFace(head, C, surfAt) {
       }
       eyes.forEach((q) => { q.arc.position.y = 0.006 * st.smile; q.arc.scale.x = 1 + 0.1 * st.smile; }); // (the cheeks push the laughing eyes up)
       blushU.uSmile.value = st.smile;
+      marks.update(dt, st.name);
       blushU.uBlush.value = 0.8 * st.blush;
     },
   };
@@ -675,7 +678,7 @@ export function makeKid(spec = KIDS.boy) {
   } else {
     const hoodie = grow(trunk, 0.022);
     T.push({ f: hoodie, color: (x, y) => (y < 0.04 ? shade(C.top, 0.9) : C.top) });
-    T.push({ f: rbox(0, 0.115, 0.15, 0.09, 0.048, 0.03, 0.03), color: shade(C.top, 0.95) });                          // pouch pocket
+    T.push({ f: rbox(0, 0.11, 0.162, 0.1, 0.056, 0.046, 0.034), color: shade(C.top, 0.95) });                         // pouch pocket: deep enough to take her hands
     if (C.motif === 'cat') T.push({ f: union(ellipsoid(0, 0.3, 0.158, 0.034, 0.026, 0.012), capsule([-0.022, 0.318, 0.158], [-0.028, 0.34, 0.156], 0.012, 0.004), capsule([0.022, 0.318, 0.158], [0.028, 0.34, 0.156], 0.012, 0.004)), color: '#9a8f8a' });
   }
   if (!C.winter) T.push({ f: blend(0.03, ring(0, 0.432, 0.0, 0.108, 0.048), ellipsoid(0, 0.43, -0.135, 0.17, 0.11, 0.1)), color: C.top });  // hood: a roll round the neck, the hood hanging behind
@@ -831,7 +834,7 @@ export function makeKid(spec = KIDS.boy) {
     pack.position.y = 0.27 + lag.y * 0.35;
   }
   const own = new Set(); root.traverse((o) => own.add(o)); // the child's own parts (anything added later is carried, see moveAttachments)
-  return { root, body, chest, legs, knees, arms, elbows, hands, head, hair, bun, pack, skirt, face, eyes: face.eyes.map((q2) => q2.ball), dims, sway, own, winter: !!C.winter, kid: true };
+  return { pocketPose: C.pocketPose || 'side', root, body, chest, legs, knees, arms, elbows, hands, head, hair, bun, pack, skirt, face, eyes: face.eyes.map((q2) => q2.ball), dims, sway, own, winter: !!C.winter, kid: true };
 }
 
 /** Changing clothes: move whatever was added to one child's joints since it was built (a rod, a bouquet, a flower in the hair) onto another's. */

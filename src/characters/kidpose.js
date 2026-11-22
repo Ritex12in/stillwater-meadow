@@ -56,8 +56,10 @@ export function poseKid(k, st, dt) {
     let ax = sw - 0.06 * run, az = sd * 0.07, ex = elbow - Math.max(0, -sw) * 0.35;
     // seated: hands rest on the knees
     ax = lerp(ax, -0.3, sa); az = lerp(az, -sd * 0.06, sa); ex = lerp(ex, -1.0, sa);
-    // idle for a while: hands tucked into the pockets
-    ax = lerp(ax, 0.1, pk); az = lerp(az, -sd * 0.16, pk); ex = lerp(ex, -0.62, pk);
+    // idle for a while: hands tucked into the pockets, as the owner's sheets draw them: his into the side pockets
+    // of his trousers, the hands sinking in at his hips; hers into her hoodie's front pouch, meeting in the middle
+    const P = k.pocketPose === 'pouch' ? [0.58, -sd * 0.66, -1.5] : [0.02, -sd * 0.05, -0.12];
+    ax = lerp(ax, P[0], pk); az = lerp(az, P[1], pk); ex = lerp(ex, P[2], pk);
     k.arms[i].rotation.set(ax, 0, az);
     k.elbows[i].rotation.set(ex, 0, 0);
   });

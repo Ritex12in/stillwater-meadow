@@ -469,6 +469,14 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   shoulders and the hood. Cloth, hair strands and the iris have detail drawn by the shader and faded
   by its size on screen (an idea from the film crimson-loong; its code was not used). No settings
   choice of character.
+- **From the character sheets, the rest** (2026-11-23): standing still a while, the children put their
+  hands in their pockets as the sheets draw them: the boy's sink into his trouser pockets at his hips,
+  the girl's into her hoodie's front pouch (its depth made to take them; her arm angles were solved for
+  her hands to land inside it). And little marks pop up beside the head with each expression, as the
+  sheets draw them (`characters/marks.js`): yellow dashes for joy, hearts for love, sparkles for
+  wonder, "?" when thinking, red strokes when worried, a dark scrawl when cross, a tear-drop when sad,
+  "z"s when sleepy; each bobs and fades in about 2.4 s, not again within 1.2 s, two made up front per
+  head so the scene holds the same whatever faces are pulled.
 - **Pets** (2026-11-22, the owner: "redesign pets after the sheets"): the dogs and cats are sculpted as
   the children are, in their chibi style (`makeDog` and `makeCat` in `characters/rigs.js`): a big round
   head, a small plump body, short legs with white paws. The first dog is the sheet's puppy (cream with

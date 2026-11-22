@@ -133,6 +133,14 @@ if (view === 'body') {
     if (st.sitAmt) { const seat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.44, 0.5), new THREE.MeshLambertMaterial({ color: '#b08a62' })); seat.position.set(k.root.position.x - 0.12, 0.22, -0.12); seat.rotation.y = 1.0; scene.add(seat); }
   });
   cam.position.set(0, 1.5, 8.6); cam.lookAt(0, 0.75, 0);
+} else if (view === 'idle') {
+  // standing still a while (hands in the pockets), from the front, three-quarter and the side, and (?mark=) a mark over the head
+  [[0, -1.5], [0.7, -0.5], [Math.PI / 2, 0.5], [-0.5, 1.5]].forEach(([ry, x]) => {
+    const k = makeKid(KIDS[who]); k.root.position.x = x; k.root.rotation.y = ry; scene.add(k.root); kids.push(k);
+    const st = { move: 0, phase: 0, idleT: 9, t: 3, turn: 0 };
+    for (let n = 0; n < 90; n++) poseKid(k, st, 1 / 30);
+  });
+  cam.position.set(0, 1.0, 6.4); cam.lookAt(0, 0.85, 0);
 } else if (view === 'hair') {
   // the hair's physics: head upright, tipped back, tipped to the side, and caught in the middle of a quick turn
   [[0, 0, -1.65], [-0.6, 0, -0.55], [0, 0.55, 0.55], [0, 0, 1.65]].forEach(([rx, rz, x], i) => {

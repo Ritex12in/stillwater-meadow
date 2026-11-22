@@ -60,8 +60,8 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
     and be carved the same in every tile, which the height function cannot yet do without a
     drainage pass over a whole region; that is a project of its own, best planned with the owner.
     Islands in lakes were left out too (the lakes are small, and the boat only tours the home lake).
-  - New animals wait: no CC0 rigged deer or fox could be fetched without a browser, and the owner
-    disliked the code-made figures, so the existing deer and owl stay until the owner chooses.
+  - Animals: no CC0 rigged deer or fox could be fetched without a browser, so, as told ("whatever is
+    best available"), the fox is made in code like the deer and owl; rigged ones can replace them later.
 - **Worlds and carrying (2026-11-22):** seeds as in Minecraft: any text is a seed, the same text
   the same world, a new player gets a random one. The backpack is a real inventory of slots
   (flowers, later tools and other things); bouquets are tied from flowers in it.
@@ -98,7 +98,7 @@ Each one leaves the game playable and tested.
 | 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed (done); (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | done overnight 2026-11-22 (see "How the biomes, buildings and places work"): flower journal, fish by country, skating, places found with a journal and postcards, camp and lanterns; the giant old tree is the enchanted wood's giants ringed with glowing mushrooms |
 | N | **Seasons and weather by place** (2026-11-22; see "Plan: seasons and weather by place"). (1) Away from home, lakes are wild. (2) A game year of 8 real days, and each place's temperature through it; warmer regions. (3) Snow, ice, leaves, blossom and flowers from that local temperature. (4) Weather as a pattern moving across the land with the wind, the same for everyone in a world. (5) The World panel says what it is like where you stand; distant storms later. | Pure in seed, position and time; nothing rebuilt as the days pass. | done (see "How seasons and weather work") |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | | done: companions come with you when you travel; the journal's places found have a Go button |
-| 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | | started: KayKit Rogue and Mage (CC0) follow the two children under `?hero=kaykit`, for the owner to judge. Not done: rewiring actions to them; new animals (no CC0 rigged deer or fox could be fetched without a browser; the code-made deer and owl remain) |
+| 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | | started: KayKit Rogue and Mage (CC0) follow the two children under `?hero=kaykit`, for the owner to judge. Not done: rewiring every action to them. Animals: a fox by country added and the deer travel with you, made in code (no CC0 rigged deer or fox could be fetched without a browser) |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | | view distance setting done (near, medium, far); tuning on the owner's GPU and a phone needs the owner |
 | 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; islands in lakes and rivers and waterfalls not done (see below) |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
@@ -469,10 +469,16 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   as islands and headlands. Sand where land meets sea (`beachAt`, shown through the desert's look),
   palms on it (`world/makers.js palm`), nothing else growing there; huts on stilts on mild beaches
   and ships at anchor offshore (`SITE_KINDS` beachhut and ship, `world/buildings.js ship`). The
-  water is the lakes' shader on one wide sheet that follows you when the sea is near (`world/water.js`).
-- **Left for later** from the mood board: rivers and waterfalls (frozen ones too), wind-bent trees, hanging moss, dunes, mesas and
-  sea arches, a sky city on the floating islands, cave interiors; and new animals (deer, foxes,
-  owls). See the milestone table.
+  water is the lakes' shader on one wide sheet that follows you when the sea is near (`world/water.js`),
+  drawn only where a mask of the sea field says there is sea, so lake bowls keep their own water.
+  Travelling to a spot at sea (a ship found) lands you on the nearest shore, facing it.
+- **Wind-bent trees**: on the windy cliffs the trees lean, all one way, more where it is windier.
+- **A fox by country** (`features/wildlife.js`): red in mild country, white in the snow, a big-eared
+  fennec in the desert, none in the volcanic country; at the lake you are at, trotting, sitting,
+  slipping away when you come close. The deer now come to the lake you are at too (none in the
+  desert). Both made in code, like the owl and heron.
+- **Left for later** from the mood board: rivers and waterfalls (frozen ones too), hanging moss, dunes, mesas and
+  sea arches, a sky city on the floating islands, cave interiors. See the milestone table.
 
 ## How seasons and weather work (built 2026-11-22)
 

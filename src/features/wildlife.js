@@ -2,7 +2,10 @@
 // lily pads, a shy deer at the forest edge and a fox by country, both at the lake you are at.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
-import { TAU, lerp, damp, smooth, rnd } from '../core/math.js';
+import { TAU, lerp, damp, smooth, rnd, mulberry32 } from '../core/math.js';
+// (the fox, and the deer away from home, draw from a source of their own, so the rest of the world's
+// random sequence, which the other animals draw from, is as it was without them)
+const own = mulberry32(0x0F0C5), ownRnd = (a = 0, b = 1) => a + (b - a) * own();
 import { lakeAt, lakeT, heightAt, walkable, HOME, lakeIce } from '../core/shape.js';
 import { std, enableShadows, glowTex } from '../core/materials.js';
 import { hooks, seasonState, world } from '../core/state.js';
@@ -120,11 +123,12 @@ export function initWildlife() {
   const deerSpots = [];
   const findDeerSpots = (L) => {
     deerSpots.length = 0;
+    const home = L === HOME, r = home ? rnd : ownRnd;
     const b = biomesAt(L.x, L.z, 2);
     if (b.desert > 0.4 || b.volcanic > 0.4) return; // (no deer in the desert)
     for (let i = 0; i < 60 && deerSpots.length < 8; i++) {
-      const a = rnd() * TAU, r = L.rmax * rnd(2.1, 3.2), x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r;
-      if (walkable(x, z) && heightAt(x, z) > 0.4 && heightAt(x, z) < 40 && lakeT(x, z) > 1.5) deerSpots.push({ x, z });
+      const a = r() * TAU, d = L.rmax * r(2.1, 3.2), x = L.x + Math.cos(a) * d, z = L.z + Math.sin(a) * d;
+      if (walkable(x, z) && heightAt(x, z) < (home ? 14 : 40) && (home || heightAt(x, z) > 0.4) && lakeT(x, z) > 1.5) deerSpots.push({ x, z });
     }
   };
   findDeerSpots(HOME);
@@ -154,14 +158,14 @@ export function initWildlife() {
     scene.add(g);
     return { g, neck, legs, state: 'graze', x: 0, z: 0, heading: 0, t: 0, away: 0, phase: 0, look: 0 };
   })();
-  const placeDeer = () => {
+  const placeDeer = (r = rnd) => {
     if (!deerSpots.length) { deer.g.visible = false; return; }
     let best = deerSpots[0], bd = -1;
-    for (const s of deerSpots) { const d = Math.hypot(s.x - player.x, s.z - player.z); if (d > bd && rnd() < 0.7) { bd = d; best = s; } }
-    deer.x = best.x; deer.z = best.z; deer.heading = rnd() * TAU; deer.state = 'graze'; deer.g.visible = true;
+    for (const s of deerSpots) { const d = Math.hypot(s.x - player.x, s.z - player.z); if (d > bd && r() < 0.7) { bd = d; best = s; } }
+    deer.x = best.x; deer.z = best.z; deer.heading = r() * TAU; deer.state = 'graze'; deer.g.visible = true;
   };
   placeDeer();
-  const placeDeerAt = (L) => { findDeerSpots(L); placeDeer(); };
+  const placeDeerAt = (L) => { findDeerSpots(L); placeDeer(L === HOME ? rnd : ownRnd); };
 
   // a fox, by country: red in mild country, white in the snow, a sandy fennec with great ears in
   // the desert. It trots about the lake you are at, sits now and then, and slips away if you come
@@ -201,11 +205,11 @@ export function initWildlife() {
     fox.g.visible = false; fox.state = 'gone'; fox.away = 0;
     if (!kind) return;
     for (let i = 0; i < 40; i++) {
-      const a = rnd() * TAU, r = L.rmax * rnd(1.7, 2.8), x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r;
+      const a = ownRnd() * TAU, r = L.rmax * ownRnd(1.7, 2.8), x = L.x + Math.cos(a) * r, z = L.z + Math.sin(a) * r;
       if (!walkable(x, z) || heightAt(x, z) < 0.4 || Math.hypot(x - player.x, z - player.z) < 22) continue;
       const c = COATS[kind];
       fox.kind = kind; fox.coat.color.set(c[0]); fox.pale.color.set(c[1]); fox.ears.forEach((e) => e.scale.set(c[2], c[2], c[2]));
-      fox.x = fox.cx = x; fox.z = fox.cz = z; fox.heading = rnd() * TAU; fox.state = 'trot'; fox.t = 0; fox.next = rnd(6, 12);
+      fox.x = fox.cx = x; fox.z = fox.cz = z; fox.heading = ownRnd() * TAU; fox.state = 'trot'; fox.t = 0; fox.next = ownRnd(6, 12);
       fox.g.visible = true;
       return;
     }
@@ -327,11 +331,11 @@ export function initWildlife() {
         f.t += dt; speed = 1.4;
         f.heading += Math.sin(f.t * 0.7) * dt * 0.9;
         if (Math.hypot(f.x - f.cx, f.z - f.cz) > 26) f.heading = Math.atan2(f.cx - f.x, f.cz - f.z); // (it keeps about its own patch)
-        if (f.t > f.next) { f.state = 'sit'; f.t = 0; f.next = rnd(3, 6); }
+        if (f.t > f.next) { f.state = 'sit'; f.t = 0; f.next = ownRnd(3, 6); }
       } else if (f.state === 'sit') {
         f.t += dt;
         f.head.rotation.y = Math.sin(f.t * 0.8) * 0.6;
-        if (f.t > f.next) { f.state = 'trot'; f.t = 0; f.next = rnd(6, 12); f.head.rotation.y = 0; }
+        if (f.t > f.next) { f.state = 'trot'; f.t = 0; f.next = ownRnd(6, 12); f.head.rotation.y = 0; }
       } else {
         f.t -= dt; speed = 6.5;
         if (f.t <= 0) { f.state = 'gone'; f.away = 50; f.g.visible = false; }

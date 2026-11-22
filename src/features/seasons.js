@@ -112,7 +112,7 @@ function setMode(m) {
   store.season = m;
   saveSoon();
   turnYear();
-  recolourIn = 0; // (straight away)
+  recolourIn = 0; hereIn = 0; // (straight away: the trees, and how it is here)
   toast(m === 'auto' ? `The year turns on its own: ${phaseName(st.phase).toLowerCase()} now.` : `${phaseName(st.phase)} comes to the land.`);
   syncUi();
 }

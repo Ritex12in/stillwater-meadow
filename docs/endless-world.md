@@ -36,6 +36,15 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
   lake keeps its jetty, boat and skipper, fire, bench, chairs, lamps and path; every other lake is
   wild; the shrines in blossom groves stay. (Amended the same day: buildings that match their
   biome are welcome, see "Plan: a fantasy world of biomes"; out-of-place things stay out.)
+- **Calls made overnight 2026-11-22 (ours, the owner asked us to decide, as other games do):**
+  - Settled lakes are switched off rather than deleted (`?settlements=1` keeps their tests).
+  - The home lake still freezes in midwinter (about 4 in 10 of the year), so the skipper's pine
+    cones and the skating dance still come; the skipper asks for cones whenever fewer than about a
+    third of the flowers are out where you are.
+  - Weather spells: banks 6 km across, wind 3 m/s, so rain comes in spells of minutes to an hour or
+    two (like the gentle weather cycles of cosy games), not days. Fog goes by the time of day where
+    you play (your clock), since day and night do.
+  - Tests are held at summer unless they ask for a season (the year turns every 8 days).
 - **Worlds and carrying (2026-11-22):** seeds as in Minecraft: any text is a seed, the same text
   the same world, a new player gets a random one. The backpack is a real inventory of slots
   (flowers, later tools and other things); bouquets are tied from flowers in it.
@@ -70,7 +79,7 @@ Each one leaves the game playable and tested.
 | 4b-2 | **Lake life at every lake.** Reeds and lily pads per lake, worked out from the lake and its country and drawn from fixed slots for the three nearest; the ducks, the heron, the frogs and the mist are at the lake you are at (not ducks on ice). | Each lake's are the same every visit; none undrawn; a tour of lakes leaves the scene as it was (`tests/lakes.spec.js`). | done |
 | 4c | **The valley goes.** Start beside a lake generated from the seed, with the full set of landmarks. The hand-placed valley, its plants, fences and pebbles are removed. Flowers to pick grow everywhere. Shrine sites are fixed by the seed (one back from the home lake, others in blossom groves); the ground under each is levelled, and the one shrine stands at the site nearest you. Tests go by places found by query. | One full run of the suite. | done (full run 2026-11-22: 42 of 43 passed; the one failure, the untamed cat, was the test assuming the old valley's shore, fixed) |
 | 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed (done); (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | |
-| N | **Seasons and weather by place** (planned 2026-11-22, before 4d step 2; see "Plan: seasons and weather by place"). (1) Away from home, lakes are wild. (2) A game year of 8 real days, and each place's temperature through it; warmer regions. (3) Snow, ice, leaves, blossom and flowers from that local temperature. (4) Weather as a pattern moving across the land with the wind, the same for everyone in a world. (5) The World panel says what it is like where you stand; distant storms later. | Pure in seed, position and time; nothing rebuilt as the days pass. | |
+| N | **Seasons and weather by place** (2026-11-22; see "Plan: seasons and weather by place"). (1) Away from home, lakes are wild. (2) A game year of 8 real days, and each place's temperature through it; warmer regions. (3) Snow, ice, leaves, blossom and flowers from that local temperature. (4) Weather as a pattern moving across the land with the wind, the same for everyone in a world. (5) The World panel says what it is like where you stand; distant storms later. | Pure in seed, position and time; nothing rebuilt as the days pass. | done (see "How seasons and weather work") |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | |
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | |
@@ -275,7 +284,7 @@ or dropped once a pack is chosen.
   shows only its dot. Shrine sites have names by rule from where they are (the home one is named
   after the home lake). Coming to a lake, or within 40 m of a shrine, shows its name.
 
-## Plan: seasons and weather by place (decided 2026-11-22, not started)
+## Plan: seasons and weather by place (decided 2026-11-22, built the same night)
 
 **What is wrong today.** One season for the whole world, from the calendar or picked: in winter every
 lake freezes, snow covers everything and flowers go everywhere; walking never changes the season.
@@ -382,6 +391,37 @@ fixed by the seed, on ground levelled for them (the shrine's method), kept clear
 **Risks.** Code-made buildings must reach the mood board's charm in the game's low-poly style: show
 the owner each new kind of piece early. Draw cost: biome edges, glow and far structures need
 budgets checked on the owner's machine. The scope is many milestones; each lands playable.
+
+## How seasons and weather work (built 2026-11-22)
+
+- **The year** (`core/year.js`): a phase, 0 midwinter, 0.5 midsummer, the same for every player at
+  the same real moment (UTC), one year every 8 real days. A picked season holds the phase at its
+  middle (`?season=` too; tests are held at summer unless they ask, `tests/helpers.js`).
+- **Chill** (`coldAt`): each place's cold in summer, from its country (`coldBase`, now with a warm
+  side to -`WARMTH`), its height and the way it faces. Today's chill is
+  `chillNow(c, s) = c + s * swing(c)`, `s` the season value (0 midsummer to `WINTER_CHILL` 0.75
+  midwinter), `swing` smaller in warm country. Snow (`snowFrom`), lake ice (`iceFrom`, from the
+  season `ICE_LAG` back), flowers (`flowersOut`: late in spring, early in autumn) and leaves
+  (`leavesAt`) all follow it. The same formula is in GLSL (`SEASON_GLSL`, uniform `seasonU`) for
+  the ground and grass, so nothing is rebuilt as the days pass.
+- **Who reads what:** the ground and grass, spot by spot (the ground's seasonal snow is its drifted
+  snow, through `SNOW_AMOUNT`; its permanent snowfields are as before; far lakes painted in the
+  ground freeze too; warm country golds in its summer drought); trees each by their own `chill`
+  (recoloured when their state changes, checked every 5 s); flowers to pick each by their square's
+  chill; lily pads per lake; each lake's water sheet `lakeIce(lake)`; the home lake's ice waits for
+  the boat (`seasonState.ice`). Where you stand (`features/seasons.js readHere`, twice a second):
+  `winterHere` (with separate in and out chills), the snow on trees, rocks and things
+  (`coverFloor`), the share of flowers out (`flowerFrac`), the leaves, insects, falling leaves or
+  petals, the grass tint, clothes, music; the snowman by the home lake's own winter.
+- **Weather** (`systems/weatherfield.js`): `weatherAt(x, z, ms, hour)`, pure. Banks of cloud 6 km
+  across drift on a 3 m/s wind from the west (turned by the seed), reshaping over 90 minutes; rain
+  where thick, more in wet country (`moistAt`) and on windward slopes; snow where today's chill is
+  high; storms in warm air of an afternoon; fog of a morning in low ground by water, on some days.
+  At home in summer: rain about a tenth of the time, in spells of about 10 minutes (up to 1.5
+  hours), clear spells of about 1.5 hours, fog on about one morning in three. Auto weather samples
+  it where you stand once a second and eases toward it; a picked weather overrides it.
+- **The World panel** says how it is where you stand ("Here: mid autumn · rain · snow lies here").
+- **Wild lakes:** `SETTLEMENTS` (`?settlements=1`) turns the settled lakes back on; off in the game.
 
 ## How nature shapes the land (after milestone 4d, step 1)
 

@@ -64,7 +64,8 @@ test('the landmarks follow you from lake to lake: everything works there, and no
   expect((await actions(page)).map((x) => x.id)).toContain('board');
   // there and back, again and again: the same seats, the same obstacles, the same scene
   const round = () => page.evaluate((id) => {
-    const m = window.__meadow, settle = () => { for (let i = 0; i < 200; i++) m.ground.update(m.player.x, m.player.z); for (let i = 0; i < 5; i++) m.tick(1 / 30); };
+    // (a second of ticks: long enough for clothes to change if it is winter at the far lake)
+    const m = window.__meadow, settle = () => { for (let i = 0; i < 200; i++) m.ground.update(m.player.x, m.player.z); for (let i = 0; i < 30; i++) m.tick(1 / 30); };
     m.visitLake(id); settle();
     const away = { anchor: m.anchor(), counts: m.counts() };
     m.visitLake('home'); m.travelTo(m.spawn.x, m.spawn.z); settle();

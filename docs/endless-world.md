@@ -48,10 +48,8 @@ site (GitHub Pages) and stays untouched until the owner asks for a merge.
   - Biomes and buildings: buildings are rare enough to be finds (one castle in about 7 km2); the
     start (450 m round home) is always ordinary country; the floating islands and grottos sit in
     the enchanted wonder pockets, the volcano in the other kind.
-  - Characters: the CC0 KayKit Adventurers pack (on GitHub, so it could be fetched without the owner)
-    was chosen over code-made ones, the owner having disliked the code-made children's proportions,
-    face, hair and animation; it is behind `?hero=kaykit` until the owner has seen it, as the plan
-    for milestone 6 says. Its adventurers fit the fantasy world.
+  - Characters: the CC0 KayKit Adventurers pack was tried overnight behind `?hero=kaykit`; the owner
+    turned it down the next morning, and the VRoid characters replaced it (see "Characters" below).
   - The backpack starts with a tent and 8 lanterns (places you make need them).
   - The sea: never within 2 km of home, so every start is inland by a lake; about 5% of world 1
     within 6 km is sea, the nearest coast some 2 km from home. You cannot wade or swim (the shore
@@ -98,7 +96,7 @@ Each one leaves the game playable and tested.
 | 4d | **More to discover, and a backpack.** Build order: (1) backpack, compass and named places, and the random saved seed (done); (2) flowers picked anywhere with a flower journal, fish by country; (3) skating and ice fishing; (4) places to find; (5) places you make; then the places journal and the postcard album. Glowing stone circles on hilltops; a giant old tree ringed with glowing mushrooms; summit cairns with a bench and a view; hot springs in snow country to sit in; pitching your own camp; lanterns lit as trail markers; skating and ice fishing on frozen lakes; fish and rare flowers by kind of country, with a flower journal; a compass and named places. A backpack holds what you carry (rod, creel, flowers, cones, lanterns, tent). | Each place is pure in seed and position and drawn from fixed slots. | done overnight 2026-11-22 (see "How the biomes, buildings and places work"): flower journal, fish by country, skating, places found with a journal and postcards, camp and lanterns; the giant old tree is the enchanted wood's giants ringed with glowing mushrooms |
 | N | **Seasons and weather by place** (2026-11-22; see "Plan: seasons and weather by place"). (1) Away from home, lakes are wild. (2) A game year of 8 real days, and each place's temperature through it; warmer regions. (3) Snow, ice, leaves, blossom and flowers from that local temperature. (4) Weather as a pattern moving across the land with the wind, the same for everyone in a world. (5) The World panel says what it is like where you stand; distant storms later. | Pure in seed, position and time; nothing rebuilt as the days pass. | done (see "How seasons and weather work") |
 | 5 | **Travelling.** Companions keep up over long distances; finding places again (builds on the compass). | | done: companions come with you when you travel; the journal's places found have a Go button |
-| 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | | started: KayKit Rogue and Mage (CC0) follow the two children under `?hero=kaykit`, for the owner to judge. Not done: rewiring every action to them. Animals: a fox by country added and the deer travel with you, made in code (no CC0 rigged deer or fox could be fetched without a browser) |
+| 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | | started: the seven VRoid characters are in, chosen in Settings (KayKit turned down by the owner). Not done: rewiring every action to them. Animals: a fox by country added and the deer travel with you, made in code (no CC0 rigged deer or fox could be fetched without a browser) |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | | view distance setting done (near, medium, far); tuning on the owner's GPU and a phone needs the owner |
 | 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; islands in lakes and rivers and waterfalls not done (see below) |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
@@ -459,11 +457,16 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   layer at 26 m following the camera). Windmills take to the cliffs. About 4% of world 1's land.
 - **Flower journal**: each kind picked, how many, and the country where first found.
 - **View distance** (Settings): near (about 0.7 km of land), medium (1.4 km), far (2.3 km).
-- **Imported characters** (`characters/rigged.js`, `?hero=kaykit`): KayKit's Rogue for the boy
-  and KayKit's Mage for the girl (CC0, licence in `public/assets/characters/kaykit/`), 76
-  animations each, following the code-made children with walk, run, sit, lie, cheer, pick-up and
-  petting animations; the code-made children are hidden under them. Off unless asked for, for the
-  owner to judge first.
+- **Characters** (`characters/vroid.js`, decided 2026-11-22): the owner turned KayKit down ("big no")
+  and said not to look only for children. All seven of VRoid's sample avatars (pixiv; each file's
+  licence: anyone may use, change and share them, commercially too, no credit) are in: you and your
+  friend default to Fumiriya and Bibi, and Settings lets you pick any of the seven or the classic
+  figures (`?hero=classic` forces the classic ones). Only the two chosen load (about 4.5 MB each,
+  textures shrunk to WebP by `tools/shrink-vrm.mjs`). They come with no animations, so they are posed
+  in code from what the code-built figure underneath is doing (which still runs, hidden): standing,
+  walking and running by stride, skating, sitting on a seat or the grass, lying, crouching, fishing,
+  cheering, waving; cel shading; blinking by the file's own blink expression. Not yet: held things
+  (the rod, a bouquet) in their hands, the dances and hand-holding, hair that sways.
 - **The sea** (`seaAt`, `SEA_DEPTH` in `core/shape.js`): a continent field, broad as the climate's,
   sinks the land under one sea at the lakes' level (0); lowland goes under first and hills stand out
   as islands and headlands. Sand where land meets sea (`beachAt`, shown through the desert's look),

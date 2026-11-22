@@ -8,6 +8,7 @@
 // fishing, and cheering or waving. The textures were shrunk (tools/shrink-vrm.mjs).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { scene } from '../core/render.js';
 import { query } from '../core/env.js';
 import { damp } from '../core/math.js';
@@ -54,12 +55,13 @@ export async function loadCharacter(id) {
   const gltf = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}assets/characters/vroid/${id}.vrm`).catch((e) => { console.error('character', id, e); return null; });
   if (!gltf) return null;
   const model = gltf.scene;
-  const bones = {}, blink = [];
+  const bones = {}, blink = [], toons = new Map();
+  const toonOf = (m) => { if (!toons.has(m)) toons.set(m, toon(m)); return toons.get(m); };
   model.traverse((o) => {
     for (const k in BONES) if (o.name === BONES[k]) bones[k] = o;
     if (o.isMesh) {
       o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
-      o.material = Array.isArray(o.material) ? o.material.map(toon) : toon(o.material);
+      o.material = Array.isArray(o.material) ? o.material.map(toonOf) : toonOf(o.material);
       const d = o.morphTargetDictionary;
       if (d) for (const name in d) if (/EYE_Close$|Blink$/i.test(name) && !/_[LR]$/.test(name)) blink.push([o, d[name]]);
     }
@@ -72,6 +74,11 @@ export async function loadCharacter(id) {
     const dep = await gltf.parser.getDependency('mesh', bind.mesh);
     dep.traverse((o) => { if (o.isMesh && o.morphTargetInfluences && bind.index < o.morphTargetInfluences.length) blink.push([o, bind.index]); });
   }
+  // the files come in many small pieces (the hair alone in 60 to 80, of two or three materials):
+  // the pieces of one mesh that share a material are merged, so each is drawn once, not dozens of times
+  const merged = mergePieces(model);
+  for (const e of blink) if (merged.has(e[0])) e[0] = merged.get(e[0]);
+  for (let i = blink.length - 1; i >= 0; i--) if (blink.findIndex((q) => q[0] === blink[i][0] && q[1] === blink[i][1]) !== i) blink.splice(i, 1);
   // the model faces -z (VRM 0.x): turned to face +z like everything else in the meadow
   const inner = new THREE.Group(); inner.add(model); model.rotation.y = Math.PI;
   const root = new THREE.Group(); root.add(inner); root.scale.setScalar(SCALE);
@@ -82,6 +89,32 @@ export async function loadCharacter(id) {
   const hips0 = bones.hips.position.clone();
   const rest = {}; for (const k in bones) rest[k] = bones[k].rotation.clone();
   return { id, root, inner, model, bones, rest, hips0, hipY, thigh, blink, phase: 0, t: 0, nextBlink: 2, blinkT: 0, w: {} };
+}
+/** Merge the skinned pieces under one parent that share a material and a skin. Returns old piece -> merged mesh. */
+function mergePieces(model) {
+  const groups = new Map(), out = new Map();
+  model.traverse((o) => {
+    if (!o.isSkinnedMesh || Array.isArray(o.material)) return;
+    const key = o.parent.uuid + '|' + o.material.uuid + '|' + o.skeleton.bones.length + '|' + Object.keys(o.geometry.attributes).sort().join() + '|' + Object.keys(o.geometry.morphAttributes).join() + ':' + ((o.geometry.morphAttributes.position || []).length);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(o);
+  });
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const first = list[0], indexed = list.every((q) => q.geometry.index), plain = list.every((q) => !q.geometry.index);
+    if (!indexed && !plain) continue;
+    const geo = BufferGeometryUtils.mergeBufferGeometries(list.map((q) => q.geometry), false);
+    if (!geo) continue;
+    geo.morphTargetsRelative = first.geometry.morphTargetsRelative;
+    const m = new THREE.SkinnedMesh(geo, first.material);
+    m.name = first.name; m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false;
+    m.position.copy(first.position); m.quaternion.copy(first.quaternion); m.scale.copy(first.scale);
+    first.parent.add(m);
+    m.bind(first.skeleton, first.bindMatrix);
+    if (first.morphTargetDictionary) m.morphTargetDictionary = Object.assign({}, first.morphTargetDictionary);
+    for (const q of list) { q.parent.remove(q); q.geometry.dispose(); out.set(q, m); }
+  }
+  return out;
 }
 /** Take a character out of the world. */
 export function dropCharacter(c) {

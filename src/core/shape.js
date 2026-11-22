@@ -852,13 +852,21 @@ export const riverIce = (r) => iceFrom(riverChill(r), seasonState.lagged || 0);
 /** The ice's top where (x, z) is on a frozen river, or null. */
 function riverIceAt(x, z) {
   const r = riverNear(x, z);
-  return r && r.d < r.w / 2 + 0.3 && riverIce(r.river) > 0.85 ? r.lv : null;
+  if (!r) return null;
+  const b = bridgeAt(x, z, r.river);
+  if (b !== null) return b; // (on a bridge)
+  return r.d < r.w / 2 + 0.3 && riverIce(r.river) > 0.85 ? r.lv : null;
 }
-export const groundAt = (x, z) => { if (onDock(x, z)) return Math.max(DOCK_Y + 0.05, heightAt(x, z)); if (onIce(x, z)) return Math.max(heightAt(x, z), ICE_Y); const ri = riverIceAt(x, z); return ri === null ? heightAt(x, z) : Math.max(heightAt(x, z), ri); };
+/** Over water you can walk on: a bridge's deck, a stepping stone, or a frozen river's ice (its height), or null. */
+export function crossingAt(x, z) {
+  const st = stonesAt(x, z);
+  return st !== null ? st : riverIceAt(x, z);
+}
+export const groundAt = (x, z) => { if (onDock(x, z)) return Math.max(DOCK_Y + 0.05, heightAt(x, z)); const ri = crossingAt(x, z); if (ri !== null) return Math.max(heightAt(x, z), ri); return onIce(x, z) ? Math.max(heightAt(x, z), ICE_Y) : heightAt(x, z); }; // (a stone or a bridge stands above the ice)
 export const MAX_SLOPE = 1.25;    // steeper than this (about 51 degrees) is a cliff, not a hillside
 /** Anywhere that is dry land and not too steep to climb (or the jetty, or solid ice). */
 export function walkable(x, z) {
-  if (onDock(x, z) || onIce(x, z)) return true;
+  if (onDock(x, z) || onIce(x, z) || stonesAt(x, z) !== null) return true;
   return heightAt(x, z) > 0.22 && slopeAt(x, z) < MAX_SLOPE;
 }
 export const animalWalkable = (x, z) => onDock(x, z) || (walkable(x, z) && !onIce(x, z) && heightAt(x, z) > 0.35);
@@ -1232,5 +1240,83 @@ export function riverAt(x, z) {
 export function riversNear(x, z, r) {
   for (let j = Math.floor((z - r) / RIVER_CELL); j <= Math.floor((z + r) / RIVER_CELL); j++) for (let i = Math.floor((x - r) / RIVER_CELL); i <= Math.floor((x + r) / RIVER_CELL); i++) riversReady(i * RIVER_CELL, j * RIVER_CELL);
   return rivers.filter((v) => { for (let i = 0; i < v.n; i += 5) if (Math.hypot(v.x[i] - x, v.z[i] - z) < r) return true; return false; });
+}
+
+// ── Ways across water ─────────────────────────────────────────
+// A wooden footbridge wherever a trail crosses a river (not over a fall), and a line of stepping stones
+// from the nearest shore out to each island. You walk on both, as on the jetty. Worked out from the
+// river, the trails and the island alone, so they are the same whichever way you come; kept once found.
+const BRIDGE_W = 1.0, STONE_W = 0.62, STONE_TOP = 0.2;
+/** Where the trails cross a river: [{ x, z, ux, uz (along the trail), half (half its span), y (its deck at the ends), arch }]. */
+export function bridgesOf(r) {
+  if (r.bridges) return r.bridges;
+  const out = (r.bridges = []);
+  if (!sitesReady) return out;
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (let i = 0; i < r.n; i++) { x0 = Math.min(x0, r.x[i]); x1 = Math.max(x1, r.x[i]); z0 = Math.min(z0, r.z[i]); z1 = Math.max(z1, r.z[i]); }
+  const segs = new Map();
+  for (let cz = Math.floor(z0 / TRAIL_CELL); cz <= Math.floor(z1 / TRAIL_CELL); cz++) for (let cx = Math.floor(x0 / TRAIL_CELL); cx <= Math.floor(x1 / TRAIL_CELL); cx++) for (const s of trailsOfCell(cx, cz)) segs.set(s.id, s);
+  for (const s of segs.values()) {
+    // the trail as a line of points 4 m apart, as it wanders
+    let px = null, pz = null;
+    for (let d = 0; d <= s.len; d += 4) {
+      const t = d / s.len, w = wander(s, t), qx = s.a.x + s.ux * d - s.uz * w, qz = s.a.z + s.uz * d + s.ux * w;
+      if (px !== null && qx >= x0 - 8 && qx <= x1 + 8 && qz >= z0 - 8 && qz <= z1 + 8) {
+        for (let i = 0; i < r.n - 1; i++) {
+          const ax = r.x[i], az = r.z[i], bx = r.x[i + 1] - ax, bz = r.z[i + 1] - az, cx = qx - px, cz = qz - pz, den = bx * cz - bz * cx;
+          if (Math.abs(den) < 1e-6) continue;
+          const u = ((px - ax) * cz - (pz - az) * cx) / den, v = ((px - ax) * bz - (pz - az) * bx) / den;
+          if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+          if (r.fall[i] || (i && r.fall[i - 1])) continue; // (not over a fall)
+          const x = ax + bx * u, z = az + bz * u, cl = Math.hypot(cx, cz), ux = cx / cl, uz = cz / cl, w2 = r.w[i] + (r.w[i + 1] - r.w[i]) * u, lv = r.lv[i] + (r.lv[i + 1] - r.lv[i]) * u;
+          // over the water from bank to bank, each end resting on the ground before rivers
+          const half = w2 / 2 / Math.max(0.35, Math.abs(ux * (-bz) + uz * bx) / Math.hypot(bx, bz)) + 1.8;
+          const ya = heightBeforeRivers(x - ux * half, z - uz * half), yb = heightBeforeRivers(x + ux * half, z + uz * half);
+          if (out.some((b) => Math.hypot(b.x - x, b.z - z) < 12)) continue;
+          out.push({ x, z, ux, uz, half, ya, yb, lv, arch: 0.3 + 0.04 * half });
+        }
+      }
+      px = qx; pz = qz;
+    }
+  }
+  return out;
+}
+/** The deck of a bridge at a spot, or null. */
+function bridgeAt(x, z, r) {
+  for (const b of bridgesOf(r)) {
+    const dx = x - b.x, dz = z - b.z, along = dx * b.ux + dz * b.uz, across = -dx * b.uz + dz * b.ux;
+    if (Math.abs(along) > b.half || Math.abs(across) > BRIDGE_W) continue;
+    return deckY(b, along);
+  }
+  return null;
+}
+/** A bridge's deck height `along` metres from its middle: from one bank to the other, arching over the water. */
+export const deckY = (b, along) => { const t = (along + b.half) / (2 * b.half); return Math.max(b.ya + (b.yb - b.ya) * t, b.lv + 0.35) + b.arch * Math.sin(Math.PI * t) + 0.12; };
+/** An island's stepping stones, from the nearest shore out to it: { ax, az (on the shore), bx, bz (on the island), stones: [{ x, z, s, ry }] }. */
+export function stonesOf(L) {
+  const I = L.isle;
+  if (!I) return null;
+  if (I.stones) return I.stones;
+  // the shore nearest the island's edge
+  let best = null;
+  for (let k = 0; k < 48; k++) {
+    const a = (k / 48) * TAU, p = L.point(a, 1.0), toward = Math.atan2(p.z - I.z, p.x - I.x), q = islePoint(I, toward, I.shore), d = Math.hypot(p.x - q.x, p.z - q.z);
+    if (!best || d < best.d) best = { d, a, toward };
+  }
+  const A = L.point(best.a, 1.03), B = islePoint(I, best.toward, I.shore * 0.92), len = Math.hypot(A.x - B.x, A.z - B.z), n = Math.max(2, Math.round(len / 0.95));
+  const stones = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, j = hash(Math.round(I.x * 7) + i * 13, Math.round(I.z * 7) - i * 7);
+    stones.push({ x: A.x + (B.x - A.x) * t + (j - 0.5) * 0.18, z: A.z + (B.z - A.z) * t + (hash(i * 31 + 5, Math.round(I.x)) - 0.5) * 0.18, s: 0.82 + 0.3 * j, ry: j * TAU });
+  }
+  return (I.stones = { ax: A.x, az: A.z, bx: B.x, bz: B.z, len, stones });
+}
+/** The top of a stepping stone at a spot, or null. */
+function stonesAt(x, z) {
+  const L = lakeAt(x, z);
+  if (!L.isle || L.t(x, z) > 1.15) return null;
+  const S = stonesOf(L), dx = S.bx - S.ax, dz = S.bz - S.az, t = ((x - S.ax) * dx + (z - S.az) * dz) / (S.len * S.len);
+  if (t < -0.02 || t > 1.02) return null;
+  return Math.hypot(S.ax + dx * t - x, S.az + dz * t - z) < STONE_W ? STONE_TOP : null;
 }
 sitesReady = true; // (from here on the land's height levels the buildings' ground)

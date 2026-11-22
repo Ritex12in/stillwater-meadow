@@ -284,3 +284,40 @@ test('rivers: springs in the hills run down to a lake or the sea, never near hom
   expect(await page.evaluate(() => window.__meadow.riversShown())).toContain(r.id);
   noErrors(errors);
 });
+
+test('ways across water: a footbridge where a trail crosses a river, and stepping stones out to each island; you walk on both', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const r = await page.evaluate(async () => {
+    const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
+    const SH = await import(url('/src/core/shape.js')), m = window.__meadow, H = m.home;
+    const bridges = [];
+    for (const v of SH.riversNear(H.x, H.z, 6000)) for (const b of SH.bridgesOf(v)) bridges.push(b);
+    let lowDeck = 0, cantWalk = 0, offTrail = 0;
+    for (const b of bridges) {
+      if (SH.trailAt(b.x - b.ux * (b.half + 4), b.z - b.uz * (b.half + 4)) < 0.2 && SH.trailAt(b.x + b.ux * (b.half + 4), b.z + b.uz * (b.half + 4)) < 0.2) offTrail++;
+      for (let a = -b.half; a <= b.half; a += 0.5) {
+        const x = b.x + b.ux * a, z = b.z + b.uz * a;
+        if (Math.abs(a) < b.half - 1.8 && SH.groundAt(x, z) < b.lv + 0.3) lowDeck++; // above the water (its ends rest on the banks)
+        if (!SH.walkable(x, z)) cantWalk++;
+      }
+    }
+    const isles = SH.lakesNear(H.x, H.z, 3000).filter((L) => L.isle);
+    let noStones = 0, gaps = 0, wrongEnds = 0, wet = 0;
+    for (const L of isles) {
+      const S = SH.stonesOf(L);
+      if (!S) { noStones++; continue; }
+      for (let t = 0; t <= 1; t += 0.05) { const x = S.ax + (S.bx - S.ax) * t, z = S.az + (S.bz - S.az) * t; if (!SH.walkable(x, z)) gaps++; if (SH.groundAt(x, z) < 0.15) wet++; }
+      if (L.t(S.ax - (S.bx - S.ax) * 0.15, S.az - (S.bz - S.az) * 0.15) < 1 || !SH.onIsland(S.bx, S.bz)) wrongEnds++; // from the shore to the island
+    }
+    return { bridges: bridges.length, lowDeck, cantWalk, offTrail, isles: isles.length, noStones, gaps, wrongEnds, wet };
+  });
+  expect(r.bridges, 'bridges within 6 km').toBeGreaterThanOrEqual(3);
+  expect(r.offTrail, 'each on a trail').toBe(0);
+  expect(r.lowDeck, 'decks above the water').toBe(0);
+  expect(r.cantWalk, 'walkable end to end').toBe(0);
+  expect(r.noStones, 'stones to every island').toBe(0);
+  expect(r.gaps, 'no gap to fall in').toBe(0);
+  expect(r.wet, 'stones stand out of the water').toBe(0);
+  expect(r.wrongEnds, 'from the shore to the island').toBe(0);
+  noErrors(errors);
+});

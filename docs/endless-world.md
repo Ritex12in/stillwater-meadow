@@ -507,7 +507,7 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   or hidden. On seed 1 the nearest river is about 480 m from home, a mountain stream stepping down
   into a lake. Rivers meet in 3 places within 6 km of home; at one their levels differ by 1.6 m,
   leaving a small step. Not done: rivers between lakes (every lake lies at the same level, so water
-  cannot run from one to another), fishing in rivers, bridges where trails cross them.
+  cannot run from one to another), fishing in rivers. (Bridges came later: see "Ways across water".)
 - **Islands** (2026-11-22, the owner: "add islands in lakes"; `core/shape.js` "Islands"). About 70% of
   the wild lakes 20 m or more across have one (never home nor a settled lake, which the boat tours): a
   low mound 1.4 to 3.6 m high and a fifth to a third of the lake's radius across, its shore wobbling,
@@ -517,7 +517,16 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   a cast line keep off it. You reach one only over the ice when its lake freezes (no swimming, and the
   boat tours only the home lake). Fixed by the seed from the lake's own square, from its own draws, so
   the lake itself, its other reeds and its lilies are as they were. Seed 1 has 9 within 3 km of home
-  (of 61 lakes). Not done: a way across in summer (a boat of your own, or stepping stones).
+  (of 61 lakes). Stepping stones lead out to each (see "Ways across water").
+- **Ways across water** (2026-11-22, the owner: "add bridges and stepping stones"; `core/shape.js`
+  "Ways across water", `world/crossings.js`). A wooden footbridge wherever a trail crosses a river (not
+  over a fall): planks across, beams under them, posts and a rail each side, its ends resting on the
+  banks and arching over the water. A line of flat stones from the shore nearest each island out to it,
+  just above the water, close enough to walk without a gap. You walk on both as on the jetty (on a
+  frozen lake the stones stand above the ice). Worked out from the river, the trails and the island
+  alone, the same whichever way you come; drawn within 700 m. Seed 1 has 7 bridges within 6 km of home
+  (spans of 6 to 10 m; most about a metre over the water, one 5 m up over a deep cut) and stones to
+  all 9 islands within 3 km (5 to 19 m long).
 - **The skipper** (2026-11-22, the owner: "redesign the skipper"): drawn as the children are
   (`KIDS.skipper` in `characters/kid.js`, a little taller): an old boatman in a green knitted coat, a
   mustard scarf, dark trousers and boots, short grey hair under his straw hat, a white moustache and

@@ -181,6 +181,28 @@ test('waystones: one to a stretch of country, on the map from the start; track o
   await expect(page.locator('#mapPanel')).toBeHidden();
   expect(await page.locator('#fade').evaluate((el) => el.classList.contains('on')), 'the view has faded back in').toBe(false);
 
+  // a stone far beyond the end of the view: its marker still lies the way the stone does
+  const farOff = await page.evaluate(async () => {
+    const m = window.__meadow, pl = m.player, S = await import(performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes('/src/core/shape.js')));
+    const st = S.sitesNear(pl.x, pl.z, 9000, 'waystone').find((q) => Math.hypot(q.x - pl.x, q.z - pl.z) > 5000);
+    m.track({ id: st.id, name: 'Far stone', x: st.x, z: st.z });
+    m.camState.yaw = Math.atan2(pl.x - st.x, pl.z - st.z); m.camState.pitch = 0.2; // (facing it)
+    return { st: { x: st.x, z: st.z }, far: Math.hypot(st.x - pl.x, st.z - pl.z) };
+  });
+  expect(farOff.far).toBeGreaterThan(5000);
+  const markAt = async (turn) => {
+    await page.evaluate(([x, z, turn]) => { const m = window.__meadow, pl = m.player; m.camState.yaw = Math.atan2(pl.x - x, pl.z - z) + turn; }, [farOff.st.x, farOff.st.z, turn]);
+    await step(page, 0.3);
+    return page.evaluate(() => { const t = /translate\(([-\d.]+)px/.exec(document.getElementById('trackMark').style.transform); return +t[1] / window.innerWidth; });
+  };
+  const ahead = await markAt(0);
+  expect(ahead, 'facing it: the marker is in the middle of the view').toBeGreaterThan(0.4);
+  expect(ahead).toBeLessThan(0.6);
+  // (the camera's yaw grows turning left: with it at your right shoulder the marker is at the right edge)
+  expect(await markAt(1.4), 'turned left of it: the marker is at the right edge').toBeGreaterThan(0.9);
+  expect(await markAt(-1.4), 'turned right of it: at the left edge').toBeLessThan(0.1);
+  await page.evaluate(() => window.__meadow.track(null));
+
   // it stays awake
   await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   await page.reload();

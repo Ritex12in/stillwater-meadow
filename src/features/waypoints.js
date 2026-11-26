@@ -4,9 +4,9 @@
 // map, from anywhere. The home lake and your own camp are points from the start. Which stones are
 // awake is kept per world (`store.waypoints`). Travelling fades the view out and in, with a chime.
 //
-// Tracking: any stone (or other place) chosen on the map can be tracked, awake or not. A marker then
+// Tracking: any waystone chosen on the map can be tracked, awake or not. A marker then
 // hangs over it in the world, with its name and how far it is; when it is out of view the marker
-// sits at the edge of the screen pointing the way to turn; the compass marks it too. One thing is
+// sits at the edge of the screen pointing the way to turn; the compass marks it too. One stone is
 // tracked at a time (`store.track`, per world); it ends when you reach it (a sleeping stone: when
 // you wake it) or when you stop it on the map.
 import * as THREE from 'three';
@@ -18,7 +18,7 @@ import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
 import { store, saveSoon } from '../systems/save.js';
 import { audio, playing } from '../systems/audio.js';
-import { toast, togglePanel } from '../ui/hud.js';
+import { toast, togglePanel, anyPanelOpen } from '../ui/hud.js';
 import { placeName, setWaystoneAwake } from '../world/landmarks.js';
 
 const WAKE_REACH = 4.5, FADE_MS = 380;
@@ -122,9 +122,12 @@ export function initWaypoints(go) {
       const far = Math.hypot(T.x - player.x, T.z - player.z), sleeping = /^waystone:/.test(T.id) && !isAwake(T.id);
       if (far < 9 && !sleeping) { toast(`You have reached ${T.name}.`, 3); track(null); return; }
       if (id !== T.id) { id = T.id; y = Math.max(0, height(T.x, T.z)) + 4.2; nameEl.textContent = T.name; }
+      if (anyPanelOpen() || document.body.classList.contains('photo-mode')) { if (!el.hidden) el.hidden = true; return; } // (not over a panel, nor in a photo)
+      // (behind you or not is read from where it lies to the camera, not from the projection's depth: a stone beyond the far end of the view is still ahead)
+      camera.updateMatrixWorld(); // (the camera has just been moved: place the marker by where it is now)
+      const behind = v.set(T.x, y, T.z).applyMatrix4(camera.matrixWorldInverse).z > 0;
       v.set(T.x, y, T.z).project(camera);
       let sx = v.x, sy = v.y;
-      const behind = v.z > 1;
       if (behind) { sx = -sx; sy = -sy; }
       const off = behind || Math.abs(sx) > 0.9 || Math.abs(sy) > 0.8;
       if (off) { const k = Math.max(Math.abs(sx) / 0.9, Math.abs(sy) / 0.8, 1e-6); sx /= k; sy /= k; } // (out to the edge, the way it lies)

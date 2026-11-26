@@ -50,7 +50,7 @@ import { initCountries, nearestCountries } from './ui/countries.js';
 import { initBackpack, backpackView } from './ui/backpack.js';
 import { initFoundPlaces, foundView } from './features/places.js';
 import { initMap, mapView } from './ui/map.js';
-import { initWaypoints, waypointsView, travelToPoint } from './features/waypoints.js';
+import { initWaypoints, waypointsView, travelToPoint, track } from './features/waypoints.js';
 import { initCamp } from './features/camp.js';
 import { initLandmarks, landmarksView, landmarkBlocks, landmarkSeats } from './world/landmarks.js';
 import { initSignposts, signsNear, signBlocks } from './world/signposts.js';
@@ -388,7 +388,7 @@ window.__meadow = {
   /** The map (ui/map.js): how it stands, and what of the land is explored. */
   get map() { return mapView(); },
   /** Waystones (features/waypoints.js): those awake, the points you can travel to, those asleep about you; and a way to travel to a point. */
-  get waypoints() { return waypointsView(); }, travelToPoint,
+  get waypoints() { return waypointsView(); }, travelToPoint, track,
   /** The year: hold it at a phase (0 midwinter .. 0.5 midsummer; null lets it run), and how it is now. */
   year: { hold: holdPhase, get state() { return Object.assign({}, seasonState, { mapWeather: undefined }); } },
   /** The home lake's middle, and where you first arrive beside it. */

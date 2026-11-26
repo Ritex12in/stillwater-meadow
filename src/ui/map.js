@@ -330,8 +330,8 @@ function say() {
     b1.textContent = chosen.name;
     const asleep = chosen.kind === 'waystone' && !isAwake(chosen.id);
     place.replaceChildren(b1, ` · ${chosen.kind === 'waystone' ? (asleep ? 'Waystone, asleep' : 'Waystone') : KIND_LABEL[chosen.kind] || chosen.kind} · ${far < 60 ? 'you are here' : farText(far) + ' to the ' + wayTo(chosen.x - player.x, chosen.z - player.z)}${asleep ? ' · track it and walk there to wake it' : ''}`);
-  } else place.textContent = T ? `Tracking ${T.name}: follow the marker. Choose a waystone or a place to track it instead.` : 'Drag to move the map, scroll to zoom. Choose a waystone to track it; a woken one, home or your camp to travel there.';
-  tr.hidden = !chosen;
+  } else place.textContent = T ? `Tracking ${T.name}: follow the marker. Choose another waystone to track it instead.` : 'Drag to move the map, scroll to zoom. Choose a waystone to track it; a woken one, home or your camp to travel there.';
+  tr.hidden = !chosen || chosen.kind !== 'waystone'; // (waystones are what you track)
   tr.textContent = chosen && T && T.id === chosen.id ? 'Stop tracking' : 'Track';
   go.hidden = !chosen || !(freeTravel || pointFor(chosen.id));
 }

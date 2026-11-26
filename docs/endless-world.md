@@ -847,15 +847,15 @@ stones stand about **1.5 km** apart.
   unexplored map"): every waystone in view is marked, explored land or not; woken ones glow blue
   with their names, sleeping ones are dim (name when chosen). The stones are looked up a square
   at a time (`WAYSTONE_CELL`), 4 ms a frame while the map is open, nearest the middle first.
-  Choosing a mark offers **Track**; a woken stone, home or your camp also **Travel there**. The
+  Choosing a waystone offers **Track**; a woken stone, home or your camp **Travel there**. The
   header counts the stones awake.
 - **Tracking** (the owner: "track means show in world, show that the player can move in that
   direction"): one thing at a time, kept per world (`store.track`). A gold marker hangs over it in
   the world with its name and how far it is; when it is out of view the marker sits at the edge of
   the screen pointing the way to turn. The compass marks it in gold, before everything but home,
   and the map draws a dashed line to it. It ends when you reach it (within 9 m; a sleeping stone:
-  when you wake it) or with "Stop tracking" on the map. Ours, not asked for: any place chosen on
-  the map can be tracked, not only waystones.
+  when you wake it) or with "Stop tracking" on the map. Only waystones can be tracked. The marker
+  is hidden while a panel is open and in photo mode.
 - **On the compass:** also the nearest stone still asleep within 1.5 km, as "Waystone".
 - `window.__meadow.waypoints`: `awake`, `points`, `asleep` (within 2.5 km), `track`, `busy`;
   `__meadow.travelToPoint(point)`.

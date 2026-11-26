@@ -79,7 +79,7 @@ test('the map shows only the land you have explored, fills in as you walk, marks
   noErrors(errors);
 });
 
-test('waystones: one to a stretch of country, asleep until you wake it; then you can travel to it from the map, and it stays awake', async ({ page }) => {
+test('waystones: one to a stretch of country, on the map from the start; track one to be shown the way; asleep until you wake it, then you can travel to it, and it stays awake', async ({ page }) => {
   const errors = await open(page, 'weather=clear');
   await step(page, 1);
   // where they stand: by the seed, spread out, on dry ground clear of home
@@ -106,8 +106,38 @@ test('waystones: one to a stretch of country, asleep until you wake it; then you
   expect(w0.points.map((p) => p.kind)).toEqual(['home']);
   expect(w0.asleep.map((s) => s.id)).toContain(land.first.id);
 
-  // walk up to the nearest: it stands there asleep, shown dimly on the map, and cannot be travelled to
+  // the map marks waystones in land you have not explored; one asleep can be tracked, not travelled to
   const s = land.first;
+  await page.keyboard.press('KeyM');
+  await step(page, 0.2);
+  await page.locator('#mapOut').click();
+  await page.locator('#mapOut').click();
+  await step(page, 0.2);
+  await page.evaluate(() => { window.__meadow.map.settle(); });
+  const far = (await state(page)).marks.find((k) => k.id === s.id);
+  expect(far && far.awake, 'marked though its land is unexplored').toBe(false);
+  expect(await page.evaluate(([x, z]) => window.__meadow.map.explored(x, z), [s.x, s.z])).toBe(false);
+  const box0 = await page.locator('#mapCanvas').boundingBox();
+  await page.mouse.click(box0.x + far.x, box0.y + far.y);
+  expect((await state(page)).chosen).toBe(s.id);
+  await expect(page.locator('#mapGo'), 'asleep: no travelling there').toBeHidden();
+  await expect(page.locator('#mapTrack')).toHaveText('Track');
+  await page.locator('#mapTrack').click();
+  await expect(page.locator('#mapTrack')).toHaveText('Stop tracking');
+  expect((await page.evaluate(() => window.__meadow.waypoints.track)).id).toBe(s.id);
+  await step(page, 0.1);
+  expect((await state(page)).marks.find((k) => k.id === s.id).tracked).toBe(true);
+  await page.keyboard.press('Escape');
+  // tracking shows the way in the world: a marker with its name and how far, and a mark on the compass
+  await step(page, 1);
+  await expect(page.locator('#trackMark')).toBeVisible();
+  await expect(page.locator('#trackMark')).toContainText(/waystone.*\d(\.\d)? km/);
+  const cm = await page.evaluate(() => window.__meadow.compass().marks.find((k) => k.kind === 'track'));
+  expect(cm, 'on the compass').toBeTruthy();
+  const want = await page.evaluate(([x, z]) => { const p = window.__meadow.player; return (Math.atan2(x - p.x, -(z - p.z)) * 180 / Math.PI + 360) % 360; }, [s.x, s.z]);
+  expect(Math.abs(((cm.bearing - want + 540) % 360) - 180), 'pointing at the stone').toBeLessThan(1);
+
+  // walk up to it: it stands there asleep, shown dimly on the map
   await page.evaluate((s) => { window.__meadow.travelTo(s.x - 1.5, s.z + 3, s.x, s.z); }, s);
   await step(page, 1.5);
   expect(await page.evaluate(() => window.__meadow.landmarks().some((l) => l.kind === 'waystone')), 'the stone stands there').toBe(true);
@@ -126,6 +156,9 @@ test('waystones: one to a stretch of country, asleep until you wake it; then you
   expect(w1.asleep.map((q) => q.id)).not.toContain(s.id);
   expect(await toastText(page)).toContain('is awake');
   expect((await actions(page)).map((a) => a.id)).toContain('waystone-map');
+  expect(await page.evaluate(() => window.__meadow.waypoints.track), 'woken: the tracking is done').toBeNull();
+  await step(page, 0.2);
+  await expect(page.locator('#trackMark')).toBeHidden();
 
   // from home, choose it on the map and travel: the view fades, you stand by the stone, the map has closed
   await page.evaluate(() => { const m = window.__meadow; m.travelTo(m.spawn.x, m.spawn.z); });

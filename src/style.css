@@ -64,6 +64,8 @@ body.quiet .brand { opacity: 0.45; }
 .compass .mark::before { content: ""; position: absolute; top: -9px; left: 50%; translate: -50% 0; width: 6px; height: 6px; border-radius: 50%; background: #9fd8e8; box-shadow: 0 0 6px rgba(159, 216, 232, 0.8); }
 .compass .mark.home::before { background: #ffd27a; box-shadow: 0 0 6px rgba(255, 210, 122, 0.85); }
 .compass .mark.shrine::before { background: #ff9ec2; box-shadow: 0 0 6px rgba(255, 158, 194, 0.85); }
+.compass .mark.track { color: #ffd27a; }
+.compass .mark.track::before { width: 8px; height: 8px; top: -10px; background: #ffd27a; box-shadow: 0 0 8px rgba(255, 210, 122, 0.95); }
 .compass .mark.waystone::before { background: #7fe3ff; box-shadow: 0 0 6px rgba(127, 227, 255, 0.85); }
 .compass .mark b { font-weight: 700; }
 .compass .mark.dot b, .compass .mark.dot i { visibility: hidden; }
@@ -240,6 +242,10 @@ body.photo-mode > *:not(#world):not(.photo-bar):not(.photo-vignette):not(.photo-
 .pack-info b { color: var(--ink); font-size: 14px; }
 .pack-info .row { display: flex; gap: 6px; flex-wrap: wrap; }
 .catches.places-found li { grid-template-columns: minmax(0, 1fr) auto auto; }
+/* The marker over what you are tracking (features/waypoints.js): placed each frame */
+.track-mark { position: fixed; left: 0; top: 0; z-index: 3; translate: -50% -50%; pointer-events: none; display: grid; justify-items: center; gap: 2px; white-space: nowrap; font: 700 11.5px var(--font-ui); color: #ffd27a; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.5); }
+.track-mark i { width: 11px; height: 11px; margin-bottom: 4px; border-right: 3px solid #ffd27a; border-bottom: 3px solid #ffd27a; rotate: 45deg; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8)); }
+.track-mark span { color: var(--ink); font-weight: 600; font-size: 10.5px; font-variant-numeric: tabular-nums; }
 /* Travelling to a waystone: the view fades out and in */
 .fade { position: fixed; inset: 0; z-index: 55; background: #0e1418; opacity: 0; pointer-events: none; transition: opacity 0.36s ease; }
 .fade.on { opacity: 1; }

@@ -79,7 +79,7 @@ export function seedOf(v) {
 /** A new world's seed, at random (never 1, the first world). */
 export const randomSeed = () => 2 + Math.floor(Math.random() * (MAX_SEED - 1));
 /** What belongs to one world rather than to you. */
-const WORLD_KEYS = ['where', 'places', 'anchor', 'benchBouquet', 'boatBouquet', 'camp', 'lanterns', 'found', 'explored', 'waypoints'];
+const WORLD_KEYS = ['where', 'places', 'anchor', 'benchBouquet', 'boatBouquet', 'camp', 'lanterns', 'found', 'explored', 'waypoints', 'track'];
 /**
  * The world this visit is in. The address wins; then the world last played; a save from before
  * worlds had numbers was world 1; someone new gets a world of their own, at random (never 1).

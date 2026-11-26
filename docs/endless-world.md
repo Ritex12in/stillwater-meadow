@@ -843,11 +843,21 @@ stones stand about **1.5 km** apart.
   (sitting, fishing, in the boat).
 - **Names:** a stone has its own, by rule from its site: "Goldenford waystone", "Ravenmoor
   waystone" (`placeName`). A waystone is woken, not "found": it is not in the places journal.
-- **On the map:** woken stones glow blue with their names; stones still asleep show dimly once the
-  land they stand on is explored (name only when chosen, with "walk to it and wake it"). "Go
-  there" shows only for home, your camp and woken stones. The header counts the stones awake.
-- **On the compass:** the nearest stone still asleep within 1.5 km, as "Waystone".
-- `window.__meadow.waypoints`: `awake`, `points`, `asleep` (within 2.5 km), `busy`;
+- **On the map** (changed 2026-11-27 at the owner's word: "why can't I see waypoints on the
+  unexplored map"): every waystone in view is marked, explored land or not; woken ones glow blue
+  with their names, sleeping ones are dim (name when chosen). The stones are looked up a square
+  at a time (`WAYSTONE_CELL`), 4 ms a frame while the map is open, nearest the middle first.
+  Choosing a mark offers **Track**; a woken stone, home or your camp also **Travel there**. The
+  header counts the stones awake.
+- **Tracking** (the owner: "track means show in world, show that the player can move in that
+  direction"): one thing at a time, kept per world (`store.track`). A gold marker hangs over it in
+  the world with its name and how far it is; when it is out of view the marker sits at the edge of
+  the screen pointing the way to turn. The compass marks it in gold, before everything but home,
+  and the map draws a dashed line to it. It ends when you reach it (within 9 m; a sleeping stone:
+  when you wake it) or with "Stop tracking" on the map. Ours, not asked for: any place chosen on
+  the map can be tracked, not only waystones.
+- **On the compass:** also the nearest stone still asleep within 1.5 km, as "Waystone".
+- `window.__meadow.waypoints`: `awake`, `points`, `asleep` (within 2.5 km), `track`, `busy`;
   `__meadow.travelToPoint(point)`.
 
 ## Tools

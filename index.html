@@ -167,7 +167,7 @@
       <dt><kbd>R</kbd></dt><dd>Fish: cast, hook a bite, reel in</dd>
       <dt><kbd>I</kbd></dt><dd>Backpack: what you are carrying</dd>
       <dt><kbd>J</kbd></dt><dd>Catch journal</dd>
-      <dt><kbd>M</kbd></dt><dd>Map: the land you have explored · travel to home, your camp and the waystones you have woken</dd>
+      <dt><kbd>M</kbd></dt><dd>Map: the land you have explored, and the waystones · track one to be shown the way; travel to home, your camp and the stones you have woken</dd>
       <dt><kbd>B</kbd></dt><dd>Toss bread to the ducks</dd>
       <dt><kbd>G</kbd></dt><dd>Pick flowers, give or leave the bouquet</dd>
       <dt><kbd>Y</kbd></dt><dd>Throw a stick for a tamed dog</dd>
@@ -213,7 +213,7 @@
         <button type="button" class="glass" id="mapMe" title="Centre on you" aria-label="Centre on you"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.500 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
       </div>
     </div>
-    <div class="map-info"><span id="mapPlace"></span><button type="button" class="btn primary" id="mapGo" hidden>Go there</button></div>
+    <div class="map-info"><span id="mapPlace"></span><button type="button" class="btn" id="mapTrack" hidden>Track</button><button type="button" class="btn primary" id="mapGo" hidden>Travel there</button></div>
   </section>
 
   <div class="dialog" id="nameDialog" hidden>
@@ -236,6 +236,7 @@
     <div class="line"><span id="promptPrimary" class="line"></span><button type="button" class="more" id="promptMore" hidden aria-expanded="false"></button></div>
   </div>
   <div class="lock-tip glass auto-hide" id="lockTip" hidden>Click anywhere to look around with the mouse</div>
+  <div class="track-mark" id="trackMark" hidden aria-hidden="true"><i></i><b></b><span></span></div>
   <div class="fade" id="fade"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

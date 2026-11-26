@@ -11,18 +11,18 @@
 // country's own in summer (meadow, lush wood, heath, grove, snow, desert, swamp and the rest), lit
 // from the north-west so the hills stand out, with a faint line every 20 m of height.
 import { clamp, smooth } from '../core/math.js';
-import { sitesNear, rawHeight, seaAt, lakeAt, coldBase, coldAt, rainAt, snowCold, snowOf, dryOf, lushOf, groveAt, biomesAt, aboveTrees, TREE_COLD, ASPECT, riverNear } from '../core/shape.js';
+import { sitesNear, WAYSTONE_CELL, rawHeight, seaAt, lakeAt, coldBase, coldAt, rainAt, snowCold, snowOf, dryOf, lushOf, groveAt, biomesAt, aboveTrees, TREE_COLD, ASPECT, riverNear } from '../core/shape.js';
 import { hooks } from '../core/state.js';
 import { player } from '../characters/player.js';
 import { camState } from '../systems/input.js';
 import { store } from '../systems/save.js';
 import { bindKey } from '../systems/actions.js';
 import { togglePanel, onPanel } from './hud.js';
-import { CELL, SPAN, REGION, explored, exploredRegions, isExplored, exploredAt, reveal } from '../systems/explored.js';
+import { CELL, SPAN, REGION, explored, exploredRegions, isExplored, reveal } from '../systems/explored.js';
 import { KIND_LABEL } from '../features/places.js';
 import { freeTravel } from '../core/env.js';
 import { placeName } from '../world/landmarks.js';
-import { travelPoints, pointFor, travelToPoint, isAwake } from '../features/waypoints.js';
+import { travelPoints, pointFor, travelToPoint, isAwake, tracked, track } from '../features/waypoints.js';
 
 const $ = (id) => document.getElementById(id);
 const PX = 8, M = CELL / PX, SIDE = SPAN * PX;   // pixels to a cell; metres to a pixel; a region's picture
@@ -153,22 +153,39 @@ const view = { x: 0, z: 0, scale: START_SCALE };
 let open = false, follow = true, dirty = true, chosen = null, marks = [];
 let panel = null, canvas = null, ctx = null, maskLayer = null, mctx = null, cssW = 0, cssH = 0, dpr = 1;
 
-/** The waystones in explored land (looked up once per explored region): asleep ones are marked dimly, to walk to. */
-const stonesBy = new Map();
-function stonesSeen() {
-  const out = new Map(), hw = cssW / 2 / view.scale + REGION, hh = cssH / 2 / view.scale + REGION;
-  for (const R of exploredRegions()) {
-    if (Math.abs((R.rx + 0.5) * REGION - view.x) > hw || Math.abs((R.rz + 0.5) * REGION - view.z) > hh) continue; // (only the regions in view: a first look at one may have rivers to trace)
-    const k = R.rx + ',' + R.rz;
-    let list = stonesBy.get(k);
-    if (!list) stonesBy.set(k, (list = sitesNear((R.rx + 0.5) * REGION, (R.rz + 0.5) * REGION, REGION * 0.75, 'waystone').map((s) => ({ id: s.id, kind: 'waystone', name: placeName(s), x: s.x, z: s.z }))));
-    for (const s of list) if (!out.has(s.id) && exploredAt(s.x, s.z)) out.set(s.id, s);
-  }
+// The waystones are marked whether or not their land is explored (they are what you set out for).
+// Each has a square of WAYSTONE_CELL metres to itself; the squares in view are looked up one at a
+// time, a few milliseconds a frame, nearest the middle first (a first look at far country may have
+// rivers to trace), and kept.
+const stoneCells = new Map(); // "cx,cz" -> { id, kind, name, x, z } or null
+function stoneSquares() {
+  const hw = cssW / 2 / view.scale + 60, hh = cssH / 2 / view.scale + 60;
+  return { x0: Math.floor((view.x - hw) / WAYSTONE_CELL), x1: Math.floor((view.x + hw) / WAYSTONE_CELL), z0: Math.floor((view.z - hh) / WAYSTONE_CELL), z1: Math.floor((view.z + hh) / WAYSTONE_CELL) };
+}
+function stonesInView() {
+  const out = [], q = stoneSquares();
+  for (let cz = q.z0; cz <= q.z1; cz++) for (let cx = q.x0; cx <= q.x1; cx++) { const st = stoneCells.get(cx + ',' + cz); if (st) out.push(st); }
   return out;
 }
-/** The places to mark: those you have found (your camp where it stands now), and the waystones: awake (`awake`), or asleep in land you have explored. */
+/** Look up squares in view not yet looked up, for `ms` milliseconds. Returns whether any were. */
+function loadStones(ms) {
+  if (!cssW) return false;
+  const q = stoneSquares(), todo = [];
+  for (let cz = q.z0; cz <= q.z1; cz++) for (let cx = q.x0; cx <= q.x1; cx++) if (!stoneCells.has(cx + ',' + cz)) todo.push([cx, cz, Math.hypot((cx + 0.5) * WAYSTONE_CELL - view.x, (cz + 0.5) * WAYSTONE_CELL - view.z)]);
+  if (!todo.length) return false;
+  todo.sort((p, r) => p[2] - r[2]);
+  const t0 = performance.now();
+  for (const [cx, cz] of todo) {
+    // (a stone stands in the middle half of its square: this reach takes in that square's and no other's)
+    const st = sitesNear((cx + 0.5) * WAYSTONE_CELL, (cz + 0.5) * WAYSTONE_CELL, WAYSTONE_CELL * 0.36, 'waystone')[0];
+    stoneCells.set(cx + ',' + cz, st ? { id: st.id, kind: 'waystone', name: placeName(st), x: st.x, z: st.z } : null);
+    if (performance.now() - t0 > ms) break;
+  }
+  return true;
+}
+/** The places to mark: those you have found (your camp where it stands now), and the waystones in view: awake (`awake`) or asleep. */
 function places() {
-  const out = [], stones = stonesSeen();
+  const out = [], stones = new Map(stonesInView().map((st) => [st.id, st]));
   for (const p of travelPoints()) if (p.kind === 'waystone') { stones.delete(p.id); out.push({ id: p.id, kind: 'waystone', name: p.name, x: p.x, z: p.z, awake: true }); }
   for (const s of stones.values()) if (!isAwake(s.id)) out.push(Object.assign({ awake: false }, s));
   for (const f of store.found || []) {
@@ -220,6 +237,7 @@ function draw() {
   // (the chosen place first, then those nearest the middle: where names would run together, the later ones go without)
   const picked = (f) => !!chosen && f.id === chosen.id;
   list.sort((p, q) => picked(q.f) - picked(p.f) || Math.hypot(p.x - cssW / 2, p.y - cssH / 2) - Math.hypot(q.x - cssW / 2, q.y - cssH / 2));
+  const T = tracked();
   marks = [];
   ctx.textAlign = 'center'; ctx.lineJoin = 'round';
   for (const m of list) {
@@ -246,7 +264,16 @@ function draw() {
         ctx.fillStyle = on ? '#ffd27a' : ink; ctx.fillText(f.name, m.x, ty);
       }
     }
-    marks.push({ id: f.id, name: f.name, kind: f.kind, x: Math.round(m.x), y: Math.round(m.y), label, awake: stone ? !!f.awake : undefined });
+    marks.push({ tracked: !!T && T.id === f.id, id: f.id, name: f.name, kind: f.kind, x: Math.round(m.x), y: Math.round(m.y), label, awake: stone ? !!f.awake : undefined });
+  }
+  // what you are tracking: a dashed line to it from where you stand, and a ring round it
+  if (T) {
+    const tx = px(T.x), ty = pz(T.z);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 210, 122, 0.9)'; ctx.lineWidth = 2; ctx.setLineDash([7, 6]);
+    ctx.beginPath(); ctx.moveTo(px(player.x), pz(player.z)); ctx.lineTo(tx, ty); ctx.stroke();
+    ctx.setLineDash([]); ctx.beginPath(); ctx.arc(tx, ty, 15, 0, 7); ctx.stroke();
+    ctx.restore();
   }
   // you: an arrow pointing the way you look
   {
@@ -297,20 +324,22 @@ function say() {
   const sum = $('mapSummary'), km2 = (explored.cells * CELL * CELL) / 1e6, n = (store.found || []).length;
   const stones = travelPoints().filter((p) => p.kind === 'waystone').length;
   sum.textContent = `${km2 < 10 ? km2.toFixed(1) : Math.round(km2)} km² explored · ${n} ${n === 1 ? 'place' : 'places'} · ${stones} ${stones === 1 ? 'waystone' : 'waystones'} awake`;
-  const place = $('mapPlace'), go = $('mapGo');
+  const place = $('mapPlace'), go = $('mapGo'), tr = $('mapTrack'), T = tracked();
   if (chosen) {
     const far = Math.hypot(chosen.x - player.x, chosen.z - player.z), b1 = document.createElement('b');
     b1.textContent = chosen.name;
     const asleep = chosen.kind === 'waystone' && !isAwake(chosen.id);
-    place.replaceChildren(b1, ` · ${chosen.kind === 'waystone' ? (asleep ? 'Waystone, asleep' : 'Waystone') : KIND_LABEL[chosen.kind] || chosen.kind} · ${far < 60 ? 'you are here' : farText(far) + ' to the ' + wayTo(chosen.x - player.x, chosen.z - player.z)}${asleep ? ' · walk to it and wake it to travel here' : ''}`);
-  } else place.textContent = 'Drag to move the map, scroll to zoom. Choose home, your camp or a waystone you have woken to travel there.';
+    place.replaceChildren(b1, ` · ${chosen.kind === 'waystone' ? (asleep ? 'Waystone, asleep' : 'Waystone') : KIND_LABEL[chosen.kind] || chosen.kind} · ${far < 60 ? 'you are here' : farText(far) + ' to the ' + wayTo(chosen.x - player.x, chosen.z - player.z)}${asleep ? ' · track it and walk there to wake it' : ''}`);
+  } else place.textContent = T ? `Tracking ${T.name}: follow the marker. Choose a waystone or a place to track it instead.` : 'Drag to move the map, scroll to zoom. Choose a waystone to track it; a woken one, home or your camp to travel there.';
+  tr.hidden = !chosen;
+  tr.textContent = chosen && T && T.id === chosen.id ? 'Stop tracking' : 'Track';
   go.hidden = !chosen || !(freeTravel || pointFor(chosen.id));
 }
 
 /** For tests: how the map stands, a way to finish painting it, and the colour drawn at a spot. */
 export const mapView = () => ({
   open: open && !!panel && !panel.hidden, cells: explored.cells, pending: pendingCells, follow, x: view.x, z: view.z, scale: view.scale, chosen: chosen && chosen.id, marks: marks.slice(),
-  settle: () => { syncWants(); while (build(1e9)); draw(); return pendingCells; },
+  settle: () => { syncWants(); while (build(1e9)); while (loadStones(1e9)); draw(); return pendingCells; },
   /** The colour drawn at a spot in the world ([r, g, b]), or null off the map's edge. */
   colourAt: (x, z) => { const sx = Math.round(((x - view.x) * view.scale + cssW / 2) * dpr), sy = Math.round(((z - view.z) * view.scale + cssH / 2) * dpr); return ctx && sx >= 0 && sy >= 0 && sx < canvas.width && sy < canvas.height ? Array.from(ctx.getImageData(sx, sy, 1, 1).data.slice(0, 3)) : null; },
   explored: (x, z) => isExplored(Math.floor(x / CELL), Math.floor(z / CELL)),
@@ -371,6 +400,12 @@ export function initMap(goTo) {
   $('mapIn').addEventListener('click', () => zoomBy(1.5));
   $('mapOut').addEventListener('click', () => zoomBy(1 / 1.5));
   $('mapMe').addEventListener('click', () => { follow = true; dirty = true; });
+  $('mapTrack').addEventListener('click', () => {
+    if (!chosen) return;
+    const T = tracked();
+    track(T && T.id === chosen.id ? null : chosen);
+    say(); dirty = true;
+  });
   $('mapGo').addEventListener('click', () => {
     if (!chosen) return;
     const p = pointFor(chosen.id);
@@ -391,6 +426,7 @@ export function initMap(goTo) {
     if (follow && (view.x !== player.x || view.z !== player.z)) { view.x = player.x; view.z = player.z; dirty = true; }
     if (Math.hypot(player.x - drawnX, player.z - drawnZ) * view.scale > 0.5 || Math.abs(camState.yaw - drawnYaw) > 0.02) dirty = true;
     if (build(BUILD_MS)) dirty = true;
+    if (loadStones(4)) dirty = true;
     sayIn -= dt;
     if (sayIn <= 0) { sayIn = 1; say(); }
     if (dirty) { drawnX = player.x; drawnZ = player.z; drawnYaw = camState.yaw; draw(); }

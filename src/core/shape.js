@@ -718,6 +718,8 @@ export function biomeAt(x, z, h, min = 0.5) {
 // land, so by the seed, each kind by its own rule, one or none to a square of its own size, in the
 // square's middle half (so two are never close), on ground levelled for it (see height()), clear
 // of every lake, of the shrines and of the start. `flat`/`out`: the levelled ground's radii.
+/** The side (m) of the square a waystone has to itself (the map looks them up square by square). */
+export const WAYSTONE_CELL = 1500;
 const SITE_KINDS = {
   // a pagoda in a blossom grove
   pagoda: { cell: 700, flat: 10, out: 18, salt: 0x9A60D, tries: 10, chance: 0.6, rule: (x, z, h) => groveAt(x, z) > 0.6 && h > 1 && h < 45 },
@@ -745,7 +747,7 @@ const SITE_KINDS = {
   ship: { cell: 1500, flat: 0, out: 0, ship: true, salt: 0x5419, tries: 12, chance: 0.7, rule: (x, z, h) => h < -6 && seaAt(x, z) > 0.5 },
   // a waystone (features/waypoints.js): a standing stone to travel to, one to a square in every kind of country, on
   // fairly level dry ground clear of water, rivers and the other buildings (no levelled ground: it changes nothing of the land)
-  waystone: { cell: 1500, flat: 0, out: 0, salt: 0x3A75, tries: 48, rule: (x, z, h) => h > 1.5 && h < 220 && seaAt(x, z) < 0.02 && reliefAt(x, z, h) < 5 && !otherSiteNear(x, z, 70) && !riverHere(x, z) },
+  waystone: { cell: WAYSTONE_CELL, flat: 0, out: 0, salt: 0x3A75, tries: 48, rule: (x, z, h) => h > 1.5 && h < 220 && seaAt(x, z) < 0.02 && reliefAt(x, z, h) < 5 && !otherSiteNear(x, z, 70) && !riverHere(x, z) },
   skyisle: { cell: 1900, flat: 6, out: 11, salt: 0x5C15, tries: 12, rule: (x, z, h) => h > 4 && h < 90 && wonderAt(x, z).a > 0.3 && rangeAt(x, z) < 0.45 },
 };
 /** The volcano's cone: how much it raises the land (m) at a distance `r` from its middle; a crater at the top. */

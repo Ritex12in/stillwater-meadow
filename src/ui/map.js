@@ -147,7 +147,7 @@ const wayTo = (dx, dz) => WAYS[Math.round(((Math.atan2(dx, -dz) * 180) / Math.PI
 // ── The panel ──────────────────────────────────────────────────
 const view = { x: 0, z: 0, scale: START_SCALE };
 let open = false, follow = true, dirty = true, chosen = null, marks = [];
-let canvas = null, ctx = null, maskLayer = null, mctx = null, cssW = 0, cssH = 0, dpr = 1;
+let panel = null, canvas = null, ctx = null, maskLayer = null, mctx = null, cssW = 0, cssH = 0, dpr = 1;
 
 /** The places to mark: those you have found (your camp where it stands now). */
 function places() {
@@ -286,7 +286,7 @@ function say() {
 
 /** For tests: how the map stands, a way to finish painting it, and the colour drawn at a spot. */
 export const mapView = () => ({
-  open, cells: explored.cells, pending: pendingCells, follow, x: view.x, z: view.z, scale: view.scale, chosen: chosen && chosen.id, marks: marks.slice(),
+  open: open && !!panel && !panel.hidden, cells: explored.cells, pending: pendingCells, follow, x: view.x, z: view.z, scale: view.scale, chosen: chosen && chosen.id, marks: marks.slice(),
   settle: () => { syncWants(); while (build(1e9)); draw(); return pendingCells; },
   /** The colour drawn at a spot in the world ([r, g, b]), or null off the map's edge. */
   colourAt: (x, z) => { const sx = Math.round(((x - view.x) * view.scale + cssW / 2) * dpr), sy = Math.round(((z - view.z) * view.scale + cssH / 2) * dpr); return ctx && sx >= 0 && sy >= 0 && sx < canvas.width && sy < canvas.height ? Array.from(ctx.getImageData(sx, sy, 1, 1).data.slice(0, 3)) : null; },
@@ -297,6 +297,7 @@ export const mapView = () => ({
 export function initMap(goTo) {
   canvas = $('mapCanvas');
   if (!canvas) return;
+  panel = $('mapPanel');
   ctx = canvas.getContext('2d');
   maskLayer = document.createElement('canvas'); mctx = maskLayer.getContext('2d');
   onPanel('mapPanel', (o) => {
@@ -357,6 +358,7 @@ export function initMap(goTo) {
       lookIn = 0.4;
       if (!(Math.hypot(player.x - lastX, player.z - lastZ) < CELL / 2)) { lastX = player.x; lastZ = player.z; reveal(player.x, player.z); }
     }
+    if (open && panel.hidden) open = false; // (another panel took its place: that hides it without a word)
     if (!open) return;
     if (seenRev !== explored.rev) { seenRev = explored.rev; syncWants(); dirty = true; }
     if (follow && (view.x !== player.x || view.z !== player.z)) { view.x = player.x; view.z = player.z; dirty = true; }

@@ -52,6 +52,15 @@ test('the map shows only the land you have explored, fills in as you walk, marks
   expect(back, 'you stand by the home lake').toBeLessThan(2.5);
   await page.keyboard.press('Escape');
   await expect(page.locator('#mapPanel')).toBeHidden();
+  // another panel takes the map's place: it is closed, not left working unseen
+  await page.keyboard.press('KeyM');
+  await step(page, 0.2);
+  expect((await state(page)).open).toBe(true);
+  await page.keyboard.press('KeyI');
+  await step(page, 0.2);
+  await expect(page.locator('#mapPanel')).toBeHidden();
+  expect((await state(page)).open).toBe(false);
+  await page.keyboard.press('Escape');
 
   // kept with the save: the same after a reload; another world starts blank; this one is there on coming back
   const kept = (await state(page)).cells;

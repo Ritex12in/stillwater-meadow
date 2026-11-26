@@ -3,7 +3,7 @@
 // the cells are gathered into regions of SPAN x SPAN (about a kilometre square), each saved as its
 // own short string, so the save grows by a couple of hundred characters per square kilometre walked
 // and never holds a list of points. The map (ui/map.js) draws only what is marked here.
-import { store, saveSoon, onSave } from './save.js';
+import { store, onSave } from './save.js';
 
 /** A cell's side (m); cells along a region's side; a region's side (m); how far about you the land is revealed (m). */
 export const CELL = 32, SPAN = 32, REGION = CELL * SPAN, REVEAL = 190;
@@ -42,7 +42,7 @@ export function reveal(x, z, r = REVEAL) {
     const dx = (gx + 0.5) * CELL - x, dz = (gz + 0.5) * CELL - z;
     if (dx * dx + dz * dz <= r * r) n += mark(gx, gz);
   }
-  if (n) { explored.rev++; explored.cells += n; saveSoon(); }
+  if (n) { explored.rev++; explored.cells += n; } // (saved with the next regular save, and on leaving: not worth a save of its own every few steps)
   return n;
 }
 

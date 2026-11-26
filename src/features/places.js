@@ -14,7 +14,7 @@ import { phaseName } from '../core/year.js';
 import { seasonState } from '../core/state.js';
 
 const POSTCARDS = 30;
-export const KIND_LABEL = { lake: 'Lake', shrine: 'Shrine', pagoda: 'Pagoda', castle: 'Castle', ruin: 'Ruins', hut: 'Stilt hut', windmill: 'Windmill', circle: 'Stone circle', cairn: 'Summit cairn', spring: 'Hot spring', camp: 'Camp' };
+export const KIND_LABEL = { lake: 'Lake', shrine: 'Shrine', pagoda: 'Pagoda', castle: 'Castle', ruin: 'Ruins', hut: 'Stilt hut', windmill: 'Windmill', circle: 'Stone circle', cairn: 'Summit cairn', spring: 'Hot spring', icecastle: 'Ice castle', grotto: 'Crystal grotto', volcano: 'Volcano', beachhut: 'Beach hut', ship: 'Ship', skyisle: 'Floating islands', camp: 'Camp' };
 
 /** The places near a spot that can be found: { id, kind, name, x, z, reach }. */
 function placesNear(x, z) {

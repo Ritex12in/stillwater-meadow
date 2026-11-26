@@ -108,6 +108,7 @@ Each one leaves the game playable and tested.
 | 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; rivers and waterfalls done (see "Rivers and waterfalls"); islands in lakes done (see "Islands") |
 | M | **A map** (asked for by the owner, 2026-11-26): a screen opened with M showing the land you have explored, filling in as you walk, with the places you have found marked. | Explored land is kept per world; nothing unfound is marked (`tests/map.spec.js`). | done (see "How the map works"); its look is for the owner to judge |
 | T | **Teleport points** (asked for by the owner, 2026-11-27; the owner took our picks): waystones, standing stones you wake and then travel to from the map; the lists that took you anywhere at once are gone from play. | Stones are fixed by the seed and change nothing of the land; a woken stone stays woken per world (`tests/map.spec.js`). | done (see "How travelling works"); the stone's look is for the owner to judge |
+| L | **Seasons by latitude** (planned 2026-11-27, not started; see "Plan: seasons by latitude"). The endless world in lands 12 km north to south, each pole, equator, pole; the kind of year a place has follows its latitude, and the two halves of a land are half a year apart. | Pictures agreed by the owner before the build; every kind of country still findable; one full run of the suite; speed checked on the owner's computer. | planned |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
@@ -859,6 +860,142 @@ stones stand about **1.5 km** apart.
 - **On the compass:** also the nearest stone still asleep within 1.5 km, as "Waystone".
 - `window.__meadow.waypoints`: `awake`, `points`, `asleep` (within 2.5 km), `track`, `busy`;
   `__meadow.travelToPoint(point)`.
+
+## Plan: seasons by latitude (decided 2026-11-27; nothing built)
+
+**Why.** The owner: a player who wants spring in winter has to wait, which is annoying (the World
+panel's season picker is a debugging tool, not for players); and in the real world seasons vary
+by place, by latitude, and not every place has changing seasons. A sphere and a wrapped planet
+were talked through and set aside ("forget about this"); the world stays endless and flat.
+
+**Decided by the owner.**
+- The endless world is divided into small finite worlds, each with its own north and south: "a
+  lot of north-south".
+- 6 km from pole to equator, so a land is 12 km north to south.
+- The kind of year follows latitude, as on Earth, in five belts: polar (frozen all year),
+  subpolar (long winter, short cool summer), temperate (four seasons), subtropical (hot summer,
+  mild winter, no snow), tropical (no winter: a wet and a dry season).
+- Home lies in a temperate belt.
+
+**Ours (the owner may overturn any).** Where the belts' edges lie; how strongly temperature
+follows latitude against the local patches; that the belts' edges wander a little; the formulas
+below; the order of work. Every distance below is proposed, none measured.
+
+### The rule
+
+North is -z (the compass and the sun have it so). Let `d` be how far south a spot is of the pole
+north of home: `d = z - (HOME.z - 2700)`. (`makeHome` does not read the climate, so anchoring to
+home is not circular.)
+
+- **Latitude** `L = |1 - (d mod 12000) / 6000|`: 1 at a pole, 0 at an equator; it repeats every
+  12 km. Home is at `L = 0.55`.
+- **Which half-year** `off = floor((floor(d / 6000) + 1) / 2) mod 2`: 0 where the year runs as at
+  home, 1 where it runs half a year apart. It changes only at equators (d = 6, 18, 30 km...),
+  never at a pole, so it repeats every 24 km: lands are mirror images of their neighbours, and
+  the two sides of a pole are in the same season.
+- **Belts** (proposed): tropical `L < 0.2`, subtropical to 0.4, temperate to 0.7, subpolar to
+  0.87, polar above. From home that puts the subpolar belt about 0.9 km north and the pole
+  2.7 km north; the subtropical about 0.9 km south, the tropical 2.1 km, the equator 3.3 km, and
+  the middle of the other temperate belt (the opposite season) 6.6 km south.
+
+### Two separate things: what a place is, and what the year does to it
+
+1. **What a place is** stays `coldAt`: its own warm-season chill, which about twenty callers use
+   to decide what exists there (snowfields, which trees, biomes, buildings' rules, lakes frozen
+   for good, the map's colours). Latitude goes into `coldBase`:
+   `coldBase = clamp(T(L') + 0.35 * patches) * mild`, where `T` runs about -0.6 at the equator,
+   -0.3 at 0.3, 0 at home's 0.55, +0.3 at 0.75, +0.7 at 0.9; `patches` is today's noise field (so
+   a cold valley can lie in a mild belt); `L'` is `L` with `d` shifted up to about 300 m by a
+   slow noise, so a belt's edge wanders instead of running ruler-straight; `mild` keeps the
+   country round home as it is. Rain may lean a little by latitude (wetter at the equator, drier
+   in the subtropics, where the deserts are), the noise still deciding.
+2. **What the year does** is on the season's side, never folded into `coldAt` (or half the map
+   would draw as snow). Today: chill today = `c + s * swing(c)`, `s` the one season value
+   (0 midsummer to 0.75 midwinter). New: chill today = `c + sHere * A(L)`.
+   - `A(L)`, how much the year moves a place: 0 below `L = 0.15`, rising to 1 by 0.45, 1 from
+     there to the pole (the pole is frozen by `c` anyway). This is what makes the tropics
+     seasonless and the temperate belt the one with four seasons.
+   - `sHere`: the other half-year's season value is simply `0.75 - s`, so
+     `sHere = s + m * (0.75 - 2s)`, `m` going 0 to 1 across an equator over a few hundred metres
+     (where `A` is 0, so the change is not seen).
+   - "Cooling or warming" (`isCooling`, which leaves and flowers read) flips with `off`; lake and
+     river ice use the lagged season value the same way.
+
+### Who has to change
+
+- **The ground and grass shaders** (`SEASON_GLSL`, `world/terrain.js`, `world/grassfield.js`).
+  They keep the one uniform `uSeason`. `A` and `m` depend only on z, so the shader can work them
+  out from the spot's own z with a few `smoothstep`s (the wander is in the baked cold, not here).
+  No new vertex data should be needed: the ground's `clime` has three values and the grass map's
+  four channels are full, so this matters. To be measured A/B on the owner's computer.
+- **Things with their own chill** (`features/seasons.js`: trees, flowers to pick, lily pads; lake
+  and river ice in `core/shape.js`; `systems/weatherfield.js` for snow or rain): each also keeps
+  its `A` and `m`, worked out once with its chill.
+- **Where you stand** (`readHere`): winter here, flowers out, leaves, insects, clothes, music.
+- **Names of the season.** The clock label, the "Here" line and the season stamped on found
+  places and postcards say the season where you stand: the four names in the temperate and
+  subpolar belts, "wet season" and "dry season" in the tropical, none at the pole.
+- **Tropical wet and dry.** In the tropical belt the weather field rains more in the half of the
+  year that is that side's summer, and the grass golds in the dry half.
+- **The sun.** Day length and the sun's height stay as now, one for the whole world (proposed:
+  day and night follow the player's real clock, and a sun that changed with every few
+  kilometres walked would be strange).
+
+### What must still hold
+
+- The home lake freezes in midwinter (the skipper's pine cones, the skating dance): home is in
+  the temperate belt with a full `A`, and `mild` keeps its own ground as it is.
+- Every kind of country stays findable (a seed sweep of the distance from home to each, before
+  and after). Expect cold kinds to the north of home and warm kinds to the south, where today
+  they are scattered.
+- Weather stays a pure function of the seed, the place and the moment, the same for everyone.
+- Nothing is rebuilt as the days pass.
+
+### What it moves (the cost)
+
+`coldBase` and `rainAt` are read by more than colours: the land's own shape (`plainsAt` and
+`cliffsAt` flatten or step it), the lakes (beach, frozen, names), the buildings' rules, and so
+the trails, and some waystones. Beyond the mild ground round home, **existing worlds change**:
+places found, woken waystones, what is tracked, the camp, lanterns and the explored map can all
+point at land that is no longer what it was. The save needs a number for the world's making, and
+the owner a decision (below).
+
+### Order of work
+
+1. **Pictures first, no change to the game.** A tool draws the climate from above, old against
+   new, for a few seeds, with the belts and home marked, and the seed sweep of distances. The
+   owner judges by pictures; east-west stripes are the look at risk. Belt edges, the blend and
+   the wander are tuned here.
+2. **Climate by latitude** (`coldBase`, the lean on rain), the world's making numbered in the
+   save, old saves handled as decided. Tests about where things lie are brought up to date.
+3. **The year by latitude in the game's own code:** `core/year.js` (`A`, `m`, the flipped
+   cooling), each thing's chill, lake and river ice, the weather's snow, `readHere`.
+4. **The shaders,** with an A/B on the owner's computer.
+5. **Tropical wet and dry, and the names of the season.**
+6. **One full run of the suite,** docs, then the owner tries it before any release.
+
+**Tests.** `tests/helpers.js` holds every test at `season=summer`, which is the world's phase:
+under it the other half-year is in winter, so tests that travel far see winter there. Tests that
+assert climate by place and will need looking at, at least: in `world.spec.js` the kinds of
+country, nature, seasons by place, flowers and biomes; in `lakes.spec.js` frozen lakes; in
+`explore.spec.js` skating, the castle, the sea, the fox and the countries list.
+
+### Decisions wanted from the owner
+
+1. **Old worlds,** the live site's among them. Proposed: when a world made before this is opened,
+   its places found, woken waystones, tracking, camp, lanterns and explored map are cleared once,
+   with a line saying the land has changed; what you carry, your journals, pets and settings are
+   kept.
+2. **How strongly temperature follows latitude.** Proposed above: latitude leads, the patches
+   add about a third. To be settled on the pictures.
+3. **The sun** staying one for the whole world.
+
+### Not part of this
+
+Asked or suggested, not decided: names and completion goals for each land ("34% explored, 12 of
+40 waystones"); dividing lands east to west; hiding the World panel and its keys from play;
+latitude lines on the map; rules of their own for the enchanted wood and volcanic country (no
+leaf fall, no lying snow).
 
 ## Tools
 

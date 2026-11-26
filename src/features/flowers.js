@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { lerp } from '../core/math.js';
-import { heightAt } from '../core/shape.js';
+import { heightAt, yearOf } from '../core/shape.js';
 import { std, bothSides } from '../core/materials.js';
 import { flowerHeadGeos, flowerCentreGeo, FLOWER_KINDS, FLOWER_CENTRE, BOUQUET_SHAPE, STEM_H } from '../world/detail.js';
 import { clock } from '../core/clock.js';
@@ -93,7 +93,7 @@ export function initFlowers() {
   const redraw = () => {
     const now = clock.elapsed, s = seasonState.season, cool = seasonState.cooling;
     for (const [id, t] of picked) if (now - t > REGROW) picked.delete(id);
-    shown = items.filter((it) => it.keep < flowersOut(it.chill || 0, s, cool) && !picked.has(it.id)); // (each by its own place's season)
+    shown = items.filter((it) => it.keep < flowersOut(it.chill || 0, s, cool, yearOf(it)) && !picked.has(it.id)); // (each by its own place's season)
     world.picksDropped = world.drawPicks ? world.drawPicks(shown) : 0;
     lastFrac = s; lastCool = cool;
   };

@@ -9,8 +9,8 @@ import { clamp, damp, rnd, mulberry32, hash } from '../core/math.js';
 import { query } from '../core/env.js';
 import { glowTex } from '../core/materials.js';
 import { hooks, seasonState as st, world } from '../core/state.js';
-import { coldAt, coldBase, northness, ASPECT, HOME, lakeChill, height, groveAt, biomesAt } from '../core/shape.js';
-import { yearPhase, seasonValue, isCooling, phaseName, dayOfPhase, chillNow, snowFrom, iceFrom, flowersOut, leavesAt, SEASON_PHASE, ICE_LAG, seasonU } from '../core/year.js';
+import { coldAt, coldBase, northness, ASPECT, HOME, lakeChill, height, groveAt, biomesAt, yearAt, yearOf, latitudeAt, beltOf, wetSeasonAt } from '../core/shape.js';
+import { yearPhase, seasonValue, isCooling, phaseName, dayOfPhase, chillNow, snowFrom, iceFrom, flowersOut, leavesAt, SEASON_PHASE, ICE_LAG, seasonU, yearHereU, seasonHere, phaseHere } from '../core/year.js';
 import { bindKey } from '../systems/actions.js';
 import { store, saveSoon } from '../systems/save.js';
 import { wx } from '../systems/weather.js';
@@ -54,7 +54,7 @@ function palOf(it) {
 /** A tree's chill (its place's cold in summer), kept on it. */
 const chillOf = (it) => (it.chill !== undefined ? it.chill : (it.chill = coldAt(it.x, it.z, it.y !== undefined ? it.y : height(it.x, it.z))));
 /** What a tree's leaves are doing today. */
-const stateOf = (it) => leavesAt(chillOf(it), st.season, st.cooling);
+const stateOf = (it) => leavesAt(chillOf(it), st.season, st.cooling, yearOf(it));
 /** Give a tree the colour it should be showing (called for trees as they come into view). */
 function tintTree(it) {
   if (!ready) return;
@@ -94,14 +94,21 @@ function turnYear() {
 
 /** How the season is where you stand: snow, flowers, the state of the leaves, winter or not. */
 let winterHere = false;
+const hereYear = { A: 1, m: 0 };
 function readHere(x, z) {
-  const h = height(x, z), base = coldBase(x, z), c = coldAt(x, z, h + ASPECT * northness(x, z, h, base), base), now = chillNow(c, st.season);
+  const h = height(x, z), base = coldBase(x, z), c = coldAt(x, z, h + ASPECT * northness(x, z, h, base), base), y = Object.assign(hereYear, yearAt(x, z)), now = chillNow(c, st.season, y);
+  // the year here: for the grass, and the season's name where you stand (the tropics have a wet and a dry season; the pole has none)
+  yearHereU.value[0] = y.A; yearHereU.value[1] = y.m;
+  st.seasonHere = seasonHere(st.season, y);
+  st.phaseHere = phaseHere(st.phase, y);
+  st.beltHere = beltOf(latitudeAt(x, z));
+  st.nameHere = st.beltHere === 'polar' ? '' : st.beltHere === 'tropical' ? (wetSeasonAt(x, z, st.season) > 0.5 ? 'Wet season' : 'Dry season') : phaseName(st.phaseHere);
   // (in and out at different chills, so clothes and music do not flicker along a snow line)
   winterHere = winterHere ? now > 0.42 : now > 0.5;
   st.winterHere = winterHere;
-  st.coverFloor = COVER * snowFrom(c, st.season);
-  st.flowerFrac = flowersOut(c, st.season, st.cooling);
-  st.leavesHere = leavesAt(c, st.season, st.cooling);
+  st.coverFloor = COVER * snowFrom(c, st.season, y);
+  st.flowerFrac = flowersOut(c, st.season, st.cooling, y);
+  st.leavesHere = leavesAt(c, st.season, st.cooling, y);
   st.groveHere = groveAt(x, z);
   st.enchantedHere = biomesAt(x, z, h, base).enchanted;
   // the northern lights: over cold country (more of them in winter)
@@ -195,12 +202,28 @@ export function initSeasons() {
   // rain or snow, by how cold it is where you stand
   st.mapWeather = (k) => {
     if (st.winterHere && (k === 'rain' || k === 'storm')) return 'snow';
-    if (!st.winterHere && k === 'snow' && (st.season < 0.3 || rnd() < 0.7)) return 'rain';
+    if (!st.winterHere && k === 'snow' && ((st.seasonHere ?? st.season) < 0.3 || rnd() < 0.7)) return 'rain';
     return k;
   };
   return { resize: (h) => falling.resize(h) };
 }
 
+/**
+ * You have travelled at once to another place (main.js travelTo): the season is as it is there
+ * straight away. What eases as you walk (the grass's tint, the insects) and the snow carried on
+ * the trees and rocks would otherwise come with you from a winter into a summer for some minutes.
+ */
+export function settleSeason(x, z) {
+  if (!ready) return;
+  readHere(x, z);
+  const p = P[st.leavesHere || 'summer'];
+  st.bugs = p.bugs;
+  world.grassMat.color.setRGB(...p.grass);
+  if (world.grassKitMat) world.grassKitMat.color.setRGB(...p.grass);
+  world.terrain.material.color.setRGB(...p.ground);
+  wx.cover = st.coverFloor; // (the snow lying on things: what the season gives here, no more)
+  recolourIn = 0; hereIn = 0.5;
+}
 /** The season by the calendar of the game year ('winter', 'spring', 'summer' or 'autumn'). */
 export const seasonNow = () => phaseName(typeof st.phase === 'number' ? st.phase : 0.5).toLowerCase();
 /** For tests: hold the year at a phase (0 midwinter .. 0.5 midsummer), or let it run again (null). */

@@ -9,7 +9,7 @@
 // "The lake you are at" (`lifeLake`) changes only when you have left the old one out of sight;
 // whoever keeps creatures there is told through `hooks.lake` (core/state.js) and moves them.
 import { TAU, mulberry32, hash } from '../core/math.js';
-import { HOME, height, lakesNear, kitOf, lakeIce, lakeChill, islePoint } from '../core/shape.js';
+import { HOME, height, lakesNear, kitOf, lakeIce, lakeChill, islePoint, yearOf } from '../core/shape.js';
 import { flowersOut } from '../core/year.js';
 import { col } from '../core/materials.js';
 import { hooks, world, seasonState } from '../core/state.js';
@@ -75,7 +75,7 @@ export function updateLakeLife(x, z) {
   if (!sets) return;
   // (each lake's lilies by its own season: no pads on ice, no flowers out of their season)
   const near = lakesNear(x, z, LIFE_REACH).slice(0, 3);
-  const ice = near.map((L) => lakeIce(L) > 0.4), bloom = near.map((L) => flowersOut(lakeChill(L), seasonState.season, seasonState.cooling) > 0.3);
+  const ice = near.map((L) => lakeIce(L) > 0.4), bloom = near.map((L) => flowersOut(lakeChill(L), seasonState.season, seasonState.cooling, yearOf(L)) > 0.3);
   const key = near.map((L, i) => L.id + (ice[i] ? '*' : '') + (bloom[i] ? '+' : '')).join('|');
   if (key === shown) return;
   shown = key;

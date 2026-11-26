@@ -12,7 +12,7 @@
 // You feel it where you stand: systems/weather.js samples it there now and then and eases toward it,
 // so you can walk out of the rain, or watch a storm come in over the hills.
 import { fbm, smooth, clamp, hash } from '../core/math.js';
-import { WORLD, height, moistAt, coldAt, lakeAt } from '../core/shape.js';
+import { WORLD, height, moistAt, coldAt, lakeAt, yearAt, wetSeasonAt } from '../core/shape.js';
 import { chillNow } from '../core/year.js';
 import { seasonState } from '../core/state.js';
 
@@ -42,10 +42,11 @@ export function weatherAt(x, z, ms, hour) {
   // air rises up a slope facing the wind and drops its rain; behind the hill it is drier
   const up = ((height(x + wx0 * 40, z + wz0 * 40) - height(x - wx0 * 40, z - wz0 * 40)) / 80);
   const lift = clamp(-up, -1, 1) * 0.12; // (the ground rising toward where the wind comes from: we are on its windward face)
-  const bank = cloudAt(x, z, t) + (wet - 0.5) * 0.35 + lift;
+  const s = seasonState.season || 0;
+  const bank = cloudAt(x, z, t) + (wet - 0.5) * 0.35 + lift + (wetSeasonAt(x, z, s) - 0.5) * 0.3; // (and in the tropics, the wet season)
   const cloud = smooth(0.42, 0.7, bank);
   let rain = smooth(0.6, 0.72, bank);
-  const chill = chillNow(coldAt(x, z, h), seasonState.season || 0);
+  const chill = chillNow(coldAt(x, z, h), s, yearAt(x, z));
   // storms: the heaviest cells, in warm air, of an afternoon
   const afternoon = smooth(11.5, 14, hour) * (1 - smooth(19, 21.5, hour));
   const storm = smooth(0.76, 0.84, bank) * (1 - smooth(0.2, 0.45, chill)) * (0.35 + 0.65 * afternoon);

@@ -56,6 +56,8 @@ const fit = (x, z) => walkable(x, z) && !onIce(x, z) && !onDock(x, z) && heightA
 export function initCamp() {
   // the tent and lanterns come with the backpack (once)
   if (!store.campKit) { add('tent'); for (let i = 0; i < 8; i++) add('lantern'); store.campKit = true; saveSoon(); }
+  // (lanterns that stood in a world whose land has since changed come back to the backpack: systems/save.js)
+  if (store.lanternsBack > 0) { for (let i = 0; i < store.lanternsBack; i++) add('lantern'); delete store.lanternsBack; saveSoon(); }
   const camp = makeCamp(), block = { x: 4e5, z: 4e5, r: 1.4 };
   camp.g.visible = false;
   scene.add(camp.g);

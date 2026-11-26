@@ -40,7 +40,7 @@ for (const seed of SEEDS) {
       const rain = S.rainAt(x, z) + (0.06 * (1 - smooth(0, 0.2, Lw)) - 0.07 * smooth(0.15, 0.3, Lw) * (1 - smooth(0.3, 0.45, Lw))) * mi;
       // (how much the year moves this place; and which half-year it keeps, eased across the equator)
       // (lands are mirror images: in every other land it is the north half that runs half a year apart, so the two sides of a pole agree)
-      const A = smooth(0.15, 0.45, Lw), u = (((d % (2 * HALF)) + 2 * HALF) % (2 * HALF)), south = smooth(-300, 300, u - HALF), odd = ((Math.floor(d / (2 * HALF)) % 2) + 2) % 2;
+      const A = smooth(0.2, 0.55, Lw), u = (((d % (2 * HALF)) + 2 * HALF) % (2 * HALF)), south = smooth(-300, 300, u - HALF), odd = ((Math.floor(d / (2 * HALF)) % 2) + 2) % 2;
       const m = odd ? 1 - south : south;
       void off;
       return { L, base, rain, A, m };

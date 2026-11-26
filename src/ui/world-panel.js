@@ -2,6 +2,7 @@
 import { timeCtl, setManual, goLive, formatHour, onTimeModeChange } from '../systems/time.js';
 import { wx, setWeather, goAutoWeather, onWeatherChange } from '../systems/weather.js';
 import { seasonState } from '../core/state.js';
+import { phaseName } from '../core/year.js';
 import { freeTravel } from '../core/env.js';
 import { worldSeed, worldSeedText, seedOf, randomSeed, goToWorld, worldAddress } from '../systems/save.js';
 
@@ -60,14 +61,15 @@ function initSeed() {
 
 /** What it is like where you stand: the time of the year, and the season and weather here. */
 export function hereText() {
-  const st = seasonState, p = typeof st.phase === 'number' ? st.phase : 0.5;
+  const st = seasonState, p = typeof st.phaseHere === 'number' ? st.phaseHere : 0.5; // (the year where you stand: by latitude)
   const into = ((((p + 0.125) % 1) + 1) % 1) * 4 % 1, part = into < 0.34 ? 'Early' : into < 0.67 ? 'Mid' : 'Late';
-  const season = (st.name || 'Summer').toLowerCase(), bits = [`${part} ${season}`];
+  const tropic = st.beltHere === 'tropical', polar = st.beltHere === 'polar', local = phaseName(p);
+  const bits = [polar ? 'Polar ice' : tropic ? st.nameHere : `${part} ${local.toLowerCase()}`, `${st.beltHere} belt`];
   const sky = { rain: 'rain', storm: 'a thunderstorm', fog: 'fog', snow: 'snowing' }[wx.type];
   if (sky) bits.push(sky);
-  if (st.winterHere && st.name !== 'Winter') bits.push('snow lies here');
-  else if (!st.winterHere && st.name === 'Winter') bits.push('mild here');
-  else if (st.leavesHere === 'autumn' && st.name !== 'Autumn') bits.push('the leaves have turned here');
+  if (st.winterHere && local !== 'Winter' && !polar) bits.push('snow lies here');
+  else if (!st.winterHere && local === 'Winter' && !tropic) bits.push('mild here');
+  else if (st.leavesHere === 'autumn' && local !== 'Autumn') bits.push('the leaves have turned here');
   return 'Here: ' + bits.join(' · ');
 }
 

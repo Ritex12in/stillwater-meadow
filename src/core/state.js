@@ -16,6 +16,8 @@ export const seasonState = {
   // the year (core/year.js): its phase, the season value today and ICE_LAG back, whether it is cooling;
   // and how it is where you stand (features/seasons.js)
   phase: 0.5, season: 0, lagged: 0, cooling: false, winterHere: false, homeWinter: false, leavesHere: 'summer',
+  // by latitude, where you stand: the season value and phase there, the belt, and the season's name ('' at a pole; 'Wet season' or 'Dry season' in the tropics)
+  seasonHere: 0, phaseHere: 0.5, beltHere: 'temperate', nameHere: 'Summer',
   mapWeather: (k) => k,
 };
 

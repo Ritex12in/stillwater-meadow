@@ -11,7 +11,7 @@
 // lake you start beside, and the single-lake names (LAKE, lakeR, lakePoint, SPAWN, dockStart, ...)
 // stand for whichever lake the landmarks are at (HOME, until they move).
 import { TAU, smooth, clamp, fbm, fbmD, hash, mulberry32 } from './math.js';
-import { iceFrom } from './year.js';
+import { iceFrom, WINTER_CHILL } from './year.js';
 import { seasonState } from './state.js';
 import { worldSeed } from '../systems/save.js';
 import { query } from './env.js';
@@ -390,8 +390,59 @@ export const WARMTH = 0.6;
  * home lake in the middle of it.
  */
 export function coldBase(x, z) {
-  const n = fbm((x + SX * 17) * 0.0011 - 63.4, (z + SZ * 17) * 0.0011 + 28.9);
-  return (smooth(0.575, 0.7, n) - WARMTH * smooth(0.425, 0.3, n)) * mild(x, z);
+  const n = fbm((x + SX * 17) * 0.0011 - 63.4, (z + SZ * 17) * 0.0011 + 28.9), patches = smooth(0.575, 0.7, n) - WARMTH * smooth(0.425, 0.3, n);
+  return clamp(latCold(latitudeAt(x, z)) + PATCHES * patches, -WARMTH, 1) * mild(x, z);
+}
+
+// ── Latitude ───────────────────────────────────────────────────
+// The endless land is divided into lands LAND metres from north to south (north is -z), each with a
+// cold pole at its north edge, a warm equator through its middle and a cold pole at its south edge
+// (the owner's rule: many small worlds, each with its own north and south, and the kind of year by
+// latitude as on Earth). Lands are mirror images of their neighbours, so a pole is shared. Home lies
+// HOME_SOUTH metres south of a pole, in a temperate belt. The belts' edges wander (a slow noise
+// shifts the latitude a spot feels by up to about BELT_WANDER metres), but not round home. The
+// country's cold follows the latitude, the old scattered patches adding PATCHES of their own, so a
+// cold valley can lie in a mild belt.
+export const LAND = 12000, HOME_SOUTH = 2700, BELT_WANDER = 900, PATCHES = 0.5;
+const HALF = LAND / 2, modLand = (d) => ((d % LAND) + LAND) % LAND;
+let wX = NaN, wZ = NaN, wV = 0;
+/** How far (m, north to south) the latitude a spot feels is shifted from its true one. */
+function latShift(x, z) {
+  if (x === wX && z === wZ) return wV;
+  const away = smooth(330, 1500, Math.hypot(x - HOME.x, z - HOME.z));
+  wX = x; wZ = z;
+  wV = away <= 0 ? 0 : away * ((fbm((x + SX * 17) * 0.00025 + 91.7, (z + SZ * 17) * 0.00025 - 37.1) - 0.5) * 2 * BELT_WANDER + (fbm((x + SX * 17) * 0.0012 - 13.3, (z + SZ * 17) * 0.0012 + 55.9) - 0.5) * 500);
+  return wV;
+}
+/** The latitude a spot feels: 0 at an equator .. 1 at a pole (home: 0.55). */
+export const latitudeAt = (x, z) => Math.abs(1 - modLand(z - (HOME.z - HOME_SOUTH) + latShift(x, z)) / HALF);
+/** The belt of a latitude: 'tropical', 'subtropical', 'temperate', 'subpolar' or 'polar'. */
+export const beltOf = (L) => (L < 0.2 ? 'tropical' : L < 0.4 ? 'subtropical' : L < 0.7 ? 'temperate' : L < 0.87 ? 'subpolar' : 'polar');
+const COLD_BY_LAT = [[0, -0.6], [0.3, -0.3], [0.55, 0], [0.75, 0.3], [0.9, 0.7], [1, 0.9]];
+/** The country's cold by its latitude alone. */
+function latCold(L) {
+  for (let i = 1; i < COLD_BY_LAT.length; i++) if (L <= COLD_BY_LAT[i][0]) { const a = COLD_BY_LAT[i - 1], b = COLD_BY_LAT[i]; return a[1] + (b[1] - a[1]) * (L - a[0]) / (b[0] - a[0]); }
+  return 0.9;
+}
+const year = { A: 1, m: 0 };
+/**
+ * A spot's year (core/year.js): `A`, how much the year moves it (nothing in the tropics, in full
+ * from the temperate belt on), and `m`, which half-year it keeps (0 as at home .. 1 half a year
+ * apart, changing across an equator over a few hundred metres, where `A` is nothing; never at a
+ * pole). The same object each call: copy what you keep (`yearOf`).
+ */
+export function yearAt(x, z) {
+  const d = z - (HOME.z - HOME_SOUTH), south = smooth(-300, 300, modLand(d) - HALF), odd = ((Math.floor(d / LAND) % 2) + 2) % 2;
+  year.A = smooth(0.2, 0.55, latitudeAt(x, z)); // (in full by home's latitude; little enough in the subtropics that no snow lies there in a mild winter)
+  year.m = odd ? 1 - south : south;
+  return year;
+}
+/** A thing's own year, worked out once and kept on it (`it.x`, `it.z`). */
+export const yearOf = (it) => it.year || (it.year = Object.assign({}, yearAt(it.x, it.z)));
+/** How much the tropics' wet season is on at a spot just now (0 dry .. 1 wet; 0.5 away from the tropics): it rains in that side's summer. */
+export function wetSeasonAt(x, z, s) {
+  const y = yearAt(x, z), tropic = 1 - smooth(0.05, 0.3, y.A);
+  return 0.5 + tropic * (0.5 - (s + y.m * (WINTER_CHILL - 2 * s)) / WINTER_CHILL);
 }
 /**
  * How cold a spot is in summer ("chill"): about 0 mild, 1 frozen, below 0 in warm country; the
@@ -451,8 +502,10 @@ export const feltHeight = (x, z, h, north, base = coldBase(x, z)) => h + TREE_CO
 export const aboveTrees = (felt) => smooth(TREELINE - 16, TREELINE, felt);
 /** How much rain a spot gets, 0 parched .. 1 soaked (0.5 in between, and in the valley). */
 export function rainAt(x, z) {
-  const n = fbm((x + SX * 17) * 0.0013 + 19.2, (z + SZ * 17) * 0.0013 - 51.7);
-  return 0.5 + (n - 0.5) * mild(x, z);
+  const n = fbm((x + SX * 17) * 0.0013 + 19.2, (z + SZ * 17) * 0.0013 - 51.7), L = latitudeAt(x, z);
+  // (it leans by latitude: a little wetter at the equator, a little drier in the subtropics, where the deserts are)
+  const lean = 0.06 * (1 - smooth(0, 0.2, L)) - 0.07 * smooth(0.15, 0.3, L) * (1 - smooth(0.3, 0.45, L));
+  return 0.5 + (n - 0.5 + lean) * mild(x, z);
 }
 /** From the rain: how parched (0..1) and how lush (0..1) a spot is. */
 export const dryOf = (rain) => smooth(0.475, 0.37, rain), lushOf = (rain) => smooth(0.535, 0.65, rain);
@@ -859,14 +912,14 @@ export const lakeChill = (L) => (L.chill !== undefined ? L.chill : (L.chill = co
  */
 export function lakeIce(L) {
   if (L === HOME) return seasonState.ice;
-  return L.frozen ? 1 : iceFrom(lakeChill(L), seasonState.lagged || 0);
+  return L.frozen ? 1 : iceFrom(lakeChill(L), seasonState.lagged || 0, yearOf(L));
 }
 export const onIce = (x, z) => { const lake = lakeAt(x, z); return lakeIce(lake) > 0.85 && lake.t(x, z) < 1.0 && heightAt(x, z) < 0.3; }; // 
 export const ICE_Y = 0.09;
 /** A river's chill (its middle's cold in summer, at the lakes' height, as the lakes' is taken), kept on the river. */
 export const riverChill = (r) => (r.chill !== undefined ? r.chill : (r.chill = coldAt(r.x[r.n >> 1], r.z[r.n >> 1], 1)));
 /** How frozen a river is just now (0 running .. 1 ice you can walk on), as its lakes freeze. */
-export const riverIce = (r) => iceFrom(riverChill(r), seasonState.lagged || 0);
+export const riverIce = (r) => iceFrom(riverChill(r), seasonState.lagged || 0, r.year || (r.year = Object.assign({}, yearAt(r.x[r.n >> 1], r.z[r.n >> 1]))));
 /** The ice's top where (x, z) is on a frozen river, or null. */
 function riverIceAt(x, z) {
   const r = riverNear(x, z);

@@ -39,7 +39,7 @@ export function initFoundPlaces(goTo) {
     lookIn = 1;
     for (const p of placesNear(player.x, player.z)) {
       if (Math.hypot(p.x - player.x, p.z - player.z) > p.reach || found().some((f) => f.id === p.id)) continue;
-      found().push({ id: p.id, kind: p.kind, name: p.name, x: Math.round(p.x), z: Math.round(p.z), season: phaseName(seasonState.phase || 0.5) });
+      found().push({ id: p.id, kind: p.kind, name: p.name, x: Math.round(p.x), z: Math.round(p.z), season: seasonState.nameHere || phaseName(seasonState.phaseHere ?? 0.5) });
       saveSoon();
       if (p.kind !== 'lake' || p.name !== HOME.name) toast(`Found: ${p.name}. It is in your journal (J).`, 3.5);
     }
@@ -53,7 +53,7 @@ export function initFoundPlaces(goTo) {
     c.width = w; c.height = h;
     c.getContext('2d').drawImage(canvas, 0, 0, w, h);
     const cards = store.postcards || (store.postcards = []);
-    cards.push({ name: best.name, kind: best.kind, img: c.toDataURL('image/jpeg', 0.72), season: phaseName(seasonState.phase || 0.5), world: store.seedText || String(store.seed || '') });
+    cards.push({ name: best.name, kind: best.kind, img: c.toDataURL('image/jpeg', 0.72), season: seasonState.nameHere || phaseName(seasonState.phaseHere ?? 0.5), world: store.seedText || String(store.seed || '') });
     while (cards.length > POSTCARDS) cards.shift();
     saveSoon();
     toast(`A postcard of ${best.name} for your album.`, 3);

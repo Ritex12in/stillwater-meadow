@@ -43,7 +43,7 @@ import { updateWilds, settleWilds, wildStats, growSquare, growRocks, growSmall, 
 import { buildBiomeThings } from './world/biomethings.js';
 import { biomesAt, biomeAt } from './core/biome.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
-import { store, onSave, flush, saveSoon } from './systems/save.js';
+import { store, onSave, flush, saveSoon, landChanged } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
 import { initWorldPanel, initPlaces } from './ui/world-panel.js';
 import { initCountries, nearestCountries } from './ui/countries.js';
@@ -80,7 +80,7 @@ import { initDanceMusic } from './features/dancemusic.js';
 import { initFoley } from './features/foley.js';
 import { ferry, boatSeat, BOARD_POINT, boat } from './characters/boat.js';
 import { updateLakeLife, updateLifeLake, lifeLake, lifeStats, lifeOf } from './world/lakelife.js';
-import { seasonNow, holdPhase } from './features/seasons.js';
+import { seasonNow, holdPhase, settleSeason } from './features/seasons.js';
 
 let renderer;
 try {
@@ -161,6 +161,7 @@ function travelTo(x, z, faceX, faceZ) {
   updateAnchor(0, true); // (if this is another settled lake, its jetty, fire and bench are here when you arrive)
   updateLifeLake(0, x, z, true);
   shrineNear(x, z, true); // (and the shrine, if a site of its own is nearer here)
+  settleSeason(x, z); // (and the season is the one here)
   settleGround(x, z); settleWilds(x, z); updateWater(x, z, true); updateRivers(x, z, true); updateCrossings(x, z, true); updateLakeLife(x, z);
   // your companions come with you: your friend if you walk together, and the dogs following you
   if (friend && friend.st && friend.st.together) { friend.st.x = x + 1; friend.st.z = z + 0.5; friend.st.y = groundAt(x + 1, z + 0.5); }
@@ -290,7 +291,7 @@ function applySky() {
   post.rays = onScreen ? cur.day * (1 - wx.cloud * 0.85) * (1 - wx.fog) * (1 - wx.rain) * (0.45 + 0.55 * (1 - smooth(8, 35, solar.sunElev))) * (1 - smooth(1.0, 1.4, Math.max(Math.abs(sunScreen.x), Math.abs(sunScreen.y)))) : 0;
   post.sunPos.set(sunScreen.x * 0.5 + 0.5, sunScreen.y * 0.5 + 0.5);
   post.raysTint.copy(cur.glow).lerp(cur.light, 0.4);
-  setClockLabel(periodName(timeCtl.hour) + ' · ' + formatHour(timeCtl.hour) + (timeCtl.live ? ' · live' : '') + (seasonState.name ? ' · ' + seasonState.name : '') + (WX_LABEL[wx.type] ? ' · ' + WX_LABEL[wx.type] : ''));
+  setClockLabel(periodName(timeCtl.hour) + ' · ' + formatHour(timeCtl.hour) + (timeCtl.live ? ' · live' : '') + (seasonState.nameHere ? ' · ' + seasonState.nameHere : '') + (WX_LABEL[wx.type] ? ' · ' + WX_LABEL[wx.type] : ''));
 }
 
 // ── The frame ──
@@ -370,7 +371,7 @@ renderer.shadowMap.needsUpdate = true;
 renderNow();
 loadingFinished();
 quality.fast = true; // tune quickly while the start screen is up
-loadingDone(() => { quality.fast = false; });
+loadingDone(() => { quality.fast = false; if (landChanged) { toast('The land beyond home has changed since you were last here: the world now has poles and an equator. Your map, places and waystones start afresh; what you carry and your journals are kept.', 12); saveSoon(); } });
 requestAnimationFrame(frame);
 
 // A small handle for automated tests and the debug panel.

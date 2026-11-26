@@ -106,6 +106,7 @@ Each one leaves the game playable and tested.
 | 6 | **New characters and animals.** Starts with one imported model walking, shown to the owner before any action is rewired. New animals by kind of country (deer, foxes, owls) wait for this. | | started: the characters are the sculpted children, redrawn after the owner's character sheets (KayKit and then the VRoid characters were tried and removed by the owner).  Animals: a fox by country added and the deer travel with you, made in code (no CC0 rigged deer or fox could be fetched without a browser) |
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | | view distance setting done; tuned on the owner's own computer, 2026-11-23 (see "Performance"); a real phone not tried |
 | 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; rivers and waterfalls done (see "Rivers and waterfalls"); islands in lakes done (see "Islands") |
+| M | **A map** (asked for by the owner, 2026-11-26): a screen opened with M showing the land you have explored, filling in as you walk, with the places you have found marked. | Explored land is kept per world; nothing unfound is marked (`tests/map.spec.js`). | done (see "How the map works"); its look is for the owner to judge |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
@@ -772,6 +773,44 @@ were the cheapest with the most to show, plus Minecraft-style biomes the owner a
   `world.setWildUndergrowth`, `world.setWildFlowers`). Boulders come with the "near" squares;
   small plants only with the "close" ones (`WILD.closeIn`), grown lazily by `growSmall`.
 - `window.__meadow.wilds` (`stats`, `settle`, `square`, `rocks`, `small`) and `objects()` are there for tests.
+
+## How the map works (2026-11-26)
+
+The owner asked for a map and chose: a map screen you open (not a corner minimap), showing only
+where you have been. Calls that are ours (the owner may overturn them): **M** opens it, as in most
+games, so the music moved to **U**; land within 190 m of you counts as explored; the map's colours
+are the country's in summer whatever the season; choosing a found place on the map offers "Go
+there", as the journal does; rivers are drawn, trails and bridges are not (yet).
+
+- `systems/explored.js` keeps where you have been: the world in cells of 32 m, one bit a cell,
+  gathered into regions of 32 x 32 cells (1,024 m square). `reveal(x, z)` marks the cells within
+  190 m; the map's frame hook calls it when you have moved 16 m. The save holds it per world
+  (`store.explored`, one of `WORLD_KEYS`): one short string a region (172 characters), so about
+  200 characters per square kilometre walked.
+- `ui/map.js` draws it. The picture is never saved: it is worked out from the seed like the land.
+  Each region has a 256 x 256 picture (4 m a pixel) painted one cell at a time, only for explored
+  cells and the cells within two of them, 6 ms a frame while the map is open, nearest the middle
+  of the view first (about 0.2 ms a cell; 190 m round you is about 110 cells). A painted cell is
+  never painted again.
+- What hides unexplored land is a mask, laid over the pictures each time the map is drawn: a
+  34 x 34 image per region (a dot a cell, plus a ring of the neighbours' cells), a cell showing in
+  full when six or more of the nine cells about it are explored; the browser's smoothing as it is
+  scaled up gives the soft, rounded edge. So walking on only adds cells and rebuilds small masks.
+- A pixel's colour (`colour()`): water where the land (`rawHeight`) is below 0 (a lake by `lakeAt`,
+  ice in frozen country; otherwise the sea, darker with depth); else the country's colour from the
+  same fields the ground uses (`rainAt`, `coldBase`/`coldAt`, `snowOf`, `groveAt`, `biomesAt`), rock
+  above the treeline and on steep slopes, sand by lakes and the sea, a river within a few metres
+  (`riverNear`). Lit from the north-west by the slope, paler with height, and darkened a little
+  where a 20 m contour crosses. `rawHeight` is used, not `height`, so buildings' levelled ground
+  and the volcano's cone do not show in the relief.
+- Over it: the places in `store.found` (a lake's name under its water; a mark and a name for the
+  rest; your camp where it stands now), you as an arrow pointing the way the camera looks, north
+  (up: north is -z) and a scale. Names that would overlap are left out, nearest the middle first.
+- Drag to move, wheel or two fingers or the + and - buttons to zoom (0.03 to 1.4 screen pixels a
+  metre), the target button to centre on you again (the map follows you until you drag it). A click
+  on a found place chooses it; "Go there" calls `travelTo`.
+- `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
+  is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
 
 ## Tools
 

@@ -151,6 +151,7 @@
   <section class="popover menu" id="menuPanel" data-exclusive="1" hidden aria-label="Menu">
     <button type="button" class="tool glass" data-panel="backpack"><span>Backpack</span><kbd>I</kbd></button>
     <button type="button" class="tool glass" data-panel="journal"><span>Catch journal</span><kbd>J</kbd></button>
+    <button type="button" class="tool glass" data-panel="mapPanel"><span>Map</span><kbd>M</kbd></button>
     <button type="button" class="tool glass" id="menuPhoto"><span>Photo mode</span><kbd>P</kbd></button>
     <button type="button" class="tool glass" data-panel="controls"><span>All controls</span><kbd>H</kbd></button>
   </section>
@@ -166,6 +167,7 @@
       <dt><kbd>R</kbd></dt><dd>Fish: cast, hook a bite, reel in</dd>
       <dt><kbd>I</kbd></dt><dd>Backpack: what you are carrying</dd>
       <dt><kbd>J</kbd></dt><dd>Catch journal</dd>
+      <dt><kbd>M</kbd></dt><dd>Map: the land you have explored · drag to move, scroll to zoom</dd>
       <dt><kbd>B</kbd></dt><dd>Toss bread to the ducks</dd>
       <dt><kbd>G</kbd></dt><dd>Pick flowers, give or leave the bouquet</dd>
       <dt><kbd>Y</kbd></dt><dd>Throw a stick for a tamed dog</dd>
@@ -177,7 +179,7 @@
       <dt><kbd>P</kbd></dt><dd>Photo mode: <kbd>1</kbd>–<kbd>5</kbd> filters, <kbd>V</kbd> focus blur, <kbd>Enter</kbd> saves, <kbd>Space</kbd>/<kbd>C</kbd> up and down</dd>
       <dt><kbd>Q</kbd> <kbd>N</kbd></dt><dd>Change the weather · change the season</dd>
       <dt><kbd>[</kbd> <kbd>]</kbd> <kbd>L</kbd></dt><dd>Shift the time · back to live time</dd>
-      <dt><kbd>M</kbd> <kbd>H</kbd></dt><dd>Music on or off · this panel</dd>
+      <dt><kbd>U</kbd> <kbd>H</kbd></dt><dd>Music on or off · this panel</dd>
       <dt><kbd>Esc</kbd></dt><dd>Close any open panel</dd>
     </dl>
   </section>
@@ -199,6 +201,19 @@
     <ul class="catches places-found" id="placeList"></ul>
     <h3 class="sub">Postcards</h3>
     <div class="postcards" id="postcards"></div>
+  </section>
+
+  <section class="panel map" id="mapPanel" data-exclusive="1" hidden aria-label="Map">
+    <header><h2>Map</h2><span class="sum" id="mapSummary"></span><button type="button" class="close" data-close="mapPanel" aria-label="Close">×</button></header>
+    <div class="map-view" id="mapView">
+      <canvas id="mapCanvas" aria-label="A map of the land you have explored"></canvas>
+      <div class="map-tools">
+        <button type="button" class="glass" id="mapIn" title="Zoom in" aria-label="Zoom in">+</button>
+        <button type="button" class="glass" id="mapOut" title="Zoom out" aria-label="Zoom out">−</button>
+        <button type="button" class="glass" id="mapMe" title="Centre on you" aria-label="Centre on you"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.500 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      </div>
+    </div>
+    <div class="map-info"><span id="mapPlace"></span><button type="button" class="btn primary" id="mapGo" hidden>Go there</button></div>
   </section>
 
   <div class="dialog" id="nameDialog" hidden>

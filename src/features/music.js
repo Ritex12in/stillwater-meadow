@@ -1,4 +1,4 @@
-// Gentle generative music (M): a kalimba melody over soft pads in a reverb. Bright major
+// Gentle generative music (U): a kalimba melody over soft pads in a reverb. Bright major
 // pentatonic by day, slower minor pentatonic at night, sparser in rain, bell-like in winter.
 import { clamp, rnd } from '../core/math.js';
 import { hooks, seasonState } from '../core/state.js';
@@ -106,7 +106,7 @@ export function initMusic() {
     sync();
   };
   btn.addEventListener('click', () => setOn(!on));
-  bindKey('KeyM', () => setOn(!on));
+  bindKey('KeyU', () => setOn(!on)); // (M opens the map)
   onSoundChange(sync);
   if (store.music) {
     // turn music back on with the first gesture, unless that gesture is on the Music or Sound button

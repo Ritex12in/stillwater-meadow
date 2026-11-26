@@ -49,6 +49,7 @@ import { initWorldPanel, initPlaces } from './ui/world-panel.js';
 import { initCountries, nearestCountries } from './ui/countries.js';
 import { initBackpack, backpackView } from './ui/backpack.js';
 import { initFoundPlaces, foundView } from './features/places.js';
+import { initMap, mapView } from './ui/map.js';
 import { initCamp } from './features/camp.js';
 import { initLandmarks, landmarksView, landmarkBlocks, landmarkSeats } from './world/landmarks.js';
 import { initSignposts, signsNear, signBlocks } from './world/signposts.js';
@@ -202,7 +203,7 @@ onQualityChange((o) => {
 window.addEventListener('resize', resize);
 
 // ── Features, each isolated so one failing can't take down the rest ──
-const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initIceDance, initDanceCam, initDanceMusic, initFoley };
+const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initMap: () => initMap((x, z) => travelTo(x, z)), initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initIceDance, initDanceCam, initDanceMusic, initFoley };
 for (const [name, init] of Object.entries(features)) {
   try {
     const r = init();
@@ -383,6 +384,8 @@ window.__meadow = {
   /** The backpack's contents and the ways to change them (systems/pack.js). */
   pack: { view: pack.packView, add: pack.add, addItem: pack.addItem, take: pack.take, count: pack.count, hold: pack.hold, held: pack.held, fish: () => pack.units('fish').map((u) => ({ id: u.key, cm: u.unit })), tie: (kinds) => world.tieBouquet(kinds) },
   compass: compassView,
+  /** The map (ui/map.js): how it stands, and what of the land is explored. */
+  get map() { return mapView(); },
   /** The year: hold it at a phase (0 midwinter .. 0.5 midsummer; null lets it run), and how it is now. */
   year: { hold: holdPhase, get state() { return Object.assign({}, seasonState, { mapWeather: undefined }); } },
   /** The home lake's middle, and where you first arrive beside it. */

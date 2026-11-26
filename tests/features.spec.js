@@ -330,7 +330,8 @@ test('fishing in a river: cast from the bank, the float rides the river, a river
   const r = await page.evaluate(async () => {
     const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
     const SH = await import(url('/src/core/shape.js')), m = window.__meadow, H = m.home;
-    const v = SH.riversNear(H.x, H.z, 2000).filter((q) => !q.fall.some((f) => f) && q.w[q.n >> 1] > 3).sort((a, b) => Math.hypot(a.x[0] - H.x, a.z[0] - H.z) - Math.hypot(b.x[0] - H.x, b.z[0] - H.z))[0];
+    const v = SH.riversNear(H.x, H.z, 5000).filter((q) => !q.fall.some((f) => f) && q.w[q.n >> 1] > 3 && SH.riverIce(q) < 0.1) // (one that runs: toward the pole they are frozen the year round)
+     .sort((a, b) => Math.hypot(a.x[0] - H.x, a.z[0] - H.z) - Math.hypot(b.x[0] - H.x, b.z[0] - H.z))[0];
     const i = v.n >> 1, tx = v.x[i + 1] - v.x[i], tz = v.z[i + 1] - v.z[i], tl = Math.hypot(tx, tz), nx = -tz / tl, nz = tx / tl, off = v.w[i] / 2 + 1.2;
     return { x: v.x[i] + nx * off, z: v.z[i] + nz * off, fx: -nx, fz: -nz, lv: v.lv[i] };
   });

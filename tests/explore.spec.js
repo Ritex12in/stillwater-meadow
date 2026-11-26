@@ -233,18 +233,18 @@ test('a fox by country at the lake you are at (red, white in the snow), slipping
 
 test('kinds of country: the World popover lists every biome with the nearest one, and Go takes you there', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer&freetravel=1', '#12'); // (freetravel: the lists that take you anywhere at once, which play does without)
-  await page.locator('[data-panel="worldPanel"]').click();
+  await page.locator('[data-panel="worldPanel"]').evaluate((el) => el.click()); // (clicked from the page: with this popover open the software renderer draws a frame every several seconds, and a click that waits for the page to settle times out)
   const desert = page.locator('#countries button[data-country="desert"]');
   await expect(desert).toContainText(/Golden desert · [\d.]+ (m|km)/, { timeout: 15000 });
   expect(await page.locator('#countries button').count(), 'every kind is listed').toBe(16);
   await expect(page.locator('#countries button[data-country="meadow"]')).toContainText('here');
-  await desert.click();
+  await desert.evaluate((el) => el.click());
   await expect(desert).toContainText('here', { timeout: 15000 });
   const at = await page.evaluate(() => { const m = window.__meadow; return { desert: m.biomes(m.player.x, m.player.z).desert, dry: m.geo.walkable(m.player.x, m.player.z) }; });
   expect(at.desert, 'standing in the desert').toBeGreaterThan(0.5);
   expect(at.dry).toBe(true);
   // the wonders too: to the foot of the volcano, on ground you can stand on
-  await page.locator('#countries button[data-country="volcano"]').click();
+  await page.locator('#countries button[data-country="volcano"]').evaluate((el) => el.click());
   await expect(page.locator('#countries button[data-country="volcano"]')).toContainText(/The volcano · [\d.]+ m/, { timeout: 15000 });
   expect(await page.evaluate(() => { const m = window.__meadow; return m.geo.walkable(m.player.x, m.player.z); })).toBe(true);
   // the same world, the same answers

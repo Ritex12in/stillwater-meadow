@@ -108,7 +108,7 @@ Each one leaves the game playable and tested.
 | 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; rivers and waterfalls done (see "Rivers and waterfalls"); islands in lakes done (see "Islands") |
 | M | **A map** (asked for by the owner, 2026-11-26): a screen opened with M showing the land you have explored, filling in as you walk, with the places you have found marked. | Explored land is kept per world; nothing unfound is marked (`tests/map.spec.js`). | done (see "How the map works"); its look is for the owner to judge |
 | T | **Teleport points** (asked for by the owner, 2026-11-27; the owner took our picks): waystones, standing stones you wake and then travel to from the map; the lists that took you anywhere at once are gone from play. | Stones are fixed by the seed and change nothing of the land; a woken stone stays woken per world (`tests/map.spec.js`). | done (see "How travelling works"); the stone's look is for the owner to judge |
-| L | **Seasons by latitude** (planned 2026-11-27, not started; see "Plan: seasons by latitude"). The endless world in lands 12 km north to south, each pole, equator, pole; the kind of year a place has follows its latitude, and the two halves of a land are half a year apart. | Pictures agreed by the owner before the build; every kind of country still findable; one full run of the suite; speed checked on the owner's computer. | planned |
+| L | **Seasons by latitude** (planned 2026-11-27, not started; see "Plan: seasons by latitude"). The endless world in lands 12 km north to south, each pole, equator, pole; the kind of year a place has follows its latitude, and the two halves of a land are half a year apart. | Pictures agreed by the owner before the build; every kind of country still findable; one full run of the suite; speed checked on the owner's computer. | built 2026-11-28 (see "How seasons by latitude work"); speed on the owner's computer not yet checked |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
@@ -861,7 +861,54 @@ stones stand about **1.5 km** apart.
 - `window.__meadow.waypoints`: `awake`, `points`, `asleep` (within 2.5 km), `track`, `busy`;
   `__meadow.travelToPoint(point)`.
 
-## Plan: seasons by latitude (decided 2026-11-27; nothing built)
+## How seasons by latitude work (built 2026-11-28)
+
+Built from the plan below, with the owner's "go with your picks" on the pictures (stripes
+accepted; belt edges wandering about 900 m; the old patches adding half) and on the three
+decisions (old worlds cleared once; the sun one for the whole world).
+
+- **Latitude** (`core/shape.js`): `LAND` 12,000 m, home `HOME_SOUTH` 2,700 m south of a pole.
+  `latitudeAt(x, z)` is 0 at an equator and 1 at a pole (home 0.55), with the wander
+  (`latShift`: up to about `BELT_WANDER` 900 m broadly and 250 m finely, fading to nothing within
+  1.5 km of home, so home's own year is exactly the calendar's). `beltOf(L)` names the belt.
+- **What a place is:** `coldBase = clamp(latCold(L) + PATCHES * patches) * mild`, `latCold` from
+  `COLD_BY_LAT` (-0.6 at the equator, 0 at home's latitude, 0.9 at the pole), `PATCHES` 0.5.
+  `rainAt` leans a little wetter at the equator and drier in the subtropics. Everything that asks
+  what the country is (`coldAt`, the biomes, the buildings' rules, the map) is as it was.
+- **What the year does:** `yearAt(x, z)` gives a spot's year `{ A, m }`: `A = smooth(0.2, 0.55, L)`
+  (how much the year moves it: nothing in the tropics, 0.6 at the subtropics' edge so no snow
+  lies there in a mild winter, in full from home's latitude to the pole) and `m` (which
+  half-year: 0 as at home, 1 half a year apart, changing over 600 m across an equator, where `A`
+  is nothing). `core/year.js`: the season value there is `s + m * (0.75 - 2s)`, and
+  `chillNow(c, s, y) = c + seasonHere(s, y) * A`; `snowFrom`, `iceFrom`, `flowersOut` and `leavesAt`
+  take the year too, and "cooling or warming" flips with `m`. The old `swing` (warm country moved
+  less) is gone: latitude does that now.
+- **Who reads it:** trees and flowers to pick (`yearOf(it)`, kept on each), lily pads and each
+  lake's and river's ice (`yearOf(lake)`), the weather's rain or snow, `readHere` for where you
+  stand. The **ground** carries each vertex's year (attribute `yearly`: 8 more bytes a vertex);
+  the **grass** shares the year where the camera is (`yearHereU`: its field is about 100 m
+  across, over which the year hardly changes). One uniform still: `uSeason`.
+- **The tropics' wet and dry season:** `wetSeasonAt`: it rains more in that side's summer
+  (`systems/weatherfield.js`), and the grass and ground gold in the dry half (`droughtNow` in
+  `SEASON_GLSL`: in the subtropics the drought is in summer, as before).
+- **The season's name where you stand** (`seasonState.nameHere`, with `beltHere`, `phaseHere`,
+  `seasonHere`): the four names by the half-year there; "Wet season" or "Dry season" in the
+  tropics; none at a pole. The clock, the Here line, the pike and the season stamped on places
+  found and postcards use it. `seasonState.name` is still the calendar's (home's).
+- **Travelling at once** (`settleSeason`, from `travelTo`): the grass's tint, the insects and the
+  snow lying on trees and rocks are as the season has them there straight away; before, a winter's
+  snow rode with you into a summer for some minutes.
+- **The sun** is one for the whole world, as before.
+- **Old worlds** (`systems/save.js` `WORLD_GEN` 2, kept per world as `gen`): a world last visited
+  under an older number has its position, places found, explored map, woken waystones, tracking,
+  camp and lanterns cleared once (lanterns go back in the backpack), with a line saying the land
+  has changed. What you carry, journals, pets and settings are kept.
+- **What moved:** the climate beyond the mild ground round home, and with it where plains and
+  cliffs shape the land, the lakes' looks, the buildings and so some trails and waystones.
+- `tools/climate-map.mjs` drew the pictures the owner judged, from the proposed rule against the
+  land as it then was; now that the rule is the game's, its "as it is" views show the new land.
+
+## Plan: seasons by latitude (decided 2026-11-27; built 2026-11-28, see above)
 
 **Why.** The owner: a player who wants spring in winter has to wait, which is annoying (the World
 panel's season picker is a debugging tool, not for players); and in the real world seasons vary

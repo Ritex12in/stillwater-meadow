@@ -58,7 +58,7 @@ export function updateCrossings(x, z, now = false) {
   const want = new Map();
   for (const r of riversNear(x, z, REACH)) bridgesOf(r).forEach((b, i) => want.set('b:' + r.id + ':' + i, () => bridgeMesh(b)));
   for (const L of lakesNear(x, z, REACH)) { const S = stonesOf(L); if (S) want.set('s:' + L.id, () => stonesMesh(S)); }
-  for (const [k, make] of want) if (!shown.has(k)) { const o = make(); scene.add(o); shown.set(k, o); }
+  for (const [k, make] of want) if (!shown.has(k)) { const o = make(); o.userData.pooledLandmark = true; scene.add(o); shown.set(k, o); } // (not counted among the scene's things: they come and go with the rivers)
   for (const [k, o] of shown) if (!want.has(k)) { scene.remove(o); o.traverse((c) => { if (c.isMesh) c.geometry.dispose(); }); shown.delete(k); }
 }
 /** For tests: which bridges and stepping stones are drawn just now. */

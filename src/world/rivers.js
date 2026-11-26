@@ -127,6 +127,7 @@ function ribbon(r) {
     mist.frustumCulled = false;
     mesh.add(mist);
   }
+  mesh.userData.pooledLandmark = true; // (rivers' water comes and goes with the rivers about you: left out when the scene's things are counted, as the buildings are)
   return { mesh, u, mist, river: r };
 }
 

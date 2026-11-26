@@ -209,6 +209,7 @@ test('flowers to pick grow wherever the land allows: far from home too, each rem
     for (let d = 1500; d < 2600; d += 60) for (let a = 0; a < 6.28; a += 0.5) {
       const x = h.x + Math.cos(a) * d, z = h.z + Math.sin(a) * d;
       if (!m.geo.walkable(x, z) || m.lakes(200).some((L) => Math.hypot(L.x - x, L.z - z) < 300)) continue;
+      if (m.climate(x, z).cold > 0.25) continue; // (not toward the pole, where the cold keeps them in even in summer)
       const f = m.wilds.picksNear(x, z, 30);
       if (f.length >= 3 && m.geo.walkable(f[0].x + 0.4, f[0].z)) return { x: f[0].x + 0.4, z: f[0].z, id: f[0].id };
     }
@@ -266,7 +267,8 @@ test('nature: trees give out at a treeline, north faces hold more snow, cold dry
     for (let z = -2800; z < 2800; z += 29) for (let x = -2800; x < 2800; x += 29) {
       const y = SH.height(x, z);
       if (y > 85 && y < 140 && SH.coldBase(x, z) < 0.1) { const n = SH.northness(x, z, y), s = SH.snowOf(SH.coldAt(x, z, y + SH.ASPECT * n)); if (n > 0.4) { sn[0][0] += s; sn[0][1]++; } else if (n < -0.4) { sn[1][0] += s; sn[1][1]++; } }
-      if (y < 40 && SH.coldBase(x, z) > 0.7) { const w = SH.moistAt(x, z), s = SH.snowOf(SH.snowCold(SH.coldAt(x, z, y), w)); if (w < 0.33) { tundra[0] += s; tundra[1]++; } else if (w > 0.5) { taiga[0] += s; taiga[1]++; } }
+      // (tundra and taiga are compared in cold country short of the pole itself, where even dry ground lies under ice)
+      if (y < 40 && SH.coldBase(x, z) > 0.55 && SH.coldBase(x, z) < 0.85) { const w = SH.moistAt(x, z), s = SH.snowOf(SH.snowCold(SH.coldAt(x, z, y), w)); if (w < 0.33) { tundra[0] += s; tundra[1]++; } else if (w > 0.5) { taiga[0] += s; taiga[1]++; } }
     }
     // by a lake in dry country, the ground is wetter than the rain alone
     for (const L of m.lakes(4000)) { const x = L.x + L.rmax * 1.4, z = L.z; if (SH.rainAt(x, z) < 0.42) { oasis = { rain: SH.rainAt(x, z), moist: SH.moistAt(x, z) }; break; } }
@@ -293,22 +295,22 @@ test('seasons by place: the year turns every 8 days; cold uplands whiten and the
     let upland = null, warm = null;
     for (let z = -2800; z < 2800 && !(upland && warm); z += 41) for (let x = -2800; x < 2800; x += 41) {
       const h = SH.height(x, z), c = SH.coldAt(x, z, h);
-      if (!upland && c > 0.2 && c < 0.4 && h > 0) upland = { c };
-      if (!warm && c < -0.35) warm = { c };
+      if (!upland && c > 0.2 && c < 0.4 && h > 0) upland = { c, y: Object.assign({}, SH.yearAt(x, z)) };
+      if (!warm && c < -0.35) warm = { c, y: Object.assign({}, SH.yearAt(x, z)) }; // (each with its own year: core/shape.js yearAt)
     }
     const home = SH.lakeChill(SH.HOME);
-    out.homeSnow = Y.snowFrom(home, s); out.uplandSnow = upland ? Y.snowFrom(upland.c, s) : null;
-    out.homeLeaves = Y.leavesAt(home, s, cool); out.uplandLeaves = upland ? Y.leavesAt(upland.c, s, cool) : null;
+    out.homeSnow = Y.snowFrom(home, s); out.uplandSnow = upland ? Y.snowFrom(upland.c, s, upland.y) : null;
+    out.homeLeaves = Y.leavesAt(home, s, cool); out.uplandLeaves = upland ? Y.leavesAt(upland.c, s, cool, upland.y) : null;
     const coldLake = m.lakes(4000).map((L) => SH.lakesNear(L.x, L.z, 1)[0]).find((L) => L && !L.frozen && SH.lakeChill(L) > 0.3 && SH.lakeChill(L) < 0.45);
-    out.homeIce = Y.iceFrom(home, lag); out.coldLakeIce = coldLake ? Y.iceFrom(SH.lakeChill(coldLake), lag) : null;
+    out.homeIce = Y.iceFrom(home, lag); out.coldLakeIce = coldLake ? Y.iceFrom(SH.lakeChill(coldLake), lag, SH.yearOf(coldLake)) : null;
     // midwinter in warm country: no snow, the trees in leaf
-    out.warmSnow = warm ? Y.snowFrom(warm.c, Y.seasonValue(0)) : null; out.warmLeaves = warm ? Y.leavesAt(warm.c, Y.seasonValue(0), false) : null;
+    out.warmSnow = warm ? Y.snowFrom(warm.c, Y.seasonValue(0), warm.y) : null; out.warmLeaves = warm ? Y.leavesAt(warm.c, Y.seasonValue(0), false, warm.y) : null;
     // the year at home, in 50 steps: a bouquet of three kinds is in reach, or the skipper asks for pine cones
     const fl = m.wilds.picksNear(m.spawn.x, m.spawn.z, 60), bad = [];
     for (let k = 0; k < 50; k++) {
       m.year.hold(k / 50);
       const st = m.year.state, by = {};
-      for (const f of fl) if (f.keep < Y.flowersOut(f.chill || 0, st.season, st.cooling)) by[f.kind] = (by[f.kind] || 0) + 1;
+      for (const f of fl) if (f.keep < Y.flowersOut(f.chill || 0, st.season, st.cooling, SH.yearOf(f))) by[f.kind] = (by[f.kind] || 0) + 1;
       const kinds = Object.values(by).filter((n) => n >= 4).length;
       if (kinds < 3 && !(st.flowerFrac < 0.35)) bad.push(k / 50);
     }
@@ -372,14 +374,15 @@ test('weather moves over the land: the same for everyone at a moment, carried by
 test('biomes: desert, swamp, enchanted wood and volcanic rock lie beyond home, each grows its own things, and none crowds its slots', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer', '#12');
   const r = await page.evaluate(() => {
-    const m = window.__meadow, h = m.home, near = {};
-    for (let z = -4000; z <= 4000; z += 150) for (let x = -4000; x <= 4000; x += 150) { const w = m.biomes(h.x + x, h.z + z); for (const k in w) if (w[k] > 0.6 && (!near[k] || Math.hypot(x, z) < near[k].d)) near[k] = { d: Math.hypot(x, z), x: h.x + x, z: h.z + z }; }
-    const S = 57.6, at = (k) => { const s = near[k]; return s ? m.wilds.biome(Math.floor(s.x / S), Math.floor(s.z / S)) : null; };
+    const m = window.__meadow, h = m.home, near = {}, heart = {};
+    for (let z = -4000; z <= 4000; z += 150) for (let x = -4000; x <= 4000; x += 150) { const w = m.biomes(h.x + x, h.z + z); for (const k in w) { if (w[k] > 0.6 && (!near[k] || Math.hypot(x, z) < near[k].d)) near[k] = { d: Math.hypot(x, z), x: h.x + x, z: h.z + z }; if (w[k] > 0.6 && (!heart[k] || w[k] > heart[k].w) && m.geo.height(h.x + x, h.z + z) > 2 && m.geo.height(h.x + x, h.z + z) < 60) heart[k] = { w: w[k], x: h.x + x, z: h.z + z }; } }
+    // (what grows is looked for where each is strongest, on dry low ground: the nearest spot is its thin edge, and may be a peak or the sea's bed)
+    const S = 57.6, at = (k) => { const s = heart[k]; return s ? m.wilds.biome(Math.floor(s.x / S), Math.floor(s.z / S)) : null; };
     const homeW = m.biomes(h.x, h.z);
     const out = { near: Object.fromEntries(Object.entries(near).map(([k, v]) => [k, Math.round(v.d)])), home: Math.max(...Object.values(homeW)), desert: at('desert'), enchanted: at('enchanted'), swamp: at('swamp') };
     // stand in each: nothing drops for want of a slot
     const dropped = {};
-    for (const k of ['desert', 'enchanted', 'swamp']) { const s = near[k]; if (!s) continue; m.travelTo(s.x, s.z); for (let i = 0; i < 10; i++) m.tick(1 / 30); dropped[k] = m.wilds.stats().dropped; }
+    for (const k of ['desert', 'enchanted', 'swamp']) { const s = heart[k]; if (!s) continue; m.travelTo(s.x, s.z); for (let i = 0; i < 10; i++) m.tick(1 / 30); dropped[k] = m.wilds.stats().dropped; }
     out.dropped = dropped;
     return out;
   });

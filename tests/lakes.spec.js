@@ -65,13 +65,13 @@ test('going to a lake: its water is there, you can fish it, and visiting many le
 test('the world remembers where you were, and the Places list takes you to a lake', async ({ page }) => {
   const errors = await open(page, 'weather=clear&season=summer&freetravel=1', '#12'); // (freetravel: the lists that take you anywhere at once, which play does without)
   // the list in the World popover names the lakes about you; choosing one takes you to its shore
-  await page.locator('#worldBtn, [aria-controls="worldPanel"], button:has-text("World")').first().click();
+  await page.locator('#worldBtn, [aria-controls="worldPanel"], button:has-text("World")').first().evaluate((el) => el.click()); // (clicked from the page: with this popover open the software renderer draws a frame every several seconds, and a click that waits for the page to settle times out)
   const rows = page.locator('#places button');
   await expect(rows.first()).toBeVisible();
   expect(await rows.count()).toBeGreaterThan(3);
   await expect(rows.first()).toContainText('Stillwater');
   const second = await rows.nth(2).textContent();
-  await rows.nth(2).click();
+  await rows.nth(2).evaluate((el) => el.click());
   await step(page, 0.3);
   const at = await page.evaluate(() => { const m = window.__meadow, L = m.lakes(400)[0]; return { x: m.player.x, z: m.player.z, lake: L.name, far: L.far }; });
   expect(second).toContain(at.lake);

@@ -743,6 +743,9 @@ const SITE_KINDS = {
   // by the sea: a hut on stilts on the beach, and ships riding at anchor offshore (on the water, no levelled ground)
   beachhut: { cell: 700, flat: 5, out: 9, salt: 0xBEAC4, tries: 14, chance: 0.6, rule: (x, z, h) => h > 1.2 && h < 4.5 && seaAt(x, z) > 0.03 && snowOf(coldAt(x, z, h)) < 0.3 },
   ship: { cell: 1500, flat: 0, out: 0, ship: true, salt: 0x5419, tries: 12, chance: 0.7, rule: (x, z, h) => h < -6 && seaAt(x, z) > 0.5 },
+  // a waystone (features/waypoints.js): a standing stone to travel to, one to a square in every kind of country, on
+  // fairly level dry ground clear of water, rivers and the other buildings (no levelled ground: it changes nothing of the land)
+  waystone: { cell: 1500, flat: 0, out: 0, salt: 0x3A75, tries: 48, rule: (x, z, h) => h > 1.5 && h < 220 && seaAt(x, z) < 0.02 && reliefAt(x, z, h) < 5 && !otherSiteNear(x, z, 70) && !riverHere(x, z) },
   skyisle: { cell: 1900, flat: 6, out: 11, salt: 0x5C15, tries: 12, rule: (x, z, h) => h > 4 && h < 90 && wonderAt(x, z).a > 0.3 && rangeAt(x, z) < 0.45 },
 };
 /** The volcano's cone: how much it raises the land (m) at a distance `r` from its middle; a crater at the top. */
@@ -763,6 +766,17 @@ function hilltop(x, z, h) {
   return h - s / 8;
 }
 const siteCells = new Map(), lastSite = {};
+/** Is a river within reach of its banks at a spot? (riverNear's shared result is left as it was: a site's rule may run in the middle of someone else's look at a river.) */
+function riverHere(x, z) { const keep = Object.assign({}, near), hit = !!riverNear(x, z); Object.assign(near, keep); return hit; }
+/** Is a building of another kind (not a waystone) within `r` metres? */
+function otherSiteNear(x, z, r) {
+  for (const k in SITE_KINDS) {
+    if (k === 'waystone') continue;
+    const K = SITE_KINDS[k], far = r + (k === 'volcano' ? VOLCANO.radius : K.out);
+    for (let cz = Math.floor((z - far) / K.cell); cz <= Math.floor((z + far) / K.cell); cz++) for (let cx = Math.floor((x - far) / K.cell); cx <= Math.floor((x + far) / K.cell); cx++) { const s = siteOfCell(k, cx, cz); if (s && Math.hypot(s.x - x, s.z - z) < far) return true; }
+  }
+  return false;
+}
 function siteOfCell(kind, cx, cz) {
   const key = kind + ':' + cx + ':' + cz;
   if (siteCells.has(key)) return siteCells.get(key);
@@ -794,7 +808,9 @@ function siteOfCell(kind, cx, cz) {
 /** The building site whose levelled ground reaches a spot (within its `out`, or `reach` if given), or null. */
 export function siteAt(x, z, reach) {
   for (const kind in SITE_KINDS) {
-    const K = SITE_KINDS[kind], cx = Math.floor(x / K.cell), cz = Math.floor(z / K.cell), m = lastSite[kind];
+    const K = SITE_KINDS[kind];
+    if (reach === undefined && !K.out) continue; // (no levelled ground: nothing to reach; and a river being traced never asks after a waystone, whose place depends on the rivers)
+    const cx = Math.floor(x / K.cell), cz = Math.floor(z / K.cell), m = lastSite[kind];
     let s;
     if (m && m.cx === cx && m.cz === cz) s = m.s; else { s = siteOfCell(kind, cx, cz); lastSite[kind] = { cx, cz, s }; }
     if (!s) continue;

@@ -11,15 +11,18 @@
 // country's own in summer (meadow, lush wood, heath, grove, snow, desert, swamp and the rest), lit
 // from the north-west so the hills stand out, with a faint line every 20 m of height.
 import { clamp, smooth } from '../core/math.js';
-import { rawHeight, seaAt, lakeAt, coldBase, coldAt, rainAt, snowCold, snowOf, dryOf, lushOf, groveAt, biomesAt, aboveTrees, TREE_COLD, ASPECT, riverNear } from '../core/shape.js';
+import { sitesNear, rawHeight, seaAt, lakeAt, coldBase, coldAt, rainAt, snowCold, snowOf, dryOf, lushOf, groveAt, biomesAt, aboveTrees, TREE_COLD, ASPECT, riverNear } from '../core/shape.js';
 import { hooks } from '../core/state.js';
 import { player } from '../characters/player.js';
 import { camState } from '../systems/input.js';
 import { store } from '../systems/save.js';
 import { bindKey } from '../systems/actions.js';
 import { togglePanel, onPanel } from './hud.js';
-import { CELL, SPAN, REGION, explored, exploredRegions, isExplored, reveal } from '../systems/explored.js';
+import { CELL, SPAN, REGION, explored, exploredRegions, isExplored, exploredAt, reveal } from '../systems/explored.js';
 import { KIND_LABEL } from '../features/places.js';
+import { freeTravel } from '../core/env.js';
+import { placeName } from '../world/landmarks.js';
+import { travelPoints, pointFor, travelToPoint, isAwake } from '../features/waypoints.js';
 
 const $ = (id) => document.getElementById(id);
 const PX = 8, M = CELL / PX, SIDE = SPAN * PX;   // pixels to a cell; metres to a pixel; a region's picture
@@ -137,6 +140,7 @@ const GLYPH = {
   grotto: { d: 'M8 2l5 6-5 6-5-6z' }, skyisle: { d: 'M2 6h12l-6 8z' },
   ship: { d: 'M2 10h12l-2 4H4zM7.500 2v7h1V4l3.500 5H8.500' },
   camp: { d: 'M8 3l6 11H9l-1-4-1 4H2z' },
+  waystone: { d: 'M5.500 14l1-11.500h3l1 11.500z' },
 };
 const paths = {};
 const glyph = (kind) => { const G = GLYPH[kind]; if (!G) return null; return paths[kind] || (paths[kind] = { path: new Path2D(G.d), line: !!G.line }); };
@@ -149,9 +153,24 @@ const view = { x: 0, z: 0, scale: START_SCALE };
 let open = false, follow = true, dirty = true, chosen = null, marks = [];
 let panel = null, canvas = null, ctx = null, maskLayer = null, mctx = null, cssW = 0, cssH = 0, dpr = 1;
 
-/** The places to mark: those you have found (your camp where it stands now). */
+/** The waystones in explored land (looked up once per explored region): asleep ones are marked dimly, to walk to. */
+const stonesBy = new Map();
+function stonesSeen() {
+  const out = new Map(), hw = cssW / 2 / view.scale + REGION, hh = cssH / 2 / view.scale + REGION;
+  for (const R of exploredRegions()) {
+    if (Math.abs((R.rx + 0.5) * REGION - view.x) > hw || Math.abs((R.rz + 0.5) * REGION - view.z) > hh) continue; // (only the regions in view: a first look at one may have rivers to trace)
+    const k = R.rx + ',' + R.rz;
+    let list = stonesBy.get(k);
+    if (!list) stonesBy.set(k, (list = sitesNear((R.rx + 0.5) * REGION, (R.rz + 0.5) * REGION, REGION * 0.75, 'waystone').map((s) => ({ id: s.id, kind: 'waystone', name: placeName(s), x: s.x, z: s.z }))));
+    for (const s of list) if (!out.has(s.id) && exploredAt(s.x, s.z)) out.set(s.id, s);
+  }
+  return out;
+}
+/** The places to mark: those you have found (your camp where it stands now), and the waystones: awake (`awake`), or asleep in land you have explored. */
 function places() {
-  const out = [];
+  const out = [], stones = stonesSeen();
+  for (const p of travelPoints()) if (p.kind === 'waystone') { stones.delete(p.id); out.push({ id: p.id, kind: 'waystone', name: p.name, x: p.x, z: p.z, awake: true }); }
+  for (const s of stones.values()) if (!isAwake(s.id)) out.push(Object.assign({ awake: false }, s));
   for (const f of store.found || []) {
     if (f.id === 'camp') { if (store.camp) out.push({ id: f.id, kind: 'camp', name: f.name, x: store.camp.x, z: store.camp.z }); continue; }
     out.push(f);
@@ -199,33 +218,35 @@ function draw() {
   const px = (x) => (x - view.x) * view.scale + cssW / 2, pz = (z) => (z - view.z) * view.scale + cssH / 2;
   const named = [], list = places().map((f) => ({ f, x: px(f.x), y: pz(f.z) })).filter((m) => m.x > -40 && m.x < cssW + 40 && m.y > -40 && m.y < cssH + 40);
   // (the chosen place first, then those nearest the middle: where names would run together, the later ones go without)
-  list.sort((p, q) => (q.f === chosen) - (p.f === chosen) || Math.hypot(p.x - cssW / 2, p.y - cssH / 2) - Math.hypot(q.x - cssW / 2, q.y - cssH / 2));
+  const picked = (f) => !!chosen && f.id === chosen.id;
+  list.sort((p, q) => picked(q.f) - picked(p.f) || Math.hypot(p.x - cssW / 2, p.y - cssH / 2) - Math.hypot(q.x - cssW / 2, q.y - cssH / 2));
   marks = [];
   ctx.textAlign = 'center'; ctx.lineJoin = 'round';
   for (const m of list) {
-    const f = m.f, lake = f.kind === 'lake', G = glyph(f.kind), on = f === chosen;
+    const f = m.f, lake = f.kind === 'lake', G = glyph(f.kind), on = picked(f), stone = f.kind === 'waystone', ink = stone ? (f.awake ? '#9fe9ff' : 'rgba(247, 244, 236, 0.5)') : '#f7f4ec';
     if (!lake) {
+      if (stone && f.awake) { const halo = ctx.createRadialGradient(m.x, m.y, 4, m.x, m.y, 22); halo.addColorStop(0, 'rgba(127, 227, 255, 0.55)'); halo.addColorStop(1, 'rgba(127, 227, 255, 0)'); ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(m.x, m.y, 22, 0, 7); ctx.fill(); }
       ctx.beginPath(); ctx.arc(m.x, m.y, on ? 11 : 9.5, 0, 7);
       ctx.fillStyle = 'rgba(14, 20, 24, 0.86)'; ctx.fill();
-      ctx.strokeStyle = on ? '#ffd27a' : 'rgba(255, 255, 255, 0.75)'; ctx.lineWidth = on ? 2 : 1.2; ctx.stroke();
+      ctx.strokeStyle = on ? '#ffd27a' : stone ? (f.awake ? '#7fe3ff' : 'rgba(255, 255, 255, 0.35)') : 'rgba(255, 255, 255, 0.75)'; ctx.lineWidth = on ? 2 : 1.2; ctx.stroke();
       if (G) {
         ctx.save(); ctx.translate(m.x - 6, m.y - 6.2); ctx.scale(0.75, 0.75);
-        if (G.line) { ctx.strokeStyle = '#f7f4ec'; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.stroke(G.path); } else { ctx.fillStyle = '#f7f4ec'; ctx.fill(G.path); }
+        if (G.line) { ctx.strokeStyle = ink; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.stroke(G.path); } else { ctx.fillStyle = ink; ctx.fill(G.path); }
         ctx.restore();
       } else { ctx.beginPath(); ctx.arc(m.x, m.y, 3, 0, 7); ctx.fillStyle = '#f7f4ec'; ctx.fill(); }
     }
     // the name: under the lake's water, or under the place's mark
     let label = false;
-    if (view.scale >= 0.1 || on) {
+    if ((view.scale >= 0.1 && !(stone && !f.awake)) || on) { // (a sleeping stone's name shows only when you choose it)
       ctx.font = lake ? 'italic 600 16px "Cormorant Garamond", Georgia, serif' : '600 11px Manrope, system-ui, sans-serif';
       const tw = ctx.measureText(f.name).width / 2 + 5, ty = lake ? m.y + Math.max(16, 46 * view.scale + 14) : m.y + 23, box = { x0: m.x - tw, x1: m.x + tw, y0: ty - 14, y1: ty + 5 };
       if (on || !named.some((q) => box.x0 < q.x1 && box.x1 > q.x0 && box.y0 < q.y1 && box.y1 > q.y0)) {
         named.push(box); label = true;
         ctx.strokeStyle = 'rgba(12, 18, 22, 0.85)'; ctx.lineWidth = 3.5; ctx.strokeText(f.name, m.x, ty);
-        ctx.fillStyle = on ? '#ffd27a' : '#f7f4ec'; ctx.fillText(f.name, m.x, ty);
+        ctx.fillStyle = on ? '#ffd27a' : ink; ctx.fillText(f.name, m.x, ty);
       }
     }
-    marks.push({ id: f.id, name: f.name, kind: f.kind, x: Math.round(m.x), y: Math.round(m.y), label });
+    marks.push({ id: f.id, name: f.name, kind: f.kind, x: Math.round(m.x), y: Math.round(m.y), label, awake: stone ? !!f.awake : undefined });
   }
   // you: an arrow pointing the way you look
   {
@@ -274,14 +295,16 @@ function zoomBy(k, x = cssW / 2, y = cssH / 2) {
 }
 function say() {
   const sum = $('mapSummary'), km2 = (explored.cells * CELL * CELL) / 1e6, n = (store.found || []).length;
-  sum.textContent = `${km2 < 10 ? km2.toFixed(1) : Math.round(km2)} km² explored · ${n} ${n === 1 ? 'place' : 'places'}`;
+  const stones = travelPoints().filter((p) => p.kind === 'waystone').length;
+  sum.textContent = `${km2 < 10 ? km2.toFixed(1) : Math.round(km2)} km² explored · ${n} ${n === 1 ? 'place' : 'places'} · ${stones} ${stones === 1 ? 'waystone' : 'waystones'} awake`;
   const place = $('mapPlace'), go = $('mapGo');
   if (chosen) {
     const far = Math.hypot(chosen.x - player.x, chosen.z - player.z), b1 = document.createElement('b');
     b1.textContent = chosen.name;
-    place.replaceChildren(b1, ` · ${KIND_LABEL[chosen.kind] || chosen.kind} · ${far < 60 ? 'you are here' : farText(far) + ' to the ' + wayTo(chosen.x - player.x, chosen.z - player.z)}`);
-  } else place.textContent = 'Drag to move the map, scroll to zoom. Choose a place you have found to go back to it.';
-  go.hidden = !chosen;
+    const asleep = chosen.kind === 'waystone' && !isAwake(chosen.id);
+    place.replaceChildren(b1, ` · ${chosen.kind === 'waystone' ? (asleep ? 'Waystone, asleep' : 'Waystone') : KIND_LABEL[chosen.kind] || chosen.kind} · ${far < 60 ? 'you are here' : farText(far) + ' to the ' + wayTo(chosen.x - player.x, chosen.z - player.z)}${asleep ? ' · walk to it and wake it to travel here' : ''}`);
+  } else place.textContent = 'Drag to move the map, scroll to zoom. Choose home, your camp or a waystone you have woken to travel there.';
+  go.hidden = !chosen || !(freeTravel || pointFor(chosen.id));
 }
 
 /** For tests: how the map stands, a way to finish painting it, and the colour drawn at a spot. */
@@ -348,7 +371,11 @@ export function initMap(goTo) {
   $('mapIn').addEventListener('click', () => zoomBy(1.5));
   $('mapOut').addEventListener('click', () => zoomBy(1 / 1.5));
   $('mapMe').addEventListener('click', () => { follow = true; dirty = true; });
-  $('mapGo').addEventListener('click', () => { if (!chosen) return; goTo(chosen.x, chosen.z); reveal(player.x, player.z); follow = true; say(); dirty = true; });
+  $('mapGo').addEventListener('click', () => {
+    if (!chosen) return;
+    const p = pointFor(chosen.id);
+    if (p) travelToPoint(p); else if (freeTravel) { goTo(chosen.x, chosen.z); reveal(player.x, player.z); follow = true; say(); dirty = true; }
+  });
 
   // walking reveals the land; while the map is open it is kept up to date
   let lookIn = 0, lastX = NaN, lastZ = NaN, seenRev = -1, drawnX = NaN, drawnZ = NaN, drawnYaw = NaN, sayIn = 0;

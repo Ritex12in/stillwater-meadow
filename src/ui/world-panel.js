@@ -2,6 +2,7 @@
 import { timeCtl, setManual, goLive, formatHour, onTimeModeChange } from '../systems/time.js';
 import { wx, setWeather, goAutoWeather, onWeatherChange } from '../systems/weather.js';
 import { seasonState } from '../core/state.js';
+import { freeTravel } from '../core/env.js';
 import { worldSeed, worldSeedText, seedOf, randomSeed, goToWorld, worldAddress } from '../systems/save.js';
 
 const $ = (id) => document.getElementById(id);
@@ -72,6 +73,8 @@ export function hereText() {
 
 export function initWorldPanel() {
   initSeed();
+  // (going anywhere at once from these lists is for testing and filming: in play you travel between waystones)
+  for (const id of ['placesBox', 'countriesBox']) { const el = $(id); if (el) el.hidden = !freeTravel; }
   const here = $('hereNow'), panel = $('worldPanel');
   if (here) { const say = () => { if (!panel.hidden) here.textContent = hereText(); }; setInterval(say, 2000); new MutationObserver(say).observe(panel, { attributes: true, attributeFilter: ['hidden'] }); }
   const slider = $('timeSlider'), out = $('timeOut'), live = $('liveBtn');

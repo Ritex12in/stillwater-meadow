@@ -109,11 +109,11 @@
       </form>
       <p class="note" id="seedNote" hidden></p>
     </div>
-    <div>
+    <div id="placesBox">
       <h3>Places nearby</h3>
       <div class="places" id="places" role="group" aria-label="Places nearby: choose one to go there"></div>
     </div>
-    <div>
+    <div id="countriesBox">
       <h3>Kinds of country</h3>
       <p class="note" id="countriesNote" hidden>Looking about…</p>
       <div class="places countries" id="countries" role="group" aria-label="Kinds of country: choose one to go to the nearest"></div>
@@ -161,13 +161,13 @@
     <dl class="keys">
       <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt><dd>Walk · <kbd>Shift</kbd> to jog</dd>
       <dt>Mouse</dt><dd>Click the world, then look around · <kbd>Esc</kbd> frees the cursor · scroll to zoom</dd>
-      <dt><kbd>E</kbd></dt><dd>Sit, board the boat, light the campfire</dd>
+      <dt><kbd>E</kbd></dt><dd>Sit, board the boat, light the campfire, wake a waystone</dd>
       <dt><kbd>F</kbd></dt><dd>Pet a cat or dog once it's tame</dd>
       <dt><kbd>T</kbd></dt><dd>Feed or throw a fish to a cat or dog to win its trust</dd>
       <dt><kbd>R</kbd></dt><dd>Fish: cast, hook a bite, reel in</dd>
       <dt><kbd>I</kbd></dt><dd>Backpack: what you are carrying</dd>
       <dt><kbd>J</kbd></dt><dd>Catch journal</dd>
-      <dt><kbd>M</kbd></dt><dd>Map: the land you have explored · drag to move, scroll to zoom</dd>
+      <dt><kbd>M</kbd></dt><dd>Map: the land you have explored · travel to home, your camp and the waystones you have woken</dd>
       <dt><kbd>B</kbd></dt><dd>Toss bread to the ducks</dd>
       <dt><kbd>G</kbd></dt><dd>Pick flowers, give or leave the bouquet</dd>
       <dt><kbd>Y</kbd></dt><dd>Throw a stick for a tamed dog</dd>
@@ -236,6 +236,7 @@
     <div class="line"><span id="promptPrimary" class="line"></span><button type="button" class="more" id="promptMore" hidden aria-expanded="false"></button></div>
   </div>
   <div class="lock-tip glass auto-hide" id="lockTip" hidden>Click anywhere to look around with the mouse</div>
+  <div class="fade" id="fade"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <div class="photo-vignette" id="photoVignette"></div>

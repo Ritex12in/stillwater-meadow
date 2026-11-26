@@ -217,6 +217,34 @@ export function stoneCircle(variant = 0) {
   k.add(m.stone, box(2.2, 0.7, 1.2, 0, 0, 0));
   return { group: k.build(), radius: r + 1.5, height: 4 };
 }
+/**
+ * A waystone (features/waypoints.js): a tall leaning stone on a ring of small ones, a rune cut into
+ * each broad face. Asleep, the runes are dark (they glow a little at night, as the circles' do); woken,
+ * the bright runes show instead (`on`, its own mesh, shown by world/landmarks.js).
+ */
+export function waystone(variant = 0) {
+  const R = mulberry32(9700 + variant * 53), m = buildingMats(), k = new Kit();
+  if (!M.rune) M.rune = new THREE.MeshStandardMaterial({ color: '#2a3a44', emissive: '#7fe3ff', emissiveIntensity: 0 });
+  if (!M.wayOn) M.wayOn = new THREE.MeshStandardMaterial({ color: '#bff4ff', emissive: '#7fe3ff', emissiveIntensity: 1.6 });
+  const h = 3.1 + R() * 0.9, w = 1.0 + R() * 0.25, d = 0.55, lean = (R() - 0.5) * 0.1, sink = 0.15;
+  // the stone: a slab, broader than it is thick, narrowing to its top
+  k.add(m.darkStone, new THREE.CylinderGeometry(0.55, 0.8, h, 4).rotateY(Math.PI / 4).scale(w, 1, d).translate(0, h / 2 - sink, 0).rotateZ(lean));
+  k.add(m.stone, cyl(1.45, 1.3, 0.22, 9, 0, -0.08, 0));
+  for (let i = 0; i < 7; i++) { const a = (i / 7) * TAU + R() * 0.5, q = 0.2 + R() * 0.16; k.add(m.stone, new THREE.DodecahedronGeometry(q, 0).scale(1, 0.7, 1).translate(Math.cos(a) * 1.25, 0.16, Math.sin(a) * 1.25)); }
+  // the runes: three strokes and a dot up each broad face, lying on the face (which leans in toward the top):
+  // dark ones, and a hair in front of them bright ones
+  const face = (y) => d * (0.566 - 0.177 * ((y + sink) / h)), tilt = -Math.atan((d * 0.177) / h);
+  for (const side of [0, Math.PI]) for (const [mat, off] of [[M.rune, 0.012], [M.wayOn, 0.024]]) {
+    const put = (g, x, y) => k.add(mat, g.rotateX(tilt).translate(x, y, face(y) + off).rotateY(side).rotateZ(lean), false);
+    put(new THREE.PlaneGeometry(0.1, h * 0.4), 0, h * 0.48);
+    put(new THREE.PlaneGeometry(0.34, 0.09).rotateZ(0.6), 0.1, h * 0.6);
+    put(new THREE.PlaneGeometry(0.34, 0.09).rotateZ(-0.6), -0.1, h * 0.42);
+    put(new THREE.CircleGeometry(0.085, 10), 0, h * 0.78);
+  }
+  const group = k.build();
+  group.children.find((c) => c.material === M.wayOn).name = 'wayOn';
+  return { group, radius: 1.5, height: h };
+}
 /** A cairn on a summit: a heap of stones stacked to a point, and a plain bench beside it looking out. */
 export function cairn(variant = 0) {
   const R = mulberry32(9100 + variant * 41), m = buildingMats(), k = new Kit();

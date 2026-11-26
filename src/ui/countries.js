@@ -4,6 +4,7 @@
 // building sites, found by their own rule.
 import { height, walkable, cliffsAt, sitesNear, moistAt, coldAt, snowCold, snowOf, dryOf, lushOf, groveAt, VOLCANO } from '../core/shape.js';
 import { biomesAt } from '../core/biome.js';
+import { freeTravel } from '../core/env.js';
 
 /** How far the search reaches (m), and how finely (m between looks). */
 export const SEARCH_REACH = 6000;
@@ -112,6 +113,7 @@ export function initCountries({ where, go }) {
     }, 40);
   };
   draw();
-  new MutationObserver(() => { if (!panel.hidden) search(); }).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+  // (the list is hidden in play, so there is no need to look)
+  new MutationObserver(() => { if (!panel.hidden && freeTravel) search(); }).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
   return { list: () => last, search };
 }

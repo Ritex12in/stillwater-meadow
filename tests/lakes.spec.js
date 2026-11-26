@@ -63,7 +63,7 @@ test('going to a lake: its water is there, you can fish it, and visiting many le
 });
 
 test('the world remembers where you were, and the Places list takes you to a lake', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const errors = await open(page, 'weather=clear&season=summer&freetravel=1', '#12'); // (freetravel: the lists that take you anywhere at once, which play does without)
   // the list in the World popover names the lakes about you; choosing one takes you to its shore
   await page.locator('#worldBtn, [aria-controls="worldPanel"], button:has-text("World")').first().click();
   const rows = page.locator('#places button');

@@ -107,6 +107,7 @@ Each one leaves the game playable and tested.
 | 7 | **Performance on real devices.** A view-distance setting; tuning on a real GPU and a phone. | | view distance setting done; tuned on the owner's own computer, 2026-11-23 (see "Performance"); a real phone not tried |
 | 8 | **Water and ways** (planned, not started; each needs new terrain work), cheapest first: an **ocean** (the land formula gains a continent shape; land below the one water level becomes sea, with beaches); **trails** between neighbouring settled lakes, flattened into the ground, with signposts; **islands** in big lakes (needs the boat to steer or to have a second stop); **rivers and waterfalls** (hardest: a river is carved along a route from lake to lake or sea, and the carving must agree across tiles). | | ocean done (coast, islands, beaches, palms, beach huts, ships); trails with signposts done; rivers and waterfalls done (see "Rivers and waterfalls"); islands in lakes done (see "Islands") |
 | M | **A map** (asked for by the owner, 2026-11-26): a screen opened with M showing the land you have explored, filling in as you walk, with the places you have found marked. | Explored land is kept per world; nothing unfound is marked (`tests/map.spec.js`). | done (see "How the map works"); its look is for the owner to judge |
+| T | **Teleport points** (asked for by the owner, 2026-11-27; the owner took our picks): waystones, standing stones you wake and then travel to from the map; the lists that took you anywhere at once are gone from play. | Stones are fixed by the seed and change nothing of the land; a woken stone stays woken per world (`tests/map.spec.js`). | done (see "How travelling works"); the stone's look is for the owner to judge |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
@@ -779,8 +780,8 @@ were the cheapest with the most to show, plus Minecraft-style biomes the owner a
 The owner asked for a map and chose: a map screen you open (not a corner minimap), showing only
 where you have been. Calls that are ours (the owner may overturn them): **M** opens it, as in most
 games, so the music moved to **U**; land within 190 m of you counts as explored; the map's colours
-are the country's in summer whatever the season; choosing a found place on the map offers "Go
-there", as the journal does; rivers are drawn, trails and bridges are not (yet).
+are the country's in summer whatever the season; rivers are drawn, trails and bridges are not
+(yet). (Travel from the map goes by waystones since 2026-11-27: see "How travelling works".)
 
 - `systems/explored.js` keeps where you have been: the world in cells of 32 m, one bit a cell,
   gathered into regions of 32 x 32 cells (1,024 m square). `reveal(x, z)` marks the cells within
@@ -808,9 +809,46 @@ there", as the journal does; rivers are drawn, trails and bridges are not (yet).
   (up: north is -z) and a scale. Names that would overlap are left out, nearest the middle first.
 - Drag to move, wheel or two fingers or the + and - buttons to zoom (0.03 to 1.4 screen pixels a
   metre), the target button to centre on you again (the map follows you until you drag it). A click
-  on a found place chooses it; "Go there" calls `travelTo`.
+  on a place chooses it; "Go there" shows for home, your camp and woken waystones.
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
+
+## How travelling works (waystones, 2026-11-27)
+
+The owner asked for teleport points and said "go with your picks". The picks (ours: the owner may
+overturn any): the points are **waystones**, a new standing stone found in every kind of country,
+plus the home lake and your camp; you travel **from anywhere**, by the map; the old free jumps are
+**gone from play** (the journal's and the map's Go for any found place, the World popover's Places
+nearby and Kinds of country), kept only with `?freetravel=1` or `?debug` for tests and filming;
+stones stand about **1.5 km** apart.
+
+- **Sites:** `SITE_KINDS.waystone` in `core/shape.js`: one to a 1,500 m square (in its middle
+  half, so never two close), on dry ground that rises or falls less than 5 m within 34 m, off the
+  sea, over 2.2 lake-radii from any lake, off every river, 70 m clear of other buildings, and (as
+  all sites) 600 m clear of home. No levelled ground (`flat: 0`), so the land, the rivers and the
+  trails are exactly as they were; only trees keep 12 m off a stone. Because a stone's place
+  depends on the rivers, `siteAt()` skips kinds without levelled ground when a river is traced.
+  In world 1: 23 stones within 5 km of home, the nearest 1.1 km off, about 1.25 km between
+  neighbours.
+- **The stone:** `waystone()` in `world/buildings.js`, three variants: a leaning slab on a ring of
+  small stones, a rune on each broad face. Two sets of runes: dark (glowing a little at night like
+  the stone circles') and bright (`wayOn`), the bright ones and a glow shown only when the stone is
+  awake (`world/landmarks.js` `lightWaystone`). Set down from a pool like the other buildings.
+- **Waking and travelling:** `features/waypoints.js`. Within 4.5 m, E wakes a stone ("Wake the
+  waystone"): it goes into `store.waypoints` (per world: `{ id, name, x, z }`), its runes light,
+  a chime. At a woken stone E opens the map. `travelPoints()` gives where you may go: home (you
+  arrive at the start spot), your camp, each woken stone (you arrive 2.6 m south of it, facing
+  it). `travelToPoint()` fades the view out (0.38 s; not with reduced motion), moves you with
+  `travelTo` (companions come), closes the map, chimes and fades back in. Not while you are busy
+  (sitting, fishing, in the boat).
+- **Names:** a stone has its own, by rule from its site: "Goldenford waystone", "Ravenmoor
+  waystone" (`placeName`). A waystone is woken, not "found": it is not in the places journal.
+- **On the map:** woken stones glow blue with their names; stones still asleep show dimly once the
+  land they stand on is explored (name only when chosen, with "walk to it and wake it"). "Go
+  there" shows only for home, your camp and woken stones. The header counts the stones awake.
+- **On the compass:** the nearest stone still asleep within 1.5 km, as "Waystone".
+- `window.__meadow.waypoints`: `awake`, `points`, `asleep` (within 2.5 km), `busy`;
+  `__meadow.travelToPoint(point)`.
 
 ## Tools
 

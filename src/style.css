@@ -64,6 +64,7 @@ body.quiet .brand { opacity: 0.45; }
 .compass .mark::before { content: ""; position: absolute; top: -9px; left: 50%; translate: -50% 0; width: 6px; height: 6px; border-radius: 50%; background: #9fd8e8; box-shadow: 0 0 6px rgba(159, 216, 232, 0.8); }
 .compass .mark.home::before { background: #ffd27a; box-shadow: 0 0 6px rgba(255, 210, 122, 0.85); }
 .compass .mark.shrine::before { background: #ff9ec2; box-shadow: 0 0 6px rgba(255, 158, 194, 0.85); }
+.compass .mark.waystone::before { background: #7fe3ff; box-shadow: 0 0 6px rgba(127, 227, 255, 0.85); }
 .compass .mark b { font-weight: 700; }
 .compass .mark.dot b, .compass .mark.dot i { visibility: hidden; }
 .compass .mark i { font-style: normal; font-size: 9.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
@@ -239,6 +240,9 @@ body.photo-mode > *:not(#world):not(.photo-bar):not(.photo-vignette):not(.photo-
 .pack-info b { color: var(--ink); font-size: 14px; }
 .pack-info .row { display: flex; gap: 6px; flex-wrap: wrap; }
 .catches.places-found li { grid-template-columns: minmax(0, 1fr) auto auto; }
+/* Travelling to a waystone: the view fades out and in */
+.fade { position: fixed; inset: 0; z-index: 55; background: #0e1418; opacity: 0; pointer-events: none; transition: opacity 0.36s ease; }
+.fade.on { opacity: 1; }
 /* The map */
 .panel.map { width: min(1120px, calc(100vw - 32px)); height: min(780px, calc(100% - 96px)); max-height: none; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .map-view { position: relative; min-height: 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); background: #172027; }

@@ -11,7 +11,7 @@ const nearestSite = (page, kind) => page.evaluate(async (kind) => {
 }, kind);
 
 test('places: coming to one finds it, the journal lists it, you can go back from there, and a photo there is a postcard', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const errors = await open(page, 'weather=clear&season=summer&freetravel=1', '#12'); // (freetravel: the lists that take you anywhere at once, which play does without)
   await step(page, 1.2);
   expect((await page.evaluate(() => window.__meadow.found())).map((f) => f.kind), 'the home lake, found as you start').toContain('lake');
   const c = await nearestSite(page, 'castle');
@@ -232,7 +232,7 @@ test('a fox by country at the lake you are at (red, white in the snow), slipping
 });
 
 test('kinds of country: the World popover lists every biome with the nearest one, and Go takes you there', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const errors = await open(page, 'weather=clear&season=summer&freetravel=1', '#12'); // (freetravel: the lists that take you anywhere at once, which play does without)
   await page.locator('[data-panel="worldPanel"]').click();
   const desert = page.locator('#countries button[data-country="desert"]');
   await expect(desert).toContainText(/Golden desert · [\d.]+ (m|km)/, { timeout: 15000 });

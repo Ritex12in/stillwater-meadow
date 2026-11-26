@@ -10,7 +10,7 @@ import { sitesNear, VOLCANO } from '../core/shape.js';
 import { hooks, obstacles } from '../core/state.js';
 import { cur } from '../systems/time.js';
 import * as THREE from 'three';
-import { pagoda, castle, ruinArch, colonnade, stiltHut, windmill, stoneCircle, cairn, hotSpring, crystalGrotto, volcanoTop, skyIsles, ship, buildingMats } from './buildings.js';
+import { waystone, pagoda, castle, ruinArch, colonnade, stiltHut, windmill, stoneCircle, cairn, hotSpring, crystalGrotto, volcanoTop, skyIsles, ship, buildingMats } from './buildings.js';
 import { player } from '../characters/player.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
@@ -35,18 +35,21 @@ const KINDS = {
   beachhut: { view: 380, pool: 3, make: [0, 1, 2].map((v) => () => stiltHut(v + 3)) },
   ship: { view: 1400, pool: 2, make: [0, 1, 2].map((v) => () => ship(v)) },
   skyisle: { view: 1400, pool: 1, make: [0, 1].map((v) => () => skyIsles(v)) },
+  waystone: { view: 520, pool: 2, make: [0, 1, 2].map((v) => () => waystone(v)) },
 };
 /** The names the places are found by (world/landmarks.js placeName). */
-const KIND_NAMES = { beachhut: 'Beach hut', ship: 'Ship', skyisle: 'Floating islands', pagoda: 'Pagoda', castle: 'Castle', ruin: 'Ruins', hut: 'Stilt hut', windmill: 'Windmill', circle: 'Stone circle', cairn: 'Summit cairn', spring: 'Hot spring', icecastle: 'Ice castle', grotto: 'Crystal grotto', volcano: 'Volcano' };
+const KIND_NAMES = { beachhut: 'Beach hut', ship: 'Ship', skyisle: 'Floating islands', pagoda: 'Pagoda', castle: 'Castle', ruin: 'Ruins', hut: 'Stilt hut', windmill: 'Windmill', circle: 'Stone circle', cairn: 'Summit cairn', spring: 'Hot spring', icecastle: 'Ice castle', grotto: 'Crystal grotto', volcano: 'Volcano', waystone: 'Waystone' };
 const NAME_A = ['Old', 'Grey', 'Silver', 'High', 'Quiet', 'Misty', 'Golden', 'Hollow', 'Wind', 'Star', 'Moss', 'Dawn', 'Ember', 'Frost', 'Willow', 'Raven'];
-/** A place's name, by rule from its site: "the Misty Stone circle". */
-export const placeName = (s) => `${NAME_A[s.variant % NAME_A.length]} ${KIND_NAMES[s.kind] ? KIND_NAMES[s.kind].toLowerCase() : s.kind}`.replace(/^./, (c) => c.toUpperCase());
+const WAY_B = ['fell', 'wick', 'holt', 'combe', 'dale', 'stow', 'rise', 'ford', 'haven', 'moor', 'garth', 'mere'];
+/** A place's name, by rule from its site: "the Misty Stone circle"; a waystone has a name of its own ("Ravenmoor waystone"). */
+export const placeName = (s) => s.kind === 'waystone' ? `${NAME_A[s.variant % NAME_A.length]}${WAY_B[Math.floor(s.variant / NAME_A.length) % WAY_B.length]} waystone` : `${NAME_A[s.variant % NAME_A.length]} ${KIND_NAMES[s.kind] ? KIND_NAMES[s.kind].toLowerCase() : s.kind}`.replace(/^./, (c) => c.toUpperCase());
 /** Blockers round a building (local coordinates): a ring at its radius, and its middle. */
 function footprint(kind, made) {
   const r = made.radius, out = [[0, 0, Math.min(r * 0.6, 4)]];
   if (kind === 'volcano' || kind === 'skyisle') return [];
   if (kind === 'castle' || kind === 'icecastle') { const S = r - 3; for (let i = 0; i < 24; i++) { const a = (i / 24) * TAU; out.push([Math.cos(a) * S, Math.sin(a) * S, 2]); } out.push([0, -2, 6]); return out; }
   if (kind === 'hut') return [[0, 0, 2.5]];
+  if (kind === 'waystone') return [[0, 0, 0.85]];
   const n = kind === 'pagoda' ? 8 : 6;
   for (let i = 0; i < n; i++) { const a = (i / n) * TAU; out.push([Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.35]); }
   return out;
@@ -84,8 +87,19 @@ function place(c, s, kind) {
   const cs = Math.cos(s.turn), sn = Math.sin(s.turn);
   for (const b of c.blocks) { b.o.x = s.x + b.lx * cs + b.lz * sn; b.o.z = s.z - b.lx * sn + b.lz * cs; if (!obstacles.includes(b.o)) obstacles.push(b.o); }
   for (const st of c.seats) { st.o.x = s.x + st.q.x * cs + st.q.z * sn; st.o.z = s.z - st.q.x * sn + st.q.z * cs; st.o.baseY = s.y; st.o.rot = s.turn + st.q.rot; if (!seats.includes(st.o)) seats.push(st.o); }
+  if (kind === 'waystone') lightWaystone(c);
   // a floating island's top: where the updraft carries you
   if (c.top) c.floor = { x: s.x + c.top.x * cs + c.top.z * sn, z: s.z - c.top.x * sn + c.top.z * cs, y: s.y + c.top.y, r: c.top.r, base: { x: s.x, z: s.z } };
+}
+/** Is the waystone at a site awake? (features/waypoints.js says.) */
+let awake = () => false;
+export const setWaystoneAwake = (fn) => { awake = fn; for (const vs of made.waystone || []) if (vs) for (const c of vs.copies) if (c.site) lightWaystone(c); };
+function lightWaystone(c) {
+  const on = c.group.getObjectByName('wayOn'), lit = awake(c.site.id);
+  if (on) on.visible = lit;
+  if (!c.glow) c.glow = c.group.getObjectByName('wayGlow');
+  if (!c.glow) { c.glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: '#8fe6ff', transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending })); c.glow.name = 'wayGlow'; c.glow.position.y = 2.2; c.glow.scale.setScalar(5); c.group.add(c.glow); }
+  c.glow.visible = lit;
 }
 function release(c) {
   c.site = null;

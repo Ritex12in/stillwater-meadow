@@ -50,6 +50,7 @@ import { initCountries, nearestCountries } from './ui/countries.js';
 import { initBackpack, backpackView } from './ui/backpack.js';
 import { initFoundPlaces, foundView } from './features/places.js';
 import { initMap, mapView } from './ui/map.js';
+import { initWaypoints, waypointsView, travelToPoint } from './features/waypoints.js';
 import { initCamp } from './features/camp.js';
 import { initLandmarks, landmarksView, landmarkBlocks, landmarkSeats } from './world/landmarks.js';
 import { initSignposts, signsNear, signBlocks } from './world/signposts.js';
@@ -203,7 +204,7 @@ onQualityChange((o) => {
 window.addEventListener('resize', resize);
 
 // ── Features, each isolated so one failing can't take down the rest ──
-const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initMap: () => initMap((x, z) => travelTo(x, z)), initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initIceDance, initDanceCam, initDanceMusic, initFoley };
+const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initMap: () => initMap((x, z) => travelTo(x, z)), initWaypoints: () => initWaypoints(travelTo), initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initIceDance, initDanceCam, initDanceMusic, initFoley };
 for (const [name, init] of Object.entries(features)) {
   try {
     const r = init();
@@ -386,6 +387,8 @@ window.__meadow = {
   compass: compassView,
   /** The map (ui/map.js): how it stands, and what of the land is explored. */
   get map() { return mapView(); },
+  /** Waystones (features/waypoints.js): those awake, the points you can travel to, those asleep about you; and a way to travel to a point. */
+  get waypoints() { return waypointsView(); }, travelToPoint,
   /** The year: hold it at a phase (0 midwinter .. 0.5 midsummer; null lets it run), and how it is now. */
   year: { hold: holdPhase, get state() { return Object.assign({}, seasonState, { mapWeather: undefined }); } },
   /** The home lake's middle, and where you first arrive beside it. */

@@ -11,6 +11,7 @@ import { hooks } from '../core/state.js';
 import { player } from '../characters/player.js';
 import { toast } from './hud.js';
 import { store } from '../systems/save.js';
+import { asleepNear } from '../features/waypoints.js';
 
 const $ = (id) => document.getElementById(id);
 const SPAN = 180;  // degrees of horizon across the strip
@@ -29,6 +30,8 @@ export function marksFrom(x, z) {
   if (store.camp && Math.hypot(store.camp.x - x, store.camp.z - z) > 25) out.push({ key: 'camp', name: 'Your camp', x: store.camp.x, z: store.camp.z, kind: 'home' });
   const shrine = shrineSitesNear(x, z, 2500)[0];
   if (shrine && Math.hypot(shrine.x - x, shrine.z - z) > 30) out.push({ key: 'shrine:' + shrine.id, name: shrine.name, x: shrine.x, z: shrine.z, kind: 'shrine' });
+  const stone = asleepNear(x, z, 1500)[0]; // (a waystone still to wake)
+  if (stone && Math.hypot(stone.x - x, stone.z - z) > 12) out.push({ key: 'way:' + stone.id, name: 'Waystone', x: stone.x, z: stone.z, kind: 'waystone' });
   for (const L of lakesNear(x, z, 1500)) {
     if (out.length >= MARKS) break;
     if (L === HOME || Math.hypot(L.x - x, L.z - z) < L.R0 * 2) continue;

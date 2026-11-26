@@ -9,9 +9,11 @@ import { player } from '../characters/player.js';
 import { store, saveSoon } from '../systems/save.js';
 import { onPhoto } from './photo.js';
 import { placeName } from '../world/landmarks.js';
-import { toast, onPanel } from '../ui/hud.js';
+import { toast, onPanel, togglePanel } from '../ui/hud.js';
 import { phaseName } from '../core/year.js';
 import { seasonState } from '../core/state.js';
+import { freeTravel } from '../core/env.js';
+import { pointFor, travelToPoint } from './waypoints.js';
 
 const POSTCARDS = 30;
 export const KIND_LABEL = { lake: 'Lake', shrine: 'Shrine', pagoda: 'Pagoda', castle: 'Castle', ruin: 'Ruins', hut: 'Stilt hut', windmill: 'Windmill', circle: 'Stone circle', cairn: 'Summit cairn', spring: 'Hot spring', icecastle: 'Ice castle', grotto: 'Crystal grotto', volcano: 'Volcano', beachhut: 'Beach hut', ship: 'Ship', skyisle: 'Floating islands', camp: 'Camp' };
@@ -21,7 +23,7 @@ function placesNear(x, z) {
   const out = [];
   for (const L of lakesNear(x, z, 300)) out.push({ id: 'lake:' + L.id, kind: 'lake', name: L.name, x: L.x, z: L.z, reach: L.rmax * 1.6 });
   for (const s of shrineSitesNear(x, z, 120)) out.push({ id: 'shrine:' + s.id, kind: 'shrine', name: s.name, x: s.x, z: s.z, reach: 35 });
-  for (const s of sitesNear(x, z, 200)) out.push({ id: 'site:' + s.id, kind: s.kind, name: placeName(s), x: s.x, z: s.z, reach: s.kind === 'castle' ? 60 : 30 });
+  for (const s of sitesNear(x, z, 200)) if (s.kind !== 'waystone') out.push({ id: 'site:' + s.id, kind: s.kind, name: placeName(s), x: s.x, z: s.z, reach: s.kind === 'castle' ? 60 : 30 });
   if (store.camp) out.push({ id: 'camp', kind: 'camp', name: 'Your camp', x: store.camp.x, z: store.camp.z, reach: 25 });
   return out;
 }
@@ -66,9 +68,14 @@ export function initFoundPlaces(goTo) {
       const li = document.createElement('li'); li.className = 'got';
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = f.name;
       const st = document.createElement('span'); st.className = 'st'; st.textContent = KIND_LABEL[f.kind] || f.kind;
-      const go = document.createElement('button'); go.type = 'button'; go.className = 'btn'; go.textContent = 'Go';
-      go.addEventListener('click', () => goTo(f.x, f.z));
-      li.append(nm, st, go);
+      li.append(nm, st);
+      // (you travel only to home, your camp and woken waystones: features/waypoints.js; anywhere, when testing)
+      const point = pointFor(f.id);
+      if (point || freeTravel) {
+        const go = document.createElement('button'); go.type = 'button'; go.className = 'btn'; go.textContent = 'Go';
+        go.addEventListener('click', () => { if (point && !freeTravel) { togglePanel('journal', false); travelToPoint(point); } else goTo(f.x, f.z); });
+        li.append(go);
+      }
       return li;
     }) : [Object.assign(document.createElement('li'), { textContent: 'Nothing found yet: lakes, shrines, castles and other places go here as you come to them.' })]));
     const cards = store.postcards || [];

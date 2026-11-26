@@ -109,6 +109,7 @@ Each one leaves the game playable and tested.
 | M | **A map** (asked for by the owner, 2026-11-26): a screen opened with M showing the land you have explored, filling in as you walk, with the places you have found marked. | Explored land is kept per world; nothing unfound is marked (`tests/map.spec.js`). | done (see "How the map works"); its look is for the owner to judge |
 | T | **Teleport points** (asked for by the owner, 2026-11-27; the owner took our picks): waystones, standing stones you wake and then travel to from the map; the lists that took you anywhere at once are gone from play. | Stones are fixed by the seed and change nothing of the land; a woken stone stays woken per world (`tests/map.spec.js`). | done (see "How travelling works"); the stone's look is for the owner to judge |
 | L | **Seasons by latitude** (planned 2026-11-27, not started; see "Plan: seasons by latitude"). The endless world in lands 12 km north to south, each pole, equator, pole; the kind of year a place has follows its latitude, and the two halves of a land are half a year apart. | Pictures agreed by the owner before the build; every kind of country still findable; one full run of the suite; speed checked on the owner's computer. | built 2026-11-28 (see "How seasons by latitude work"); speed on the owner's computer not yet checked |
+| W | **A world worth looking at** (planned 2026-11-28; see "Plan: a world with places in it"). Oceans, continents and islands; regions each with a heart, a composed place like Stillwater Meadow; each biome's own look after the owner's six pictures; rivers that grow and real waterfalls. | Pictures agreed by the owner before each change to the land; all the changes to the land shipped as one. | planned; the waterfall's look begun |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
@@ -860,6 +861,97 @@ stones stand about **1.5 km** apart.
 - **On the compass:** also the nearest stone still asleep within 1.5 km, as "Waystone".
 - `window.__meadow.waypoints`: `awake`, `points`, `asleep` (within 2.5 km), `track`, `busy`;
   `__meadow.travelToPoint(point)`.
+
+## Plan: a world with places in it (2026-11-28; planned, the land not yet changed)
+
+### What the owner said
+
+- "Currently the world feels so random."
+- "We need to work on visuals, graphics and the math of generation." Six pictures to go by
+  (kept outside the repo, in the owner's Downloads, 2026-11-27: Volcanic Ruins Beneath a Fiery
+  Sky; Golden Oasis at Sunset; Aurora Over the Snowbound Fortress; Fantasy Tropical Isles and
+  Skybound Castle; Enchanted Valley Castle Vista; Enchanted Cherry Blossom Valley).
+- "Those images have man-made structures also, so I'm thinking these biomes can have something
+  like Stillwater Meadow." **This amends the earlier rule** (no built things away from home but
+  buildings that match their biome): each biome may now have a settled place of its own.
+- "Grass and desert and snow and many need new texture, new trees, better colours, eye-catching
+  sceneries."
+- "In the real world ocean covers most part, so work on ocean, and since ocean is large we can
+  think to design continents, islands."
+- "Rivers and waterfall literally need better visual."
+- "You can create any visual with code": textures, trees, structures and effects are all made in
+  code; no packs.
+
+### What the six pictures share (our reading)
+
+Each is one composed place: a landmark on a height (castle, palace, fortress, pagodas, the
+volcano); a tall waterfall off it into water in the middle of the scene; a small settlement by
+that water with a bridge and a path in; a ruin in the middle distance; one distinctive peak on
+the horizon; one strong palette (gold and violet; blue with warm windows; black and orange;
+turquoise and green; pink and lavender; green and sky blue); warm lights; a sky with character
+(two moons, aurora, ash, pink cloud).
+
+### Why the world feels random (our reading)
+
+Every feature is scattered by its own independent rule (biome patches, lakes, buildings,
+waystones), so nothing stands in relation to anything else: no castle overlooks a lake, no fall
+drops beside a village. Stillwater is the only composed place. Biomes blend and share similar
+greens, so two kilometres on rarely feels like arriving.
+
+### The plan (ours: every number and choice here is a pick the owner may overturn)
+
+1. **Oceans, continents, islands.** One broad field decides land or sea; about 55 to 60% sea
+   (less than Earth's 71%: open water is ground you cannot walk). Continents 4 to 8 km across,
+   each named, with its own waystones and its own completion ("34% explored, 5 of 9 waystones"):
+   these are the "small finite worlds" the owner wanted, with the sea as their border east to
+   west. Home's continent is guaranteed, home inland by its lake. Coasts with bays, headlands,
+   cliffs and beaches, and a pale shallow shelf before deep water. Islands in chains near the
+   continents, each with one thing on it. **With the 12 km lands:** latitude is untouched; a
+   continent simply lies across whatever belts it covers, and the sea changes by latitude too
+   (pack ice toward a pole, turquoise lagoons and island chains at an equator).
+2. **Crossing.** First, passages between harbours: find a harbour, and a skipper sails you to
+   another you know of, as a short sailing scene. Free sailing in your own boat later. (Waystones
+   alone cannot do it: you could never reach another continent the first time.)
+3. **Regions with a heart.** Each belt of a continent in regions about 2 km across, each with one
+   clear biome and one heart: a site with water, a height raised beside it for the landmark, a
+   cliff cut for the fall, and the settlement, bridge, path and lights laid out from those. The
+   rest of the region is the wild way to it, the landmark seen from afar. Waystones stand at
+   hearts; trails join heart to heart; some coastal hearts are harbours. The settled-lake code
+   (switched off, `?settlements=1`) is the starting point.
+4. **Each biome's heart and look,** one at a time, cherry blossom first (pagodas, lanterns, the
+   shrine and the blossom trees exist): snow (fortress on a cliff, frozen fall, cottages with lit
+   windows, aurora); meadow (castle on a hill, windmill farm, ruined arch); blossom (pagoda town
+   on terraces, arched bridge, stone lanterns); desert (domed palace over an oasis, tents, palms,
+   crystals); tropical isles (thatched village with jetty and boat, lagoon, rock arches);
+   volcanic (ruined arches and a stone bridge over lava, burning trees). For each: its own sky
+   tint, fog colour and grade where you stand; a ground texture of its own; its own trees and
+   plants; its structures as a kit.
+5. **Rivers and waterfalls.** Shape: rivers that start as a brook and widen to 12 to 20 m, with
+   tributaries, a valley, meanders, rapids; cliffs of 10 to 40 m for falls, most at hearts; lakes
+   with outlets; an estuary at the sea. Look: water coloured by depth, ripples that follow the
+   current, foam at banks and below rapids; a fall as layered sheets with wet rock behind, a
+   plunge pool, mist, seen from far off and heard; frozen as icicles; lava from the same code.
+
+### Order
+
+All the changes to the land (continents, regions and hearts, the rivers' shape) go out together,
+so discoveries are cleared once (`WORLD_GEN`), each after pictures the owner has seen:
+(1) pictures of continents and islands from above; (2) regions and hearts on them; (3) harbours
+and passages; (4) the biomes' looks, one at a time; (5) free sailing. What does not move the land
+can be built and judged at once: the waterfall's and the river water's look (begun 2026-11-28),
+the biomes' palettes and textures.
+
+### Decisions not yet answered by the owner
+
+How much sea; how big a continent; how to cross first; names and completion goals per continent;
+how big a region; which biome first; whether settlements have people in them (the pictures do;
+the game has no villagers).
+
+### To be straight about
+
+The pictures are paintings and the game is low-poly on an integrated graphics chip (Intel Iris
+Xe): composition, palette and light can be matched, the fine detail cannot, and every texture,
+tree and see-through layer costs frames there, so each piece is measured on the owner's computer.
 
 ## How seasons by latitude work (built 2026-11-28)
 

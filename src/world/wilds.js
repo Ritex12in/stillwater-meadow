@@ -18,7 +18,7 @@
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
 // walk.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
-import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt, seaAt, coldBase, cliffsAt, islePoint } from '../core/shape.js';
+import { gladeAt, height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt, seaAt, coldBase, cliffsAt, islePoint } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -68,6 +68,7 @@ export function growSquare(ix, iz) {
     // not on rock, cliffs or the high peaks (the same test the grass and the ground's texture use)
     const slope = slopeOf(x, z);
     if (slope > 0.62 || rockAmt(h, slope, felt) > 0.3) continue;
+    if (gladeAt(x, z)) continue; // (the open ground before a heart's cliff)
     if (trees.some((t) => (t.x - x) ** 2 + (t.z - z) ** 2 < 11)) continue;
     // pines in the cold and up the mountains, few on the heath; blossom trees in their groves
     // (near the treeline only pines, and stunted ones)

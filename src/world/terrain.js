@@ -447,7 +447,7 @@ function groundDetail(mat, textured) {
         if (vGrove > 0.05) {
           float gv = smoothstep(0.25, 0.8, vGrove);
           float gl = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-          diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb, vec3(gl), 0.45) * vec3(0.66, 0.6, 0.56) + vec3(0.04, 0.012, 0.035), gv * 0.75);
+          diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb, vec3(gl), 0.6) * vec3(0.63, 0.59, 0.57) + vec3(0.045, 0.02, 0.045), gv * 0.8); // (moss in shadow, toward mauve: the picture's ground is 473a3d, not olive)
           // petals: one to a small square of ground, each at its own spot in it, thick where they have drifted
           float drift = smoothstep(0.3, 0.72, gNoise(vGround.xz * 0.09 + 7.0) * 0.6 + gNoise(vGround.xz * 0.37 + 2.0) * 0.5);
           float lies = 0.0, h2 = 0.5;

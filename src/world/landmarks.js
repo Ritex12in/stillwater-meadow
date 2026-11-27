@@ -6,7 +6,7 @@
 // Each standing building blocks the way with a few circles round its footprint.
 import { TAU } from '../core/math.js';
 import { scene } from '../core/render.js';
-import { sitesNear, harboursNear, VOLCANO } from '../core/shape.js';
+import { sitesNear, harboursNear, VOLCANO, heartLayout } from '../core/shape.js';
 import { hooks, obstacles } from '../core/state.js';
 import { cur } from '../systems/time.js';
 import * as THREE from 'three';
@@ -89,6 +89,10 @@ function place(c, s, kind) {
   c.group.rotation.y = s.turn;
   c.group.visible = true;
   const cs = Math.cos(s.turn), sn = Math.sin(s.turn);
+  if (kind === 'heart') { // (its pagodas at the lip of this heart, either side of its fall)
+    const L = heartLayout(s);
+    [L.big, L.small].forEach((p, i) => { const dx = p.x - s.x, dz = p.z - s.z, lx = dx * cs - dz * sn, lz = dx * sn + dz * cs; c.group.children[i].position.x = lx; c.group.children[i].position.z = lz; c.blocks[i].lx = lx; c.blocks[i].lz = lz; });
+  }
   for (const b of c.blocks) { b.o.x = s.x + b.lx * cs + b.lz * sn; b.o.z = s.z - b.lx * sn + b.lz * cs; if (!obstacles.includes(b.o)) obstacles.push(b.o); }
   for (const st of c.seats) { st.o.x = s.x + st.q.x * cs + st.q.z * sn; st.o.z = s.z - st.q.x * sn + st.q.z * cs; st.o.baseY = s.y; st.o.rot = s.turn + st.q.rot; if (!seats.includes(st.o)) seats.push(st.o); }
   if (kind === 'waystone') lightWaystone(c);

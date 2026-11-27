@@ -22,6 +22,16 @@ for (const seed of (process.env.SEEDS || '1,7,42').split(',')) {
       // the way up round the back: the steepest metre of it
       let ramp = 0; for (let d = 0; d < s.R + 80; d += 1) ramp = Math.max(ramp, Math.abs(S.height(s.x - fx * d, s.z - fz * d) - S.height(s.x - fx * (d + 1), s.z - fz * (d + 1))));
       out.push(`  ${String(Math.round(Math.hypot(s.x - H.x, s.z - H.z))).padStart(5)} m off · top ${top.toFixed(1)} m (level ${s.T.toFixed(1)}) · cliff ${(top - foot).toFixed(1)} m, steepest ${steepest.toFixed(1)} m per m · back ${(top - back).toFixed(1)} m down, steepest ${ramp.toFixed(2)} · top walkable ${S.walkable(s.x, s.z)} · fall ${r ? r.drop.toFixed(1) + ' m (' + r.n + ' points)' : 'NONE'} · on it: other sites ${others.length ? others.join(',') : 0}, waystones ${stones}, shrines ${S.shrineSitesNear(s.x, s.z, 150).length}, lakes ${S.lakesNear(s.x, s.z, 150).length}, other rivers ${strays} · grove ${S.groveAt(s.x, s.z).toFixed(2)}`);
+      // step 4, the way in: the path (each length walked a metre at a time), the stream below the pool, the bridge, the trails' ends
+      const L = S.heartLayout(s), segs = S.trailsNear(s.x, s.z, 260), inner = segs.filter((q) => q.inner && q.id.startsWith(s.id + '~')), outer = segs.filter((q) => !q.inner && (q.a.id === s.id || q.b.id === s.id));
+      let worst = 0, off = 0, steps = 0, wet = 0;
+      for (const q of inner) for (let d = 0; d < q.len; d += 1) { const a = S.trailPoint(q, d / q.len), c = S.trailPoint(q, Math.min(1, (d + 1) / q.len)); steps++; if (!S.walkable(a.x, a.z)) { off++; if (S.riverNear(a.x, a.z)) wet++; } if (!S.riverNear(a.x, a.z) && !S.riverNear(c.x, c.z)) worst = Math.max(worst, Math.abs(S.height(c.x, c.z) - S.height(a.x, a.z))); }
+      const doors = outer.map((q) => { const e = q.a.id === s.id ? q.a : q.b; return Math.hypot(e.x - L.view.x, e.z - L.view.z) < 1 ? 'front' : Math.hypot(e.x - L.back.x, e.z - L.back.z) < 1 ? 'back' : 'ELSEWHERE'; });
+      // (does any trail from outside climb the cliff? the steepest metre along each, within 200 m of the heart)
+      let outSteep = 0; for (const q of outer) for (let d = 0; d < q.len; d += 1) { const a = S.trailPoint(q, d / q.len); if (Math.hypot(a.x - s.x, a.z - s.z) > 200) continue; const c = S.trailPoint(q, Math.min(1, (d + 1) / q.len)); if (!S.riverNear(a.x, a.z) && !S.riverNear(c.x, c.z)) outSteep = Math.max(outSteep, Math.abs(S.height(c.x, c.z) - S.height(a.x, a.z))); }
+      let rising = 0; if (r) for (let i = 1; i < r.n; i++) if (r.lv[i] > r.lv[i - 1] + 1e-4) rising++;
+      const br = r ? S.bridgesOf(r) : [], end = r ? Math.hypot(r.x[r.n - 1] - s.x, r.z[r.n - 1] - s.z) - s.R : 0;
+      out.push(`        the way in: path ${inner.length} lengths, ${steps} m, steepest metre ${worst.toFixed(2)}, not walkable ${off} m (${wet} in the stream) · trails from outside: ${doors.join(', ') || 'none'}, steepest metre near it ${outSteep.toFixed(2)} · stream runs to ${end.toFixed(0)} m past the rim, ${r ? Array.from(r.fall).reduce((a, f) => a + f, 0) : 0} falls, uphill ${rising} · bridges ${br.length}${br.length ? ' (garden ' + br.filter((q) => q.grove > 0.5).length + ')' : ''} · pagodas ${Math.round(Math.hypot(L.big.x - s.x, L.big.z - s.z))} and ${Math.round(Math.hypot(L.small.x - s.x, L.small.z - s.z))} m from the middle (rim ${s.R.toFixed(0)})`);
     }
     return out.join('\n');
   }));

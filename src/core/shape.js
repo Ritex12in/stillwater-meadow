@@ -721,8 +721,12 @@ export function rainAt(x, z) {
 /** From the rain: how parched (0..1) and how lush (0..1) a spot is. */
 export const dryOf = (rain) => smooth(0.475, 0.37, rain), lushOf = (rain) => smooth(0.535, 0.65, rain);
 /** How much a spot is part of a blossom grove (0..1): rare pockets, a hundred metres or so across. */
+const groveRaw = (x, z) => smooth(0.675, 0.74, fbm((x + SX * 17) * 0.0042 + 133.1, (z + SZ * 17) * 0.0042 - 87.5)) * mild(x, z);
 export function groveAt(x, z) {
-  return smooth(0.675, 0.74, fbm((x + SX * 17) * 0.0042 + 133.1, (z + SZ * 17) * 0.0042 - 87.5)) * mild(x, z);
+  const g = groveRaw(x, z);
+  // (round a grove's heart it is all grove, out past the way in: a heart is found in the grove as the noise has it, `groveRaw`, and then spreads it)
+  if (g < 1 && sitesReady) { const s = heartAt(x, z); if (s) return Math.max(g, 1 - smooth(s.R + 70, HEART.reach, Math.hypot(x - s.x, z - s.z))); }
+  return g;
 }
 /** How much snow lies at a spot with this much cold (before the ragged edge the ground's shader gives it). */
 export const snowOf = (cold) => smooth(0.46, 0.62, cold);
@@ -826,6 +830,7 @@ const marksOf = (lake) => lake.marks || (lake.marks = landmarksOf(lake));
 export function clearingAt(x, z, strand = true) {
   if (shrineSiteAt(x, z, SHRINE_R + 7)) return true;
   if (sitesReady && siteAt(x, z, -1)) return true; // (and a building's ground)
+  if (sitesReady) { const ht = heartAt(x, z); if (ht) { const L = heartLayout(ht); if ((x - L.big.x) ** 2 + (z - L.big.z) ** 2 < 64 || (x - L.small.x) ** 2 + (z - L.small.z) ** 2 < 42) return true; } } // (and a heart's pagodas)
   if (sitesReady && trailAt(x, z) > 0.25) return true; // (and the trails)
   if (sitesReady) { const r = riverNear(x, z); if (r && r.d < r.w / 2 + 2.5) return true; } // (and the rivers and their banks)
   if (seaAt(x, z) > 0) { const h = height(x, z); if (h < 1 || (strand && beachAt(x, z, h) > 0.4)) return true; } // (and the sea, and its sand but for the palms: `strand` false)
@@ -900,7 +905,7 @@ function shrineOfCell(cx, cz) {
   for (let k = 0; k < SHRINE_TRIES; k++) {
     // (in the square's middle half, so two sites are never close and levelled ground never crosses into the next square)
     const x = (cx + 0.25 + R() * 0.5) * SHRINE_CELL, z = (cz + 0.25 + R() * 0.5) * SHRINE_CELL;
-    if (groveAt(x, z) < SHRINE_GROVE) continue;
+    if (groveRaw(x, z) < SHRINE_GROVE) continue;
     const h = rawHeight(x, z);
     if (h < 1 || h > 48 || snowOf(snowCold(coldAt(x, z, h), moistAt(x, z))) > 0.15 || Math.hypot(x - home.x, z - home.z) < SHRINE_APART || !clearOfLakes(x, z)) continue;
     const relief = reliefAt(x, z, h);
@@ -986,7 +991,7 @@ export function biomeAt(x, z, h, min = 0.5) {
 export const WAYSTONE_CELL = 1500;
 const SITE_KINDS = {
   // a pagoda in a blossom grove
-  pagoda: { cell: 700, flat: 10, out: 18, salt: 0x9A60D, tries: 10, chance: 0.6, rule: (x, z, h) => groveAt(x, z) > 0.6 && h > 1 && h < 45 },
+  pagoda: { cell: 700, flat: 10, out: 18, salt: 0x9A60D, tries: 10, chance: 0.6, rule: (x, z, h) => groveRaw(x, z) > 0.6 && h > 1 && h < 45 },
   // a castle on a hilltop in mild, open country
   castle: { cell: 1500, flat: 20, out: 34, relief: 10, salt: 0x2C451E, tries: 16, chance: 0.6, rule: (x, z, h) => Math.abs(coldBase(x, z)) < 0.2 && rangeAt(x, z) < 0.15 && h > 8 && h < 60 && hilltop(x, z, h) > 5 },
   // ruins: in the plains, and sandstone ones in the desert
@@ -1032,7 +1037,7 @@ const coneRise = (r) => (r >= VOLCANO.radius ? 0 : VOLCANO.height * (1 - r / VOL
 export const HEART = { reach: 150, rise: 24 };
 /** Is this a place for a heart: deep in a grove, mild, dry, gently rolling, clear of every lake and the sea out to its foot? */
 function heartFits(x, z, h) {
-  if (groveAt(x, z) < 0.7 || h < 4 || h > 70 || rangeAt(x, z) > 0.3 || seaAt(x, z) > 0 || snowOf(coldAt(x, z, h)) > 0.25) return false;
+  if (groveRaw(x, z) < 0.7 || h < 4 || h > 70 || rangeAt(x, z) > 0.3 || seaAt(x, z) > 0 || snowOf(coldAt(x, z, h)) > 0.25) return false;
   if (lakesNear(x, z, HEART.reach + 70).length) return false;
   for (let k = 0; k < 16; k++) {
     const a = (k / 8) * TAU, d = k < 8 ? 60 : 135, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
@@ -1047,16 +1052,45 @@ function heartShape(s) {
   let top = rawHeight(s.x, s.z) + 9;
   for (let k = 0; k < 8; k++) { const a = (k / 8) * TAU; top = Math.max(top, rawHeight(s.x + Math.cos(a) * R * 0.7, s.z + Math.sin(a) * R * 0.7) + 2); }
   const T = Math.max(top, rawHeight(s.x + Math.cos(th) * (R + 10), s.z + Math.sin(th) * (R + 10)) + HEART.rise);
-  return { th, R, T, p1: hash(s.variant, 73) * TAU, p2: hash(s.variant, 79) * TAU, side: hash(s.variant, 83) < 0.5 ? -1 : 1 };
+  // (the level of the shelf before the cliff: the meadow the pool lies in and the way in crosses)
+  const F = Math.max(1.5, rawHeight(s.x + Math.cos(th) * (R + 30), s.z + Math.sin(th) * (R + 30)));
+  return { th, R, T: Math.max(T, F + HEART.rise), F, p1: hash(s.variant, 73) * TAU, p2: hash(s.variant, 79) * TAU, side: hash(s.variant, 83) < 0.5 ? -1 : 1 };
 }
 const rimOf = (s, phi) => s.R * (1 + 0.13 * Math.sin(3 * phi + s.p1) + 0.07 * Math.sin(5 * phi + s.p2));
 /** The land at a spot within a heart's reach, raised toward its top's level (never lowered). */
 function heartRise(s, x, z, h) {
-  if (h >= s.T) return h;
-  const dx = x - s.x, dz = z - s.z;
+  const dx = x - s.x, dz = z - s.z, d = Math.hypot(dx, dz);
   let phi = Math.atan2(dz, dx) - s.th; phi = Math.atan2(Math.sin(phi), Math.cos(phi));
-  const Rr = rimOf(s, phi), f = smooth(1.9, 1.15, Math.abs(phi)), k = 1 - smooth(Rr, Rr + 75 - 70.5 * f, Math.hypot(dx, dz)); // (a cliff in front, a long slope behind)
+  // (before the cliff, toward the stream's side, a level shelf: the land eased to one height, so the pool, the stream and the way in lie on a meadow whatever was there)
+  const shelf = (1 - smooth(s.R + 58, s.R + 92, d)) * (1 - smooth(0.55, 0.95, Math.abs(phi - s.side * 0.3)));
+  if (shelf > 0) h += shelf * (s.F - h);
+  if (h >= s.T) return h;
+  const Rr = rimOf(s, phi), f = smooth(1.9, 1.15, Math.abs(phi)), k = 1 - smooth(Rr, Rr + 75 - 70.5 * f, d); // (a cliff in front, a long slope behind)
   return k > 0 ? h + k * (s.T - h) : h;
+}
+/**
+ * How a heart is laid out, so that the way in gives the view (docs: "Step 4: the way in"). All by
+ * angle round from the cliff's front (`phi`, toward the stream's side) and distance from the middle:
+ *   big, small  the pagodas, at the lip either side of the fall, so they show from below
+ *   view        the front door: where a trail from in front ends, below the pool, looking up at the fall
+ *   back        the back door: where a trail from behind ends, at the foot of the slope
+ *   way         the path between: from the view, over the stream (a bridge), round the side, up the slope
+ *               behind to the middle of the top; and from the back door up to the same
+ */
+export function heartLayout(s) {
+  if (s.lay) return s.lay;
+  const sd = s.side, at = (r, phi) => ({ x: s.x + Math.cos(s.th + phi * sd) * r, z: s.z + Math.sin(s.th + phi * sd) * r }), rim = (phi) => rimOf(s, phi * sd);
+  const fall = at(rim(0.5), 0.5), view = at(s.R + 52, 0.12), back = at(s.R + 85, Math.PI), top = at(rim(2.95) - 16, 2.95), mid = { x: s.x, z: s.z };
+  return (s.lay = { fall, big: at(rim(-0.12) - 10, -0.12), small: at(rim(0.95) - 9, 0.95), view, back,
+    ways: [[view, at(s.R + 50, 0.85), at(rim(1.45) + 54, 1.45), at(rim(1.95) + 50, 1.95), at(rim(2.5) + 16, 2.5), top, mid], [back, top]] });
+}
+/** Is a spot in a heart's glade: the open ground in front of its cliff, where no tree hides the fall from the way in? */
+export function gladeAt(x, z) {
+  if (!sitesReady) return false;
+  const s = heartAt(x, z); if (!s) return false;
+  // (a lane 15 m either side of the line from the view to the fall, a little way on behind the view; the trees stand to its sides and frame it)
+  const L = heartLayout(s), ax = L.fall.x, az = L.fall.z, bx = L.view.x + (L.view.x - ax) * 0.45, bz = L.view.z + (L.view.z - az) * 0.45, ux = bx - ax, uz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * ux + (z - az) * uz) / (ux * ux + uz * uz)));
+  return (x - ax - ux * t) ** 2 + (z - az - uz * t) ** 2 < 225;
 }
 let lastHeart = null;
 /** The heart whose terrace reaches a spot (or comes within `pad` metres of it), or null. */
@@ -1290,8 +1324,16 @@ function placesAbout(x, z, r) {
   const out = [];
   if (Math.hypot(HOME.x - x, HOME.z - z) < r) { const d = Math.max(1, Math.hypot(SPAWN.x - HOME.x, SPAWN.z - HOME.z)); out.push({ id: 'home', name: HOME.name, x: SPAWN.x + (SPAWN.x - HOME.x) / d * 6, z: SPAWN.z + (SPAWN.z - HOME.z) / d * 6 }); }
   for (const s of shrineSitesNear(x, z, r)) out.push({ id: 'shrine:' + s.id, name: s.name, x: s.x + s.fx * 24, z: s.z + s.fz * 24 });
-  for (const s of sitesNear(x, z, r)) if (TRAIL_KINDS.has(s.kind)) out.push({ id: s.id, kind: s.kind, variant: s.variant, x: s.x, z: s.z, out: s.out || 10 });
+  for (const s of sitesNear(x, z, r)) if (TRAIL_KINDS.has(s.kind)) out.push({ id: s.id, kind: s.kind, variant: s.variant, x: s.x, z: s.z, out: s.out || 10, site: s.kind === 'heart' ? s : null });
   return out;
+}
+/** Where a trail to a place ends: at the place; at a heart, at its front door (the view) or its back one, whichever the other end is on the side of. */
+function doorOf(p, q) {
+  if (!p.site) return p;
+  const L = heartLayout(p.site);
+  let phi = Math.atan2(q.z - p.z, q.x - p.x) - p.site.th; phi = Math.atan2(Math.sin(phi), Math.cos(phi));
+  const d = Math.abs(phi) < 1.75 ? L.view : L.back;
+  return { id: p.id, kind: p.kind, variant: p.variant, x: d.x, z: d.z, out: 3 };
 }
 /** The trails that pass near a square: [{ a, b, len, ux, uz, phase }]. */
 function trailsOfCell(cx, cz) {
@@ -1306,12 +1348,19 @@ function trailsOfCell(cx, cz) {
     const id = p.id < best.id ? p.id + '|' + best.id : best.id + '|' + p.id;
     if (seen.has(id)) continue;
     seen.add(id);
-    const a = p.id < best.id ? p : best, b = a === p ? best : p, len = Math.hypot(b.x - a.x, b.z - a.z);
+    const a0 = p.id < best.id ? p : best, b0 = a0 === p ? best : p, a = doorOf(a0, b0), b = doorOf(b0, a0), len = Math.hypot(b.x - a.x, b.z - a.z);
     const seg = { id, a, b, len, ux: (b.x - a.x) / len, uz: (b.z - a.z) / len, phase: hash(Math.round(a.x), Math.round(b.z)) * TAU };
     // (only the ones that come near this square)
     const nx = Math.max(Math.min(mx, Math.max(a.x, b.x)), Math.min(a.x, b.x)), nz = Math.max(Math.min(mz, Math.max(a.z, b.z)), Math.min(a.z, b.z));
     if (Math.abs(nx - mx) < TRAIL_CELL && Math.abs(nz - mz) < TRAIL_CELL) segs.push(seg);
   }
+  // (a heart's own path: short straight lengths, trails like the others but with no signposts: `inner`)
+  for (const p of ps) if (p.site) heartLayout(p.site).ways.forEach((way, w) => {
+    for (let k = 0; k < way.length - 1; k++) {
+      const a = { id: p.id + '~' + w + k, x: way[k].x, z: way[k].z }, b = { id: p.id + '~' + w + (k + 1), x: way[k + 1].x, z: way[k + 1].z }, len = Math.hypot(b.x - a.x, b.z - a.z);
+      if (Math.abs((a.x + b.x) / 2 - mx) < TRAIL_CELL && Math.abs((a.z + b.z) / 2 - mz) < TRAIL_CELL) segs.push({ id: a.id + '|' + b.id, a, b, len, ux: (b.x - a.x) / len, uz: (b.z - a.z) / len, phase: hash(Math.round(a.x), Math.round(b.z)) * TAU, inner: true });
+    }
+  });
   trailCells.set(key, segs);
   return segs;
 }
@@ -1347,7 +1396,7 @@ export function trailEndsNear(x, z, r) {
   const out = [], segs = new Map();
   for (let cz = Math.floor((z - r) / TRAIL_CELL); cz <= Math.floor((z + r) / TRAIL_CELL); cz++) for (let cx = Math.floor((x - r) / TRAIL_CELL); cx <= Math.floor((x + r) / TRAIL_CELL); cx++) for (const s of trailsOfCell(cx, cz)) segs.set(s.id, s);
   for (const s of segs.values()) for (const [from, to, dir] of [[s.a, s.b, 1], [s.b, s.a, -1]]) {
-    if (Math.hypot(from.x - x, from.z - z) > r) continue;
+    if (s.inner || Math.hypot(from.x - x, from.z - z) > r) continue;
     const off = (from.out || 8) + 6, t = dir > 0 ? off / s.len : 1 - off / s.len;
     const px = s.a.x + s.ux * s.len * t - s.uz * wander(s, t), pz = s.a.z + s.uz * s.len * t + s.ux * wander(s, t);
     out.push({ id: s.id + ':' + dir, x: px + s.uz * 2.4 * dir, z: pz - s.ux * 2.4 * dir, toward: Math.atan2(to.x - px, to.z - pz), to, far: Math.round(s.len) });
@@ -1540,14 +1589,21 @@ function heartRiver(s) {
   const a = s.th + s.side * 0.5, ca = Math.cos(a), sa = Math.sin(a), Rr = rimOf(s, s.side * 0.5);
   const rows = []; // [how far out, width, how steep its banks, is it the fall]
   for (let r = Rr - 21; r < Rr - 1.4; r += 3.1) rows.push([r, 2 + 0.8 * (r - Rr + 21) / 20, RIVER_BANK, 0]);
-  rows.push([Rr - 0.4, 3, 1.5, 1], [Rr + 1.6, 3.2, 5, 1], [Rr + 3.3, 3.4, 5, 1], [Rr + 5.2, 5, 5, 0], [Rr + 9.5, 9, 5, 0], [Rr + 14, 9, 5, 0], [Rr + 18.5, 4.5, 2.5, 0]);
+  // (how far out the way in crosses it: the first length of the path, from the view, cut by this line; no step is put there, so a bridge can stand)
+  const W = heartLayout(s).ways[0], wx = W[1].x - W[0].x, wz = W[1].z - W[0].z, den = ca * wz - sa * wx, cross = Math.abs(den) > 1e-6 ? ((W[0].x - s.x) * wz - (W[0].z - s.z) * wx) / den : s.R + 45;
+  rows.push([Rr - 0.4, 3, 1.5, 1], [Rr + 5.2, 5, 5, 0], [Rr + 9.5, 11, 5, 0], [Rr + 14, 11, 5, 0], [Rr + 18.5, 4.5, 2.5, 0]); // (the lip, and the face in one length: one sheet of water; the pool)
+  // (and on down the glade, past the way in, as far as the ground goes on falling: it ends in a small pool of its own)
+  { let low = Infinity; for (let r = Rr + 9.5; r < Rr + 19; r += 4.5) low = Math.min(low, heightBeforeRivers(s.x + ca * r, s.z + sa * r) - 0.45);
+    for (let r = Rr + 26; r < Rr + 100; r += 8) { const gr = heightBeforeRivers(s.x + ca * r, s.z + sa * r) - RIVER_SINK; if (gr > low + 0.9 && r > cross + 12) break; low = Math.min(low, gr); rows.push([r, 3.4, RIVER_BANK, 0]); } // (always as far as the bridge)
+    const last = rows[rows.length - 1]; if (last[0] > Rr + 20) { last[1] = 6.5; last[2] = 2.5; } }
   const n = rows.length, X = new Float32Array(n), Z = new Float32Array(n), lv = new Float32Array(n), g = new Float32Array(n), w = new Float32Array(n), bk = new Float32Array(n), fall = new Uint8Array(n), S = new Float32Array(n);
   let pool = Infinity, lvl = Infinity, lip = 0;
-  rows.forEach(([r, wd, b, f], i) => { X[i] = s.x + ca * r; Z[i] = s.z + sa * r; g[i] = heightBeforeRivers(X[i], Z[i]); w[i] = wd; bk[i] = b; S[i] = i ? S[i - 1] + (r - rows[i - 1][0]) : 0; if (f && !lip) lip = i; if (r > Rr + 5) pool = Math.min(pool, g[i] - 0.45); });
+  rows.forEach(([r, wd, b, f], i) => { X[i] = s.x + ca * r; Z[i] = s.z + sa * r; g[i] = heightBeforeRivers(X[i], Z[i]); w[i] = wd; bk[i] = b; S[i] = i ? S[i - 1] + (r - rows[i - 1][0]) : 0; if (f && !lip) lip = i; if (r > Rr + 5 && r < Rr + 19) pool = Math.min(pool, g[i] - 0.45); });
   for (let i = 0; i < n; i++) {
     if (i <= lip) { lvl = Math.min(lvl, g[i] - RIVER_SINK); lv[i] = lvl; fall[i] = i === lip ? 1 : 0; continue; }
     const u = Math.min(1, (rows[i][0] - rows[lip][0]) / (Rr + 5.2 - rows[lip][0])); // (down the face in one fall, to the pool's level)
-    lv[i] = Math.min(lvl, lvl + (pool - lvl) * u); fall[i] = u < 1 ? 1 : 0;
+    lv[i] = rows[i][0] < Rr + 19 ? Math.min(lvl, lvl + (pool - lvl) * u) : Math.min(lv[i - 1], g[i] - RIVER_SINK); fall[i] = u < 1 ? 1 : 0;
+    if (rows[i][0] > Rr + 19 && lv[i - 1] - lv[i] > 1.3 && (rows[i][0] < cross - 9 || rows[i - 1][0] > cross + 9)) fall[i - 1] = 1; // (a low step where the ground drops)
   }
   return { id: 'heart:' + s.id, heart: true, n, x: X, z: Z, lv, g, w, bk, fall, s: S, len: S[n - 1], end: 'pool', spring: { x: X[0], z: Z[0], h: g[0] }, drop: lv[lip] - pool };
 }
@@ -1644,7 +1700,7 @@ export function bridgesOf(r) {
           const half = w2 / 2 / Math.max(0.35, Math.abs(ux * (-bz) + uz * bx) / Math.hypot(bx, bz)) + 1.8;
           const ya = heightBeforeRivers(x - ux * half, z - uz * half), yb = heightBeforeRivers(x + ux * half, z + uz * half);
           if (out.some((b) => Math.hypot(b.x - x, b.z - z) < 12)) continue;
-          const grove = smooth(0.35, 0.6, groveAt(x, z)); // (in a blossom grove the bridge is a garden bridge: a high arch, lacquered red; world/crossings.js)
+          const grove = r.heart ? 1 : smooth(0.35, 0.6, groveAt(x, z)); // (in a blossom grove the bridge is a garden bridge: a high arch, lacquered red; world/crossings.js)
           out.push({ x, z, ux, uz, half, ya, yb, lv, arch: (0.3 + 0.04 * half) * (1 + 1.5 * grove), grove });
         }
       }

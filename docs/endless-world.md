@@ -815,7 +815,7 @@ are the country's in summer whatever the season; rivers are drawn, trails and br
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
 
-## The cherry blossom valley: the owner's picture, analysed (2026-11-28; steps 1 to 3 built)
+## The cherry blossom valley: the owner's picture, analysed (2026-11-28; steps 1 to 4 built)
 
 The owner: "time to work on the biome examples I gave; pick one and start analysing". Picked: "Enchanted
 Cherry Blossom Valley" (in the owner's Downloads), the plan's first biome, since the game already has
@@ -997,13 +997,78 @@ shrine, one seed one world, travelling far and back, a world from before the lan
 lakes, fishing in a river: all pass. The rivers test was **changed**: a river may now end in a lake,
 the sea, or a heart's pool. Fishing in a river failed once (page errors) and passed twice after.
 
+### Step 4 built: the way in (2026-11-27, on "go with step 4, your picks")
+
+The plan below stops at (c); **step 4 is our own definition**, added to it as (d): lay the heart out so
+that walking in gives the picture's view (gap 5 above, the composition). It **moves land again**, still
+under `WORLD_GEN` 4, which has not gone to `main`: so it costs players nothing more than step 3 did.
+Nothing here is on `main`.
+
+- **A shelf before the cliff** (`core/shape.js heartRise`): in front, toward the stream's side, the
+  land is eased to one level out to about 60 m from the rim (fading by 92 m), whatever was there: the
+  pool, the stream and the way in lie on a meadow. (In seed 42 a 10 m gully ran across the front.)
+  The cliff stands 24 m over the shelf.
+- **Two doors and a path** (`heartLayout`, `doorOf`, `trailsOfCell`): a trail from another place no
+  longer runs to the middle of the terrace (from in front that painted it up the cliff). It ends at
+  the **front door**, 52 m before the cliff, looking up at the fall, or at the **back door** at the
+  foot of the slope behind, whichever side it comes from. From the front door the heart's own path
+  crosses the stream, goes round the side clear of the terrace's flank, up the slope behind and in to
+  a court in the middle of the top (about 400 m); the back door has a short way up to the same. The
+  path is made of ordinary trail lengths (`inner`: no signposts), so trees keep off it and the
+  grove's lanterns line it.
+- **The stream goes on** (`heartRiver`): the cliff's face is one length, so the water falls in one
+  sheet (it stepped sideways twice before); the pool is broader (11 m); below it the stream runs on
+  down the shelf past the way in, 64 to 103 m beyond the rim, with a low step where the ground
+  drops, never uphill, to a small pool of its own. No step is put where the path crosses, and it
+  always runs at least that far, so there is always a bridge: the **garden bridge** of step 2
+  (always the garden kind on a heart's stream), now seen in a picture.
+- **The pagodas at the lip** (`heartLayout`, `world/landmarks.js place`): the large one 10 m back
+  from the rim just to one side of the fall, the small one on the other side, each set for its own
+  heart (the rim differs). Both show from below. Trees keep off their ground. The lanterns stand in
+  the court.
+- **A lane kept open** (`gladeAt`, `world/wilds.js`): no tree within 15 m of the line from the front
+  door to the fall; the trees to its sides frame the view.
+- **The grove spreads round its heart** (`groveAt`, over `groveRaw`): within about 120 m of a heart
+  it is all grove (blossom trees, the mossy ground, the pink air), fading by 150 m. Places are still
+  chosen by the grove as the noise has it (`groveRaw`).
+- **In any grove** (not only at a heart): the grass is thinned by 70% so the moss and petals show
+  (`world/grassfield.js`), and the ground is a little greyer.
+
+Counted (`tools/hearts.mjs`, seeds 1, 7, 42; four hearts): the path 397 to 442 m, every metre
+walkable, its steepest metre 0.34 to 0.66; trails from outside end at a door in every case; one
+garden bridge on each; the stream never uphill. One outside trail in seed 42 crosses a steep bank
+120 m beyond the heart (the land as it was; not ours).
+
+Pictures (`tools/heart-view.mjs`, seed 1, 4.30 pm): `heart-way-in.png` (from the front door),
+`heart-way-in-wide.png`, `heart-bridge.png`, `heart-bridge-fall.png`, `heart-fall.png`,
+`heart-top.png`, `heart-lip.png`. Colours by hue (`tools/hue-count.mjs`, new: the same rule for all):
+
+| | The picture | Grove before step 1 | From the front door | By the bridge |
+|---|---|---|---|---|
+| Pink and magenta | 37% | 6% | 19% | 21% |
+| Red, orange, warm brown | 25% | 41% | 23% | 37% |
+| Gold | 10% | 11% | 33% | 21% |
+| Green | 1% | 34% | 3% | 7% |
+| Blue | 12% | 0% | 0% | 0% |
+| Violet | 9% | 2% | 12% | 8% |
+| Bright | 34% | 3% | 30% | 22% |
+| Brightness, mean | 0.62 | 0.42 | 0.67 | 0.60 |
+
+**Still off:** half the picture's pink (the cliff and ground fill the frame where the picture has
+blossom); too much gold (the ground still reads olive; pushed fully to mauve it looked dead, so it
+is half way); no blue at all (the water is pale, there is no mist to speak of at the fall's foot,
+no far blue mountains); the terrace is still a round drum with one fall; no deer was seen.
+**Not seen in a picture:** the back door and the way up; the stream's lower steps and its end; a
+heart in another seed; night. **Not measured:** speed on the owner's laptop.
+
 ### A way to build it (ours; nothing agreed)
 
 Colour first, since it is the largest gap and changes no land: (a) the grove's own look where you
 stand (blossom pink, petals on the ground, sky, fog and light), judged by pictures; then (b) the
 things that need no cliff (lanterns along trails in a grove, the giant cherry, spotted deer, an
 arched bridge); then (c) the heart itself, which changes the land (a cliffed plateau with falls and a
-stream, the pagodas set on it), with the other changes to the land.
+stream, the pagodas set on it), with the other changes to the land; then (d), added by us after (c)
+was built: the way in, the heart laid out so that walking to it gives the picture's view.
 
 ## How the pines are grown from code (2026-11-28; made and measured; the owner keeps the kit's)
 

@@ -10,7 +10,7 @@ import { scene } from '../core/render.js';
 import { smooth } from '../core/math.js';
 import { SEASON_GLSL, seasonU, yearHereU } from '../core/year.js';
 import { biomesAt } from '../core/biome.js';
-import { heightAt, slopeAt, lakeAt, trailAt, riverBank, isleQ, nearReserved, onDock, BENCH_SPOT, SPAWN, coldBase, coldAt, dryOf, slopeLook, feltHeight, ASPECT, moistAt, snowCold, snowOf } from '../core/shape.js';
+import { groveAt, heightAt, slopeAt, lakeAt, trailAt, riverBank, isleQ, nearReserved, onDock, BENCH_SPOT, SPAWN, coldBase, coldAt, dryOf, slopeLook, feltHeight, ASPECT, moistAt, snowCold, snowOf } from '../core/shape.js';
 import { weatherize, bothSides, timeU, windU, camU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { onShrineGround } from './shrine.js';
@@ -52,7 +52,7 @@ export function updateGrassMap(cx, cz) {
         // (on the tundra, cold country too dry for snow, the grass is sparse, low and tawny)
         const tundra = smooth(0.42, 0.65, chill) * (1 - snowOf(cold));
         // (and little grass on scree)
-        mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h, north, base) * (1 - 0.55 * tundra) * (1 - 0.85 * scree) * biomeGrass(biomesAt(x, z, h, base, wet)); mapNext[o + 2] = cold; mapNext[o + 3] = Math.max(dryOf(wet), tundra * 0.85);
+        mapNext[o] = h; mapNext[o + 1] = grassy(x, z, h, north, base) * (1 - 0.55 * tundra) * (1 - 0.85 * scree) * biomeGrass(biomesAt(x, z, h, base, wet)) * (1 - 0.7 * groveAt(x, z)); // (in a blossom grove the grass is thin: moss and petals show) mapNext[o + 2] = cold; mapNext[o + 3] = Math.max(dryOf(wet), tundra * 0.85);
       }
     }
   }

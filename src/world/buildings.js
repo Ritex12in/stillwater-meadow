@@ -322,10 +322,11 @@ export function skyIsles(variant = 0) {
  */
 export function heartPlace(variant = 0) {
   const g = new THREE.Group(), big = pagoda(variant ? 1 : 0), small = pagoda(2), m = buildingMats(), k = new Kit();
+  // (the two pagodas are the group's first two children: world/landmarks.js sets each at the lip of its own heart, core/shape.js heartLayout)
   big.group.position.set(0, 0, -11);
   small.group.scale.setScalar(0.72); small.group.position.set(variant ? 19 : -19, 0, 5); small.group.rotation.y = variant ? -0.5 : 0.5;
   // stone lanterns by the way between them and at the cliff's edge
-  for (const [x, z] of [[4.5, 2], [-4.5, 2], [variant ? -9 : 9, 16], [0, 24]]) {
+  for (const [x, z] of [[4.5, 2], [-4.5, 2], [4.5, -7], [-4.5, -7]]) { // (a court in the middle of the top, where the way up ends)
     k.add(m.stone, cyl(0.34, 0.28, 0.18, 6, x, 0, z)); k.add(m.stone, cyl(0.14, 0.11, 0.8, 6, x, 0.18, z)); k.add(m.stone, cyl(0.17, 0.29, 0.13, 6, x, 0.98, z));
     k.add(m.glass, box(0.3, 0.3, 0.3, x, 1.12, z), false); k.add(m.stone, cone(0.44, 0.28, 6, x, 1.44, z));
   }

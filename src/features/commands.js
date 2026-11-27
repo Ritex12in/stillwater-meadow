@@ -25,7 +25,7 @@ import { registerCommand, commandList } from '../ui/console.js';
 import { timeCtl, setManual, goLive, formatHour } from '../systems/time.js';
 import { wx, setWeather, goAutoWeather, WX_ORDER } from '../systems/weather.js';
 import { setSeasonMode, seasonMode, SEASON_MODES } from './seasons.js';
-import { HOME, SPAWN, sitesNear, harboursNear, continentAt, latitudeAt, beltOf, height, biomeAt, lakesNear, walkable } from '../core/shape.js';
+import { HOME, SPAWN, heartLayout, sitesNear, harboursNear, continentAt, latitudeAt, beltOf, height, biomeAt, lakesNear, walkable } from '../core/shape.js';
 import { player } from '../characters/player.js';
 import { clock } from '../core/clock.js';
 import { nearestCountries } from '../ui/countries.js';
@@ -94,7 +94,7 @@ export function initCommands({ go, visitLake, report }) {
     if (kind === 'harbour') { const h = harboursNear(x, z, 12000)[0]; return h && { name: h.name, x: h.ax, z: h.az, faceX: h.x, faceZ: h.z }; }
     if (kind === 'glider') { const s = gliderView().spot; return s && { name: 'the glider, by the ' + s.name, x: s.x + 1.2, z: s.z, faceX: s.x, faceZ: s.z }; }
     if (kind === 'lake') { const L = lakesNear(x, z, 3000).filter((q) => Math.hypot(q.x - x, q.z - z) > q.rmax + 20)[0]; return L && { name: L.name, lake: L.id }; }
-    if (SITES.includes(kind) && !['skyisle', 'grotto', 'volcano'].includes(kind)) { const s = sitesNear(x, z, 6000, kind).filter((q) => Math.hypot(q.x - x, q.z - z) > 12)[0]; if (!s) return null; const r = (s.out || 2) + 3, d = Math.hypot(x - s.x, z - s.z) || 1; return { name: placeName(s), x: s.x + (x - s.x) / d * r, z: s.z + (z - s.z) / d * r, faceX: s.x, faceZ: s.z }; }
+    if (SITES.includes(kind) && !['skyisle', 'grotto', 'volcano'].includes(kind)) { const s = sitesNear(x, z, 6000, kind).filter((q) => Math.hypot(q.x - x, q.z - z) > 12)[0]; if (!s) return null; if (kind === 'heart') { const L = heartLayout(s); return { name: placeName(s), x: L.view.x, z: L.view.z, faceX: L.fall.x, faceZ: L.fall.z }; } /* (a heart: to its front door, looking up at the fall) */ const r = (s.out || 2) + 3, d = Math.hypot(x - s.x, z - s.z) || 1; return { name: placeName(s), x: s.x + (x - s.x) / d * r, z: s.z + (z - s.z) / d * r, faceX: s.x, faceZ: s.z }; }
     const c = nearestCountries(x, z).find((q) => q.id === kind);
     return c && c.far !== null ? { name: c.name, x: c.x, z: c.z, faceX: c.faceX, faceZ: c.faceZ } : null;
   };

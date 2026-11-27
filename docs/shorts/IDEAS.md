@@ -16,7 +16,7 @@ One thing, shown as it was in each real version of the game.
 
 | # | Short | The story in a line | Live on the site? | Status |
 |---|---|---|---|---|
-| A1 | The character | A simple figure; two sets of downloaded characters tried and thrown out; rebuilt from the owner's own drawings; the hair redone six times, then given physics. | yes | brief ([001](briefs/001-the-character.md)) |
+| A1 | The character | A simple figure; rebuilt from the owner's own drawings; the hair redone six times, then given physics. | yes | brief ([001](briefs/001-the-character.md)) |
 | A2 | The pets | Cats and dogs before and after they were redrawn in the children's style. | yes | idea |
 | A3 | The waterfall | A flat cyan ribbon with white stripes; then white water, mist and rocks. | no | idea |
 | A4 | The mountains | A painted ridge on the horizon; then peaks you can walk to. | yes | idea |
@@ -50,7 +50,6 @@ The owner's own words on screen, then what came of them.
 | C2 | "Rivers and waterfall literally need better visual" | The new falls. | no | idea |
 | C3 | "He can't climb, jump, glide" | The frame-by-frame sheets, then the moves at full speed. | no | idea |
 | C4 | "Waiting for a season is annoying" | Seasons by latitude: walk north into winter. | no | idea |
-| C5 | "Remove Vroid" | Two words that ended a day's work on downloaded characters. | yes | idea (part of A1's story) |
 
 ## Series D: How it works, in twenty seconds
 

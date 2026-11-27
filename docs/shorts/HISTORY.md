@@ -58,13 +58,11 @@ The owner asked for an endless world made from a seed, as in Minecraft.
 
 ### 4. The character, six times over (22 November)
 
-The richest single story: about 25 commits in one day on how the children look.
+The richest single story: about 25 commits in one day on how the children look, from the owner's own
+character sheets. (Versions from this day show the game's own figures when asked: `?hero=classic`.)
 
 | Commit | What |
 |---|---|
-| `c112bbf`, `f1f3a50` | A downloaded character is tried (KayKit). The owner turns it down. |
-| `0769acd` | Seven downloaded anime avatars are tried (VRoid). |
-| `4da7465`, `43748f0` | Instead, the game's own figures learn from them: faces and hair reshaped. |
 | `da80b7d` | Heads made oval, not round. |
 | `e469097`, `20fcba4`, `07ac342` | Rebuilt after **the owner's own character sheets**: proportions, faces, clothes. |
 | `8533f5b`, `36e98f0`, `da8f185` | Hair, three tries: "the owner asked whether it matched; it did not"; then "sharp spikes with a curve". |
@@ -72,7 +70,6 @@ The richest single story: about 25 commits in one day on how the children look.
 | `d10efd5` | Hair gets physics and collision (the owner's idea). |
 | `905b641`, `d9e1567` | Hair as "few, big, separate spikes"; then flame shapes, from the flame's own maths. |
 | `c717f08`, `bbac421` | "Randomly messed up" hair put in order; "a little thin". |
-| `770a715` | **"Remove Vroid."** The downloaded avatars go; the game's own children stay for good. |
 | `c5b30af`, `4367b8d` | The pets and the skipper redrawn the same way. |
 
 ### 5. Water, and ways across it (22 to 23 November)
@@ -109,7 +106,6 @@ The richest single story: about 25 commits in one day on how the children look.
 | Rocks beside the new waterfalls came out far too big and dark. | during `df1e170` |
 | The roll after a long fall went under the ground. | `abed753`, fixed in `f8d77d0` |
 | A map marker pointed the wrong way for anything beyond the view's far end. | fixed in `7acf033` |
-| Two sets of downloaded characters were tried and thrown out. | `c112bbf`, `0769acd`, out in `770a715` |
 | A resolution change flashed the screen black for a frame. | fixed in `caec23b` |
 
 ## Not live yet

@@ -346,7 +346,11 @@ function frame(now) {
   const real = (now - last) / 1000;
   const dt = clamp(real, 0, 0.05);
   last = now;
-  tick(dt);
+  // (the game's own time: as real time, unless a debug command has it faster, slower, frozen or stepping;
+  // run faster, it is taken in steps no longer than a real frame's, so nothing moves too far at once)
+  if (clock.frozen) { if (clock.steps > 0) { clock.steps--; tick(1 / 60); } else tick(0); }
+  else if (clock.rate === 1) tick(dt);
+  else { const n = Math.max(1, Math.ceil(clock.rate)); for (let i = 0; i < n; i++) tick(dt * clock.rate / n); }
   // (before drawing: a resolution change resizes the canvas, which clears it, so it must be redrawn at once
   // in the same frame; done after drawing, the cleared canvas would be shown for a frame as a black flicker)
   tickQuality(clamp(real, 0, 0.5));

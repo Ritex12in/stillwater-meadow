@@ -830,7 +830,11 @@ build a loading screen for fast travel".
   prompted for nor listed in the controls, but anyone who presses `/` has it (our pick: say if it
   should need `?debug`). `help` lists the commands: `time`, `weather`, `season`, `pos`, `tp`,
   `goto` (the nearest of a kind of country or thing; alone, it lists them with how far each is),
-  `lakes` and `lake <n>`, `give glider`, `take glider`, `wake` (the waystones within 3 km), `seed`.
+  `lakes` and `lake <n>`, `give <item> [n]` and `take <item>` (glider, rod, tent, lantern, cone), `map` (shows
+  the map of the continent you are on; `map <km>` that far about you), `wake` (waystones woken and
+  harbours made known within 3 km; `wake all` on the continent you are on; `wake <km>`), `speed <x>` (how fast you walk and run), `tick rate <x>`,
+  `tick freeze`, `tick unfreeze` and `tick step [n]` (how fast the game runs: against real time, stopped, or
+  stepped on by sixtieths of a second; `core/clock.js`, not saved), `seed`.
   Tests run them through `window.__meadow.command('season winter')`. The address's `?season=`,
   `?weather=` and `#hour` work as before.
 - **The travelling screen** (`features/waypoints.js`; `#travel`). Travelling from the map, and a

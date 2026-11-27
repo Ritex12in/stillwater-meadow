@@ -19,6 +19,7 @@
 // climb); while it is set the activity is 'aloft', so nothing else can be begun. Everything runs
 // from `dt`, so the tests' tick drives it. The poses: characters/movepose.js.
 import { damp, clamp, turnTo } from '../core/math.js';
+import { clock } from '../core/clock.js';
 import { heightAt, groundAt, walkable, onIce, slopeAt, MAX_SLOPE, landNear, nearestShore } from '../core/shape.js';
 import { pushOut } from '../core/state.js';
 import { activity } from '../systems/activity.js';
@@ -263,7 +264,7 @@ function climb(dt, c) {
   if (S.shakeT >= 0) { S.shakeT += dt / 1.3; mv.shake = S.shakeT; if (S.shakeT >= 1 || moving) { S.shakeT = -1; mv.shake = 0; } }
   if (!moving) return;
   // up and down along the fall line, sideways along the level
-  const along = c.iz * MOVES.CLIMB * k * dt, across = c.ix * MOVES.CLIMB * 0.8 * dt;
+  const along = c.iz * MOVES.CLIMB * clock.walk * k * dt, across = c.ix * MOVES.CLIMB * clock.walk * 0.8 * dt; // (clock.walk: the `speed` debug command)
   const nx = P.x + u.x * along - u.z * across, nz = P.z + u.z * along + u.x * across;
   mv.cphase += (Math.abs(c.iz) * MOVES.CLIMB + Math.abs(c.ix) * MOVES.CLIMB * 0.8) * dt * 4.6;
   if (water(nx, nz)) return;

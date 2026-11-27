@@ -1,6 +1,7 @@
 // You: walking, sitting, the pose blend, and getting safely off thawing ice.
 import { scene } from '../core/render.js';
 import { damp, turnTo } from '../core/math.js';
+import { clock } from '../core/clock.js';
 import { SPAWN, LAKE, height, groundAt, walkable, onIce, nearestShore, ICE_Y } from '../core/shape.js';
 import { timeU, windU } from '../core/materials.js';
 import { seats, pushOut, hooks } from '../core/state.js';
@@ -90,7 +91,7 @@ export function updatePlayer(dt, petting) {
   const input = moveInput();
   const locked = activity.locksMovement();
   const mag = locked ? 0 : input.mag;
-  const speed = (input.running ? 5.4 : 2.7) * mag;
+  const speed = (input.running ? 5.4 : 2.7) * mag * clock.walk; // (clock.walk: the `speed` debug command)
   const yaw = camState.yaw;
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
   const dx = fx * input.iz + rx * input.ix, dz = fz * input.iz + rz * input.ix;

@@ -10,8 +10,13 @@
 //   goto <kind>               go to the nearest: a kind of country (desert, swamp, snow ...), or
 //                             waystone, harbour, cairn, castle (any building), glider, lake
 //   lakes | lake <n>          the lakes about you; go to one of them
-//   give glider | take glider
-//   wake                      wake the waystones within 3 km
+//   give <item> [n] | take <item>     glider, rod, tent, lantern, cone
+//   map | map <km>            show the map of the continent you are on, or that far about you
+//   wake | wake all | wake <km>       wake the waystones and make the harbours known: within 3 km, on the
+//                             continent you are on, or that far about you
+//   speed <x>                 how fast you walk and run, times x
+//   tick rate <x> | tick freeze | tick unfreeze | tick step [n]     how fast the game runs: faster or
+//                             slower than real time, stopped, or stepped on by sixtieths of a second
 //   seed [text]               this world's seed; or go to another world
 import { registerCommand, commandList } from '../ui/console.js';
 import { timeCtl, setManual, goLive, formatHour } from '../systems/time.js';
@@ -19,10 +24,13 @@ import { wx, setWeather, goAutoWeather, WX_ORDER } from '../systems/weather.js';
 import { setSeasonMode, seasonMode, SEASON_MODES } from './seasons.js';
 import { HOME, SPAWN, sitesNear, harboursNear, continentAt, latitudeAt, beltOf, height, biomeAt, lakesNear, walkable } from '../core/shape.js';
 import { player } from '../characters/player.js';
+import { clock } from '../core/clock.js';
 import { nearestCountries } from '../ui/countries.js';
 import { store, saveSoon, worldSeedText, seedOf, goToWorld } from '../systems/save.js';
 import { placeName, setWaystoneAwake } from '../world/landmarks.js';
-import { isAwake } from './waypoints.js';
+import { isAwake, knownHarbours, harbourKnown } from './waypoints.js';
+import { add as addToPack, count as countInPack, takeAll, kindOf } from '../systems/pack.js';
+import { reveal, CELL } from '../systems/explored.js';
 import { gliderView } from './glider.js';
 import { hereText } from '../ui/world-panel.js';
 
@@ -101,15 +109,72 @@ export function initCommands({ go, visitLake }) {
     return visitLake(L.id) ? `${L.name}.` : `No shore to stand on at ${L.name}.`;
   });
 
-  registerCommand('give', 'give glider', (a) => { if ((a[0] || '') !== 'glider') return 'give glider'; store.glider = true; saveSoon(); return 'The glider is yours.'; });
-  registerCommand('take', 'take glider', (a) => { if ((a[0] || '') !== 'glider') return 'take glider'; delete store.glider; saveSoon(); return 'The glider is gone (it lies where it lay).'; });
+  // things to carry: the glider (kept apart from the backpack), and what the backpack holds one kind to a stack
+  const ITEMS = { rod: 'the fishing rod', tent: 'a tent', lantern: 'lanterns', cone: 'pine cones' };
+  const itemsHelp = 'glider ' + Object.keys(ITEMS).join(' ');
+  registerCommand('give', `give <item> [how many]: ${itemsHelp}`, (a) => {
+    const it = (a[0] || '').toLowerCase(), n = Math.max(1, Math.min(99, Math.floor(+a[1]) || 1));
+    if (it === 'glider') { store.glider = true; saveSoon(); return 'The glider is yours.'; }
+    if (!ITEMS[it]) return `give <item> [how many]: ${itemsHelp}`;
+    let got = 0;
+    for (let i = 0; i < n; i++) { if ((kindOf(it).max === 1 && countInPack(it)) || !addToPack(it)) break; got++; } // (one is enough of what does not stack)
+    saveSoon();
+    const have = countInPack(it);
+    return got ? `${kindOf(it).name}: ${got} given (you carry ${have}).` : have && kindOf(it).max === 1 ? `You already carry ${ITEMS[it]}.` : 'No room in the backpack.';
+  });
+  registerCommand('take', `take <item>: ${itemsHelp} (all of it)`, (a) => {
+    const it = (a[0] || '').toLowerCase();
+    if (it === 'glider') { delete store.glider; saveSoon(); return 'The glider is gone (it lies where it lay).'; }
+    if (!ITEMS[it]) return `take <item>: ${itemsHelp}`;
+    const had = countInPack(it);
+    takeAll(it); saveSoon();
+    return had ? `${kindOf(it).name}: ${had} taken away.` : `You carry none.`;
+  });
 
-  registerCommand('wake', 'wake the waystones within 3 km', () => {
+  // the map: show the land without walking it
+  registerCommand('map', 'map (the continent you are on) | map <km> (that far about you)', (a) => {
+    const km = +a[0], c = continentAt(player.x, player.z);
+    if (a[0] && !(km > 0)) return 'map | map <km>';
+    const at = km > 0 || !c ? { x: player.x, z: player.z, r: Math.min(km > 0 ? km : 3, 15) * 1000 } : { x: c.x, z: c.z, r: Math.min(c.R * c.s * 1.25 + 1500, 8000) };
+    const n = reveal(at.x, at.z, at.r);
+    saveSoon();
+    return `${(n * CELL * CELL / 1e6).toFixed(1)} km² more of the map shown${km > 0 || !c ? '' : ' (' + c.name + ')'}. Open it with M.`;
+  });
+
+  // waystones and harbours: woken and visited without going to them
+  const wake = (x, z, r) => {
     const list = Array.isArray(store.waypoints) ? store.waypoints : (store.waypoints = []);
-    let n = 0;
-    for (const s of sitesNear(player.x, player.z, 3000, 'waystone')) if (!isAwake(s.id)) { list.push({ id: s.id, name: placeName(s), x: Math.round(s.x * 10) / 10, z: Math.round(s.z * 10) / 10 }); n++; }
+    let stones = 0, ports = 0;
+    for (const s of sitesNear(x, z, r, 'waystone')) if (!isAwake(s.id)) { list.push({ id: s.id, name: placeName(s), x: Math.round(s.x * 10) / 10, z: Math.round(s.z * 10) / 10 }); stones++; }
+    for (const h of harboursNear(x, z, r)) if (!harbourKnown(h.id)) { knownHarbours().push({ id: h.id, name: h.name, x: Math.round(h.x * 10) / 10, z: Math.round(h.z * 10) / 10, ax: h.ax, az: h.az }); ports++; }
     saveSoon(); setWaystoneAwake(isAwake);
-    return `${n} ${n === 1 ? 'waystone' : 'waystones'} woken.`;
+    return `${stones} ${stones === 1 ? 'waystone' : 'waystones'} woken, ${ports} ${ports === 1 ? 'harbour' : 'harbours'} made known. Travel to them from the map (M).`;
+  };
+  registerCommand('wake', 'wake (within 3 km) | wake all (the continent you are on) | wake <km>: waystones and harbours', (a) => {
+    const v = (a[0] || '').toLowerCase(), c = continentAt(player.x, player.z);
+    if (v === 'all') return c ? wake(c.x, c.z, Math.min(c.R * c.s * 1.25 + 1500, 8000)) + ` (${c.name})` : wake(player.x, player.z, 3000);
+    if (v && !(+v > 0)) return 'wake | wake all | wake <km>';
+    return wake(player.x, player.z, Math.min(+v > 0 ? +v : 3, 12) * 1000);
+  });
+
+  // how fast you go, and how fast the game runs
+  const num = (v, lo, hi) => { const n = +v; return Number.isFinite(n) && n >= lo && n <= hi ? n : null; };
+  registerCommand('speed', 'speed <x>: how fast you walk and run, times x (0.1 to 20; speed 1 is as usual)', (a) => {
+    if (!a[0]) return `You go at ${clock.walk} times your usual speed (${(2.7 * clock.walk).toFixed(1)} m/s walking, ${(5.4 * clock.walk).toFixed(1)} running).`;
+    const n = num(a[0], 0.1, 20);
+    if (n === null) return 'speed <x>: 0.1 to 20';
+    clock.walk = n;
+    return n === 1 ? 'You go at your usual speed.' : `You go at ${n} times your usual speed (${(2.7 * n).toFixed(1)} m/s walking, ${(5.4 * n).toFixed(1)} running).`;
+  });
+  registerCommand('tick', 'tick | tick rate <x> (0.05 to 10) | tick freeze | tick unfreeze | tick step [n]: how fast the game runs', (a) => {
+    const v = (a[0] || '').toLowerCase();
+    const now = () => (clock.frozen ? `The game is frozen${clock.steps ? ` (${clock.steps} steps to go)` : ''}. tick step [n] moves it on; tick unfreeze lets it run.` : `The game runs at ${clock.rate} times real time (${Math.round(60 * clock.rate)} sixtieths of a second each second).`);
+    if (!v) return now();
+    if (v === 'rate') { const n = num(a[1], 0.05, 10); if (n === null) return 'tick rate <x>: 0.05 to 10 (1 is real time)'; clock.rate = n; clock.frozen = false; clock.steps = 0; return now(); }
+    if (v === 'freeze') { clock.frozen = true; clock.steps = 0; return now(); }
+    if (v === 'unfreeze' || v === 'run') { clock.frozen = false; clock.steps = 0; return now(); }
+    if (v === 'step') { const n = a[1] === undefined ? 1 : num(a[1], 1, 6000); if (n === null) return 'tick step [n]: 1 to 6000 sixtieths of a second'; clock.frozen = true; clock.steps += Math.floor(n); return `Stepping on ${Math.floor(n)} ${Math.floor(n) === 1 ? 'sixtieth' : 'sixtieths'} of a second (${(Math.floor(n) / 60).toFixed(2)} s), then frozen.`; }
+    return 'tick | tick rate <x> | tick freeze | tick unfreeze | tick step [n]';
   });
 
   registerCommand('seed', 'seed | seed <text>: this world, or go to another', (a, raw) => {

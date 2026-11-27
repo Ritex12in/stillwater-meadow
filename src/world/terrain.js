@@ -493,6 +493,10 @@ function groundDetail(mat, textured) {
       }`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       {
+        // (a heart's falls glow by night: their light on the rock beside them and the ground about the pool)
+        float fallGlow = 0.0;
+        for (int i = 0; i < 3; i++) { float fd = length(vGround.xz - uFalls[i].xy); fallGlow += uFalls[i].z * (1.0 - smoothstep(1.5, 24.0, fd)) * (1.0 - smoothstep(1.5, 24.0, fd)); }
+        totalEmissiveRadiance += vec3(0.05, 0.13, 0.27) * min(fallGlow, 1.6) * uNightGlow;
         float speck = step(0.985, fract(sin(dot(floor(vGround.xz * 1.7), vec2(12.9898, 78.233))) * 43758.5453));
         totalEmissiveRadiance += vec3(0.3, 0.9, 1.0) * speck * smoothstep(0.4, 0.9, vLook.z) * uNightGlow * 1.6;
         // and the lava's glow in the cracks of volcanic rock

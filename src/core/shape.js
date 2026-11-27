@@ -1224,7 +1224,7 @@ export const ICE_Y = 0.09;
 /** A river's chill (its middle's cold in summer, at the lakes' height, as the lakes' is taken), kept on the river. */
 export const riverChill = (r) => (r.chill !== undefined ? r.chill : (r.chill = coldAt(r.x[r.n >> 1], r.z[r.n >> 1], 1)));
 /** How frozen a river is just now (0 running .. 1 ice you can walk on), as its lakes freeze. */
-export const riverIce = (r) => iceFrom(riverChill(r), seasonState.lagged || 0, r.year || (r.year = Object.assign({}, yearAt(r.x[r.n >> 1], r.z[r.n >> 1]))));
+export const riverIce = (r) => r.heart ? 0 : iceFrom(riverChill(r), seasonState.lagged || 0, r.year || (r.year = Object.assign({}, yearAt(r.x[r.n >> 1], r.z[r.n >> 1]))));
 /** The ice's top where (x, z) is on a frozen river, or null. */
 function riverIceAt(x, z) {
   const r = riverNear(x, z);

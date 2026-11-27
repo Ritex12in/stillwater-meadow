@@ -23,7 +23,8 @@ code on 2026-11-27 and must be checked again whenever the game changes what is t
 
 | Claim | What is true instead |
 |---|---|
-| **"Everything is coded"**, "no assets", "100% code". | Many trees, bushes, ferns, mushrooms, rocks, grass clumps and some flowers, the bench and the fences are downloaded models with their textures: Quaternius' Stylized Nature kits (CC0, free to use, no credit needed), about 127 MB in `public/assets/`, loaded by `src/core/assets.js`. Some trees are grown from code (`src/world/proctrees.js`), not all. The grass, soil and flower-meadow textures on the ground are downloaded pictures too (CC0, from OpenGameArt: `public/assets/ground/`), as are the clumps of meadow flowers (`public/assets/meadow/`). |
+| **"Everything is coded"**, "no assets", "100% code". | Many trees, bushes, ferns, mushrooms, rocks, grass clumps and some flowers, the bench and the fences are downloaded models with their textures: Quaternius' Stylized Nature kits (CC0, free to use, no credit needed), about 12 MB in `public/assets/` (59 models, 24 picture files; pictured in `e:Games_assetspreviews
+ot-coded-models.png` and `not-coded-pictures.png`, made by `tools/kit-sheet.mjs`), loaded by `src/core/assets.js`. Some trees are grown from code (`src/world/proctrees.js`), not all. The grass, soil and flower-meadow textures on the ground are downloaded pictures too (CC0, from OpenGameArt: `public/assets/ground/`), as are the clumps of meadow flowers (`public/assets/meadow/`). |
 | "No 3D models." | True of the characters, animals and buildings only. Say which. |
 | That a feature from chapter 6 of HISTORY.md can be played today. | Those are not on the public site yet. Say "coming soon", or wait. |
 | That the owner wrote or "coded" the game themselves. | The AI wrote the code; the owner directed it. |

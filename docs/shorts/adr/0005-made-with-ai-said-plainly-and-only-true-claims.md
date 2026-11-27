@@ -6,7 +6,7 @@
 
 ## Context
 
-The owner: "mentioning made with AI is ok, also mentioning everything is coded". The first is simply true. The second is not true as the game stands: many trees, plants and rocks, the bench and fences, and the ground's textures are downloaded files (CC0), about 127 MB of them. Viewers who look at the game's files, or other developers, would find that in a minute, and a false claim would cost more than it gains.
+The owner: "mentioning made with AI is ok, also mentioning everything is coded". The first is simply true. The second is not true as the game stands: many trees, plants and rocks, the bench and fences, and the ground's textures are downloaded files (CC0), about 12 MB of them (59 models and 24 picture files). Viewers who look at the game's files, or other developers, would find that in a minute, and a false claim would cost more than it gains.
 
 ## Decision
 

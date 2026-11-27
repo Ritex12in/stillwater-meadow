@@ -58,5 +58,6 @@ Story first, then a hook, then the video ([ADR 0003](adr/0003-story-then-hook-th
 
 ## Status
 
-The pipeline is set up on paper (2026-11-27). No tool for vertical video exists yet and no short has
-been made: see [PLAN.md](PLAN.md).
+The pipeline is set up on paper (2026-11-27). Two tools exist (2026-11-28): one that runs and opens any
+past version of the game, and a test of the tall frame with its safe areas. No short has been made:
+see [PLAN.md](PLAN.md).

@@ -4,6 +4,9 @@ Every short that could be made. One row each; the story behind it is in [HISTORY
 Status: `idea` → `brief` (being written) → `approved` → `filming` → `review` → `posted`, or `dropped`
 (with why).
 
+The "Live on the site?" columns below are from 2026-11-27; since the owner published everything on
+2026-11-28, every row is live.
+
 New ideas go at the bottom of their series. An idea needs a story, not just a picture
 ([ADR 0003](adr/0003-story-then-hook-then-video.md)).
 

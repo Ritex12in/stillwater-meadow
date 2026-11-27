@@ -3,7 +3,7 @@
 What is done, what is next, in order, and what the owner still has to answer. Updated whenever any of
 it changes.
 
-## Where things stand (2026-11-27)
+## Where things stand (2026-11-28)
 
 | Piece | State |
 |---|---|
@@ -11,7 +11,9 @@ it changes.
 | A landscape film of the game (`tools/film/`: frame-by-frame rendering, the game's sound recorded, an edit by ffmpeg) | exists, from 22 November; makes 1920 x 1080 only |
 | Debug commands that set up a shot (`time`, `weather`, `season`, `tp`, `goto`, `tick rate`, `tick freeze`) | exist, on `endless-world` |
 | Picture sheets of the moves (`tools/move-sheet.mjs`) | exist |
-| Any tool for vertical video, captions, voice, or filming an old version | not built |
+| Filming an old version (`tools/shorts/version.mjs`): checks out a commit outside the repo, serves it, opens it | built and tried (step 2) |
+| The tall frame (`tools/shorts/frame-test.mjs`): 1080 x 1920, the interface hidden, safe areas, a caption in the game's font | a test still made (step 3); not yet looked at on a phone |
+| Captions timed to a script, voice, the one command per short | not built |
 | Any short | none made; one brief drafted ([001](briefs/001-the-character.md)), not approved |
 
 ## The order of work
@@ -23,8 +25,8 @@ agreed, and no short is filmed before its brief is approved
 | # | Step | What it produces | Depends on |
 |---|---|---|---|
 | 1 | **The owner reads this folder** and answers the open questions below. | Decisions; proposed ADRs become accepted or are replaced. | — |
-| 2 | **Can the past be filmed?** Try three old versions (the baseline `620f25a`, the first children `c9b7c6f`, the day of the hair `d10efd5`): check out, install, run, take one still each with the same camera. | Three stills side by side, and a note in HISTORY.md of which versions run. Proves or breaks [ADR 0006](adr/0006-the-past-is-filmed-from-the-real-versions.md). | step 1 |
-| 3 | **A vertical frame.** The film tool renders 1080 x 1920; cameras framed for a tall picture; the safe areas drawn as guides on a test still. | One test still with guides, checked on the owner's phone. | step 1 |
+| 2 ✔ | **Can the past be filmed?** *Done 2026-11-28: yes, all three run (see below).* Try three old versions (the baseline `620f25a`, the first children `c9b7c6f`, the day of the hair `d10efd5`): check out, install, run, take one still each with the same camera. | Three stills side by side, and a note in HISTORY.md of which versions run. Proves or breaks [ADR 0006](adr/0006-the-past-is-filmed-from-the-real-versions.md). | step 1 |
+| 3 ◐ | **A vertical frame.** *A test still is made (`e:\Games\_assets\shorts\frame-test.png`); the owner has still to look at it on their phone.* The film tool renders 1080 x 1920; cameras framed for a tall picture; the safe areas drawn as guides on a test still. | One test still with guides, checked on the owner's phone. | step 1 |
 | 4 | **Captions.** Burned in from a script's lines and timings; the game's display font; inside the safe areas. | A 5-second test clip. | step 3 |
 | 5 | **Voice.** A way to take the owner's recording (or a service's), cut it by line, and time the captions and cuts to it. | The test clip with a voice. | step 4, question 1 |
 | 6 | **One command per short.** A brief's shot list as data; `node tools/shorts/make.mjs 001` films, edits and writes the video and its text file. | The command, run on a throwaway test. | steps 2 to 5 |
@@ -33,12 +35,25 @@ agreed, and no short is filmed before its brief is approved
 
 Steps 2 and 3 do not depend on each other and can be done in either order.
 
+### What step 2 found (2026-11-28)
+
+`node tools/shorts/version.mjs 620f25a c9b7c6f d10efd5 HEAD`: every one of them runs today, the first commit included (stills in `e:\Games\_assets\shorts\_versions\trial-<commit>.png`).
+
+| Version | Runs | Can be driven by script |
+|---|---|---|
+| `620f25a` (13 Nov, the baseline: plain files, no build) | yes | **No handle at all.** The camera can only be moved as a player moves it (the mouse), and the hour and weather by its own on-screen controls. Shots from it must be simple: the view it opens on, or a slow mouse turn. |
+| `c9b7c6f` (14 Nov, the first sculpted children) | yes | The player, the camera and the clock (`tick`), but no travelling: shots near where it starts. |
+| `d10efd5` (22 Nov, hair with physics) | yes | Everything a shot needs, travelling included. |
+| today | yes | Everything. |
+
+The packages have not changed since the first Vite commit, so old versions borrow this repo's `node_modules`: no installing. The versions in between have not been tried; a brief's shot list is checked with the same command before it is approved.
+
 ## Open questions for the owner
 
 | # | Question | Claude's pick | Why it matters |
 |---|---|---|---|
 | 1 | **Whose voice?** | The owner's own, recorded on a phone, one take per line. | A person's voice makes the diary theirs. This PC's built-in voices are not good enough; a voice service would be a new thing to choose and perhaps pay for. |
-| 2 | **Unreleased features:** show them as "coming soon", or wait for the release? | Start with stories that are live (A1, A2, A4, D1, D5); hold the rest. | The public site is at 23 November. Showing gliding or continents now promises what a visitor cannot find. |
+| 2 | ~~**Unreleased features:** show them as "coming soon", or wait for the release?~~ **Settled 2026-11-28: the owner published everything; nothing in HISTORY.md is unreleased now.** | Start with stories that are live (A1, A2, A4, D1, D5); hold the rest. | The public site is at 23 November. Showing gliding or continents now promises what a visitor cannot find. |
 | 3 | ~~**"Everything is coded":** drop the claim, or make it true?~~ **Answered 2026-11-28: the downloaded art stays ("external assets are good"); the claim is dropped.** | Drop it; say what is code ([CLAIMS.md](CLAIMS.md)). | It is not true today: about 12 MB of downloaded plants, rocks, props and ground textures. Making it true is a project on the game, not on the videos. |
 | 4 | **The owner's character sheets:** may they appear, and where are the files? | Yes, for a second in A1. | They are the turn of the character's story. |
 | 5 | **A name on the end card?** | The game's name and "free in your browser" only. | The owner's choice how they appear. |

@@ -7,8 +7,8 @@ where it can be seen, so a short can film the game as it was then
 owner's own words.
 
 155 commits in 15 days, 13 to 27 November 2026. The owner directs; the code is written by an AI
-(Claude). Whether an old commit still runs today has not been checked for any of them
-([PLAN.md](PLAN.md), step 2).
+(Claude). Old commits do run today: the first (`620f25a`), `c9b7c6f`, `d10efd5` and the latest were tried on
+2026-11-28 ([PLAN.md](PLAN.md), "What step 2 found"); the ones between have not been.
 
 ## The chapters
 
@@ -113,6 +113,9 @@ The richest single story: about 25 commits in one day on how the children look.
 | A resolution change flashed the screen black for a frame. | fixed in `caec23b` |
 
 ## Not live yet
+
+**Out of date since 2026-11-28:** the owner merged and published everything. The public site is at
+`5c27675`; all six chapters are live. The paragraph below is kept for the record.
 
 The public site is at `8e1ce67` (23 November): chapters 1 to 5. All of chapter 6 (the map, waystones,
 seasons by latitude, continents, harbours, the new moves) is on the `endless-world` branch, 22 commits

@@ -18,7 +18,7 @@
 // Everything is drawn from fixed slots that are refilled; nothing is made or thrown away as you
 // walk.
 import { TAU, mulberry32, hash, smooth, clamp, fbm } from '../core/math.js';
-import { height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt, seaAt, coldBase, cliffsAt, islePoint } from '../core/shape.js';
+import { gladeAt, height, lakeT, lakeAt, lakesNear, PATH_T, WORLD, northness, feltHeight, screeAt, aboveTrees, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, groveAt, clearingAt, seaAt, coldBase, cliffsAt, islePoint } from '../core/shape.js';
 import { col } from '../core/materials.js';
 import { world, obstacles } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -68,6 +68,7 @@ export function growSquare(ix, iz) {
     // not on rock, cliffs or the high peaks (the same test the grass and the ground's texture use)
     const slope = slopeOf(x, z);
     if (slope > 0.62 || rockAmt(h, slope, felt) > 0.3) continue;
+    if (gladeAt(x, z)) continue; // (the open ground before a heart's cliff)
     if (trees.some((t) => (t.x - x) ** 2 + (t.z - z) ** 2 < 11)) continue;
     // pines in the cold and up the mountains, few on the heath; blossom trees in their groves
     // (near the treeline only pines, and stunted ones)
@@ -76,6 +77,7 @@ export function growSquare(ix, iz) {
     const type = roll < pines ? 'pine' : roll > 0.975 - grove * 0.8 ? 'blossom' : 'round';
     const s = (0.8 + size * 0.7) * (1 + lush * 0.14 - snow * 0.12 + B.enchanted * 0.6) * (1 - 0.4 * smooth(TREELINE - 28, TREELINE, felt)), cols = TREE_COLOURS[type];
     const t = { x, z, y: h - 0.15, type, s, ry: turn * TAU, color: cols[Math.floor(tint * cols.length)], top: (kit ? 6.2 : 5.2) * s, wild: true, chill: cold };
+    if (type === 'blossom') { const k = grove > 0.7 && size > 0.9 ? (2.5 + (size - 0.9) * 6) / t.s : 0.7 + 1.15 * size * size; t.s *= k; t.top *= k; } // (blossom trees of many sizes, saplings to big ones; deep in a grove, one in ten a great old cherry two or three times the rest)
     const wind = cliffsAt(x, z); if (wind > 0.2) t.rx = wind * (0.22 + 0.12 * tint); // (bent by the wind on the windy cliffs, all one way)
     if (kit) {
       // on the heath the broadleaf trees are the light, airy ones: birches and the open-crowned "normal" trees
@@ -113,7 +115,8 @@ export function growRocks(ix, iz) {
   for (let k = 0; k < 16; k++) {
     const x = x0 + R() * S, z = z0 + R() * S, size = R(), a = R(), b = R(), c = R(), turn = R(), tilt = R(), tint = R(), keep = R();
     if (lakeT(x, z) < 1.15 || clearingAt(x, z)) continue;
-    const h = height(x, z), rocky = rockAmt(h, slopeOf(x, z), feltAt(x, z, h));
+    const h = height(x, z), sl = slopeOf(x, z), rocky = rockAmt(h, sl, feltAt(x, z, h));
+    if (sl > 1.6) continue; // (none hung on a sheer face)
     // (more of them on the dry heath and in the cold, where little else stands)
     if (keep > 0.07 + rocky * 0.8 + smooth(30, 70, h) * 0.15 + dryOf(moistAt(x, z)) * 0.16 + snowOf(coldAt(x, z, h)) * 0.08) continue;
     const s = 0.4 + size * size * (1.1 + rocky * 1.3);

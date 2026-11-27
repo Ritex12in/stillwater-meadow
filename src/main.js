@@ -15,6 +15,7 @@ import { buildGround, updateGround, pumpGround, settleGround, groundStats, groun
 import { buildWater, updateWater, waterLakes, waterU, seaShown, seaDrawnAt } from './world/water.js';
 import { updateRivers, riversShown, resizeRivers, riversView } from './world/rivers.js';
 import { updateCrossings, crossingsShown } from './world/crossings.js';
+import { updateTrailside, lightTrailside, trailsideShown, lanternSpots } from './world/trailside.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots, TREE_REACH, MODEL_FAR } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
 import { loadingStep, paint, loadingDone, initScreen } from './ui/loading.js';
@@ -168,7 +169,7 @@ function travelTo(x, z, faceX, faceZ) {
   updateLifeLake(0, x, z, true);
   shrineNear(x, z, true); // (and the shrine, if a site of its own is nearer here)
   settleSeason(x, z); // (and the season is the one here)
-  settleGround(x, z); settleWilds(x, z); updateWater(x, z, true); updateRivers(x, z, true); updateCrossings(x, z, true); updateLakeLife(x, z);
+  settleGround(x, z); settleWilds(x, z); updateWater(x, z, true); updateRivers(x, z, true); updateCrossings(x, z, true); updateTrailside(x, z, true); updateLakeLife(x, z);
   // your companions come with you: your friend if you walk together, and the dogs following you
   if (friend && friend.st && friend.st.together) { friend.st.x = x + 1; friend.st.z = z + 0.5; friend.st.y = groundAt(x + 1, z + 0.5); }
   for (const a of animals) if (a.state === 'follow') { const ang = Math.random() * Math.PI * 2; a.x = x + Math.cos(ang) * 2; a.z = z + Math.sin(ang) * 2; if (a.root) a.root.position.set(a.x, groundAt(a.x, a.z), a.z); }
@@ -240,8 +241,26 @@ onSave((s) => {
 // ── Apply the time-of-day palette to the scene ──
 const waterLight = cur.light.clone();
 const sunScreen = new THREE.Vector3();
+// The air of a place: in a blossom grove the sky, the haze and the light turn toward pink and lavender, and
+// a mist closes in (after the owner's picture of a cherry blossom valley: a third of it pink, a third of
+// it bright, almost none of it green). Eased in as you walk into one; less at night, and under snow.
+let groveAir = 0;
+const airC = new THREE.Color(), lumOf = (c) => 0.3 * c.r + 0.59 * c.g + 0.11 * c.b;
+function airOfPlace() {
+  groveAir += ((seasonState.groveHere || 0) * (seasonState.winterHere ? 0.35 : 1) - groveAir) * 0.02;
+  const g = smooth(0.15, 0.7, groveAir);
+  if (g <= 0.002) return;
+  // toward a colour, at about the brightness the thing already has (so night stays night), a little lifted
+  const toward = (c, hex, k, lift = 1.12) => { airC.set(hex); c.lerp(airC.multiplyScalar(Math.min(1.7, (lumOf(c) + 0.03) / lumOf(airC) * lift)), k * g); };
+  toward(cur.top, '#c3a2ea', 0.6); toward(cur.horizon, '#f8c3dd', 0.75, 1.2); toward(cur.glow, '#ffc7dc', 0.5);
+  toward(cur.light, '#ffdfeb', 0.4); toward(cur.hemiSky, '#f5cde6', 0.55, 1.2); toward(cur.hemiGround, '#d6a0b6', 0.6, 1.25);
+  if (cur.cloud) toward(cur.cloud, '#ffe3ef', 0.5);
+  cur.fogNear *= 1 - 0.35 * g; cur.fogFar *= 1 - 0.3 * g;
+  cur.hemiI *= 1 + 0.22 * g; cur.amb *= 1 + 0.2 * g;
+}
 function applySky() {
   weatherModify(cur);
+  airOfPlace();
   skyU.sunDir.value.copy(sunDir);
   skyU.moonDir.value.copy(moonDir);
   skyU.moonAmt.value = (1 - smooth(-4, 8, solar.sunElev)) * (1 - wx.cloud * 0.9);
@@ -274,6 +293,7 @@ function applySky() {
   ambient.intensity = cur.amb;
   tintClouds(cur.cloud, cur.glow, sunDir, camera.position);
   lampMat.emissiveIntensity = cur.eve * 1.6;
+  lightTrailside(cur.eve);
   if (lampGlows.length) lampGlows[0].material.opacity = cur.eve * 0.75; // the lamps share one glow material
   lampGlows.forEach((g) => { g.visible = cur.eve > 0.02; });
   const ffAmt = Math.max(seasonState.bugs, seasonState.enchantedHere || 0); // (the enchanted wood has its fireflies in any season)
@@ -394,6 +414,7 @@ function frame(now) {
   updateWater(camera.position.x, camera.position.z);
   updateRivers(camera.position.x, camera.position.z);
   updateCrossings(camera.position.x, camera.position.z);
+  updateTrailside(camera.position.x, camera.position.z);
   updateLakeLife(camera.position.x, camera.position.z);
   renderNow();
   requestAnimationFrame(frame);
@@ -457,7 +478,7 @@ window.__meadow = {
   // the trees beyond the valley: what is loaded, a way to bring it up to date, and one square's trees
   /** The shrine sites within `r` metres of you (the shrine stands at `shrine`, one of them). */
   shrines: (r = 1500) => shrineSitesNear(player.x, player.z, r), rawHeight,
-  seaShown, seaDrawnAt, riversShown, riversView, crossingsShown,
+  seaShown, seaDrawnAt, riversShown, riversView, crossingsShown, trailsideShown, lanternSpots,
   wild: () => wildView(),
   characters: () => ({ heroShown: hero.root.visible, friendShown: !!(friend && friend.k && friend.k.root.visible) }),
   countries: (x = player.x, z = player.z) => nearestCountries(x, z),

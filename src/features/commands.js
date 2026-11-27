@@ -25,7 +25,7 @@ import { registerCommand, commandList } from '../ui/console.js';
 import { timeCtl, setManual, goLive, formatHour } from '../systems/time.js';
 import { wx, setWeather, goAutoWeather, WX_ORDER } from '../systems/weather.js';
 import { setSeasonMode, seasonMode, SEASON_MODES } from './seasons.js';
-import { HOME, SPAWN, sitesNear, harboursNear, continentAt, latitudeAt, beltOf, height, biomeAt, lakesNear, walkable } from '../core/shape.js';
+import { HOME, SPAWN, heartLayout, sitesNear, harboursNear, continentAt, latitudeAt, beltOf, height, biomeAt, lakesNear, walkable } from '../core/shape.js';
 import { player } from '../characters/player.js';
 import { clock } from '../core/clock.js';
 import { nearestCountries } from '../ui/countries.js';
@@ -41,7 +41,7 @@ const far = (m) => (m < 60 ? 'here' : m < 1000 ? `${Math.round(m / 10) * 10} m` 
 let lastReport = null;
 /** For tests: the last report made ({ name, info, picture: whether a picture was taken }). */
 export const lastReportView = () => lastReport;
-const SITES = ['waystone', 'pagoda', 'castle', 'ruin', 'hut', 'windmill', 'circle', 'cairn', 'spring', 'icecastle', 'grotto', 'volcano', 'beachhut', 'ship', 'skyisle'];
+const SITES = ['heart', 'waystone', 'pagoda', 'castle', 'ruin', 'hut', 'windmill', 'circle', 'cairn', 'spring', 'icecastle', 'grotto', 'volcano', 'beachhut', 'ship', 'skyisle'];
 
 /** `go(x, z, faceX, faceZ)` takes you to a spot; `visitLake(id)` to a lake's shore; `report()` gives the view and how things stand. */
 export function initCommands({ go, visitLake, report }) {
@@ -68,7 +68,7 @@ export function initCommands({ go, visitLake, report }) {
 
   registerCommand('season', SEASON_MODES.join(' | '), (a) => {
     const v = (a[0] || '').toLowerCase();
-    if (!v) return `The season is ${seasonMode() === 'auto' ? 'turning on its own' : 'held at ' + seasonMode()}. ${hereText()}`;
+    if (!v) return `${seasonMode() === 'auto' ? 'Each place keeps its own season (auto)' : 'Held everywhere at ' + seasonMode() + ', for a look (season auto to let go)'}. ${hereText()}`;
     if (!SEASON_MODES.includes(v)) return 'season ' + SEASON_MODES.join(' | ');
     setSeasonMode(v);
     return v === 'auto' ? 'The year turns on its own.' : `The season is ${v}.`;
@@ -94,7 +94,7 @@ export function initCommands({ go, visitLake, report }) {
     if (kind === 'harbour') { const h = harboursNear(x, z, 12000)[0]; return h && { name: h.name, x: h.ax, z: h.az, faceX: h.x, faceZ: h.z }; }
     if (kind === 'glider') { const s = gliderView().spot; return s && { name: 'the glider, by the ' + s.name, x: s.x + 1.2, z: s.z, faceX: s.x, faceZ: s.z }; }
     if (kind === 'lake') { const L = lakesNear(x, z, 3000).filter((q) => Math.hypot(q.x - x, q.z - z) > q.rmax + 20)[0]; return L && { name: L.name, lake: L.id }; }
-    if (SITES.includes(kind) && !['skyisle', 'grotto', 'volcano'].includes(kind)) { const s = sitesNear(x, z, 6000, kind).filter((q) => Math.hypot(q.x - x, q.z - z) > 12)[0]; if (!s) return null; const r = (s.out || 2) + 3, d = Math.hypot(x - s.x, z - s.z) || 1; return { name: placeName(s), x: s.x + (x - s.x) / d * r, z: s.z + (z - s.z) / d * r, faceX: s.x, faceZ: s.z }; }
+    if (SITES.includes(kind) && !['skyisle', 'grotto', 'volcano'].includes(kind)) { const s = sitesNear(x, z, 6000, kind).filter((q) => Math.hypot(q.x - x, q.z - z) > 12)[0]; if (!s) return null; if (kind === 'heart') { const L = heartLayout(s); return { name: placeName(s), x: L.view.x, z: L.view.z, faceX: L.fall.x, faceZ: L.fall.z }; } /* (a heart: to its front door, looking up at the fall) */ const r = (s.out || 2) + 3, d = Math.hypot(x - s.x, z - s.z) || 1; return { name: placeName(s), x: s.x + (x - s.x) / d * r, z: s.z + (z - s.z) / d * r, faceX: s.x, faceZ: s.z }; }
     const c = nearestCountries(x, z).find((q) => q.id === kind);
     return c && c.far !== null ? { name: c.name, x: c.x, z: c.z, faceX: c.faceX, faceZ: c.faceZ } : null;
   };

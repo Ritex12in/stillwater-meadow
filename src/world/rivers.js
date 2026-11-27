@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { hash, TAU } from '../core/math.js';
-import { riversNear, riverIce } from '../core/shape.js';
+import { riversNear, riverIce, height } from '../core/shape.js';
 import { waterU } from './water.js';
 import { GRADE_GLSL, HAZE_GLSL } from '../core/atmosphere.js';
 import { glowTex, std, weatherize } from '../core/materials.js';
@@ -45,6 +45,7 @@ const VERT = `
   }`;
 const UNIFORMS = `
   uniform float uTime; uniform float uIce; uniform float uIceLight; uniform float uLight; uniform float uRain;
+  uniform vec4 uHeart;    // a grove's heart: its water's blue-violet, and how much of it (0 on every other river)
   uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyTop; uniform vec3 skyHorizon;
   uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun;
   uniform float fogNear; uniform float fogFar;
@@ -65,6 +66,7 @@ const FRAG = GRADE_GLSL + HAZE_GLSL + UNIFORMS + NOISE + `
     vec3 skyc = mix(skyHorizon, skyTop, pow(clamp(r.y, 0.0, 1.0), 0.5));
     // the water's body: blue-green and deeper in the middle, pale and clear toward the banks
     vec3 body = mix(deep * vec3(0.72, 1.0, 0.92), shallow * vec3(0.86, 1.04, 0.98), smoothstep(0.15, 0.95, edge));
+    body = mix(body, uHeart.rgb * (dot(body, vec3(0.3, 0.59, 0.11)) / 0.56), uHeart.a * 0.75); // (a heart's water: blue-violet, as bright as it was)
     body *= 0.9 + 0.2 * h0; // (light and dark moving with the ripples)
     vec3 c = mix(body, skyc, clamp(fres * 0.6 + 0.04, 0.0, 1.0));
     c += sunColor * pow(max(dot(r, normalize(sunDir)), 0.0), 160.0) * 1.4;
@@ -76,21 +78,34 @@ const FRAG = GRADE_GLSL + HAZE_GLSL + UNIFORMS + NOISE + `
     float foamCalm = clamp(fleck * (0.16 + 0.5 * vFall.y) + lace * 0.3 + pool * 0.85, 0.0, 1.0);
     // a fall's face: white water in ropes running down, the river's own colour showing in veins between
     float along = vFlow.x - uTime * 6.5;
-    float rope = vn(vec2(across * 3.2, along * 0.22)) * 0.5 + vn(vec2(across * 7.5 + 4.0, along * 0.5)) * 0.3 + vn(vec2(across * 15.0 - 2.0, along * 1.1)) * 0.2;
-    float white = smoothstep(0.26, 0.6, rope);
-    vec3 fallC = mix(mix(shallow * vec3(0.84, 1.0, 1.0) + deep * 0.2, vec3(0.9, 0.95, 0.97), 0.45), vec3(0.95, 0.97, 0.98), white) * uLight; // (pale veins, not bright ones)
-    c = mix(c, vec3(0.94, 0.96, 0.97) * uLight, foamCalm * (1.0 - vFall.x));
+    // (few fine ropes: narrower than a pixel at a low resolution, they turn to hard stripes)
+    float rope = vn(vec2(across * 3.2, along * 0.22)) * 0.56 + vn(vec2(across * 7.5 + 4.0, along * 0.5)) * 0.34 + vn(vec2(across * 12.0 - 2.0, along * 1.1)) * 0.1; // (the same from wherever you stand: nothing in it shifts as you walk)
+    // (white water by night: it catches the moon, so it is never darker than the rock behind it, and is a little blue)
+    float lit = max(uLight, 0.66), night = 1.0 - smoothstep(0.42, 0.8, uLight);
+    float white = smoothstep(0.26 + 0.14 * uHeart.a, 0.6 + 0.12 * uHeart.a, rope); // (at a heart more of the water's own colour shows between the ropes)
+    vec3 vein = mix(mix(shallow * vec3(0.84, 1.0, 1.0) + deep * 0.2, vec3(0.9, 0.95, 0.97), 0.45), uHeart.rgb, uHeart.a * 0.85);
+    vec3 fallC = mix(vein, vec3(0.95, 0.97, 0.98), white) * lit * mix(vec3(1.0), vec3(0.84, 0.92, 1.12), night); // (pale veins, not bright ones)
+    // a heart's water glows by night: the falls a soft blue-white light of their own, shimmering as they run; the pool and stream lit in their ripples and where the falls churn them
+    float glow = night * uHeart.a, shimmer = 0.86 + 0.14 * sin(uTime * 1.7 + along * 0.35 + across * 2.0);
+    fallC = mix(fallC, mix(vec3(0.3, 0.55, 1.0), vec3(0.82, 0.95, 1.0), white) * shimmer, glow * 0.9);
+    c += vec3(0.1, 0.27, 0.55) * (smoothstep(0.42, 0.8, h0) * 0.7 + 0.12) * glow;
+    c = mix(c, mix(vec3(0.94, 0.96, 0.97) * uLight, vec3(0.7, 0.9, 1.0), glow), foamCalm * (1.0 - vFall.x));
     c = mix(c, fallC, vFall.x);
     // frozen: pale ice
-    vec3 ice = mix(vec3(0.72, 0.82, 0.9), vec3(0.86, 0.92, 0.97), 0.5 + 0.2 * sin(vWP.x * 0.3 + sin(vWP.z * 0.2) * 2.0)) * uIceLight;
+    vec3 ice = mix(vec3(0.72, 0.82, 0.9), vec3(0.86, 0.92, 0.97), 0.5 + 0.2 * sin(vWP.x * 0.3 + sin(vWP.z * 0.2) * 2.0) + 0.3 * (vn(vWP.xz * 0.6) - 0.5)) * max(uIceLight, 0.56) * mix(vec3(1.0), vec3(0.82, 0.9, 1.14), night); // (by night it holds the moon's light as the snow about it does: not a dark slab)
     ice = mix(ice, skyc * vec3(0.9, 1.0, 1.15), 0.12 + 0.3 * fres);
+    // a frozen fall: a curtain of icicles, pale and streaked down its length, bright in the moonlight (not a flat grey slab)
+    float icicle = vn(vec2(across * 4.5, vFlow.x * 0.03)) * 0.6 + vn(vec2(across * 11.0 + 3.0, vFlow.x * 0.07)) * 0.4;
+    vec3 iceFall = mix(vec3(0.56, 0.7, 0.92), vec3(0.95, 0.98, 1.0), smoothstep(0.28, 0.66, icicle)) * max(uIceLight, 0.74);
+    ice = mix(ice, iceFall, vFall.x);
     c = mix(c, ice, uIce);
     float dist = length(cameraPosition - vWP);
     c = mix(c, meadowHaze(fogColor, fogGlow, vWP - cameraPosition, fogSun), smoothstep(fogNear, fogFar, dist));
     // the calm water thins to nothing at its edges (the bed shows through: no hard border); a fall's edge is ragged spray
     float calmA = (1.0 - smoothstep(0.6, 1.0, edge)) * 0.94 + lace * 0.25;
     float fallA = 1.0 - smoothstep(0.62, 1.0, edge + (vn(vec2(across * 6.0, along * 0.6)) - 0.5) * 0.4);
-    float a = mix(mix(calmA, fallA, vFall.x), 1.0 - smoothstep(0.8, 1.0, edge) * 0.7, uIce);
+    float iceA = mix(1.0 - smoothstep(0.8, 1.0, edge) * 0.7, 1.0 - smoothstep(0.5, 1.0, edge + (icicle - 0.5) * 0.7), vFall.x); // (a frozen fall's edges: ragged, in points)
+    float a = mix(mix(calmA, fallA, vFall.x), iceA, uIce);
     gl_FragColor = vec4(meadowGrade(c), clamp(a, 0.0, 1.0));
   }`;
 // The falling sheet over a fall's face: clumps and ropes of white water standing off the face and moving faster than it.
@@ -99,10 +114,12 @@ const SHEET_FRAG = GRADE_GLSL + HAZE_GLSL + UNIFORMS + NOISE + `
     float across = vFlow.y * vW * 0.5, along = vFlow.x - uTime * 9.5;
     float clump = vn(vec2(across * 2.2 + 9.0, along * 0.16)) * 0.6 + vn(vec2(across * 5.5, along * 0.34 + 2.0)) * 0.4;
     float a = smoothstep(0.5, 0.74, clump) * (1.0 - smoothstep(0.45, 1.0, abs(vFlow.y))) * smoothstep(0.0, 0.18, vFall.y) * (1.0 - smoothstep(0.82, 1.0, vFall.y)); // (thin at the lip and at the foot)
-    vec3 c = vec3(0.97, 0.98, 0.99) * uLight;
+    float night = 1.0 - smoothstep(0.42, 0.8, uLight);
+    vec3 c = mix(vec3(0.97, 0.98, 0.99), uHeart.rgb * 1.3, uHeart.a * 0.3) * max(uLight, 0.7) * mix(vec3(1.0), vec3(0.84, 0.92, 1.12), night); // (moonlit by night)
+    c = mix(c, vec3(0.8, 0.94, 1.0), night * uHeart.a); // (and at a heart, glowing)
     float dist = length(cameraPosition - vWP);
     c = mix(c, meadowHaze(fogColor, fogGlow, vWP - cameraPosition, fogSun), smoothstep(fogNear, fogFar, dist));
-    gl_FragColor = vec4(meadowGrade(c), a * 0.85 * (1.0 - uIce));
+    gl_FragColor = vec4(meadowGrade(c), a * (0.85 - 0.3 * uHeart.a) * (1.0 - uIce));
   }`;
 // Mist: soft puffs rising from a fall's foot, each swelling and thinning as it climbs.
 const MIST_VERT = `
@@ -118,12 +135,14 @@ const MIST_VERT = `
     gl_Position = projectionMatrix * mv;
   }`;
 const MIST_FRAG = GRADE_GLSL + HAZE_GLSL + `
-  uniform sampler2D tPuff; uniform float uLight; uniform float uIce;
+  uniform sampler2D tPuff; uniform float uLight; uniform float uIce; uniform vec4 uHeart;
   uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun; uniform float fogNear; uniform float fogFar;
   varying float vLife; varying vec3 vWP;
   void main() {
-    float a = texture2D(tPuff, gl_PointCoord).a * smoothstep(0.0, 0.15, vLife) * (1.0 - vLife) * 0.7 * (1.0 - uIce);
-    vec3 c = vec3(0.96, 0.98, 1.0) * min(1.0, uLight);
+    float a = texture2D(tPuff, gl_PointCoord).a * smoothstep(0.0, 0.15, vLife) * (1.0 - vLife) * (0.7 + 0.5 * uHeart.a) * (1.0 - uIce);
+    float night = (1.0 - smoothstep(0.42, 0.8, uLight)) * uHeart.a;
+    vec3 c = mix(vec3(0.96, 0.98, 1.0), vec3(0.84, 0.79, 0.93), uHeart.a) * clamp(uLight, 0.62, 1.0); // (lilac at a heart; pale in the moonlight, not dark)
+    c = mix(c, vec3(0.55, 0.8, 1.0), night * 0.8); a *= 1.0 + 0.6 * night; // (by night the mist holds the falls' glow)
     c = mix(c, meadowHaze(fogColor, fogGlow, vWP - cameraPosition, fogSun), smoothstep(fogNear, fogFar, length(cameraPosition - vWP)));
     gl_FragColor = vec4(meadowGrade(c), a);
   }`;
@@ -158,15 +177,15 @@ function stonesFor(r) {
     const hw = r.w[i] / 2, drop = r.lv[i] - r.lv[i + 1];
     if (r.fall[i]) {
       // a fall: rocks down both sides of its face (slabs beside a tall one), a few about the lip, and boulders round the pool at its foot
-      const tall = drop > TALL, big = tall ? Math.min(1.7, 0.45 + drop * 0.07) : 0.2 + drop * 0.05, rows = Math.max(2, Math.ceil(drop / (tall ? 2.6 : 1.2)));
+      const tall = drop > TALL, big = tall ? Math.min(1.7, 0.45 + drop * 0.07) : 0.2 + drop * 0.05, rows = r.heart ? 0 : Math.max(2, Math.ceil(drop / (tall ? 2.6 : 1.2))); // (a heart's fall pours down a bare rock face: rocks at its lip and round its pool, none hung on the face)
       for (let k = 0; k <= rows; k++) for (const side of [-1, 1]) {
         const t = 0.1 + (k / rows) * 0.9, off = hw * 0.95 + big * (0.6 + roll() * 0.4);
         put(r.x[i] + dx * t + nx * side * off, r.lv[i] - drop * Math.max(0, t - 0.12) / 0.88 + big * (tall ? 0.1 : 0), r.z[i] + dz * t + nz * side * off, big * (0.7 + roll() * 0.6), tall ? 1.15 : 0.8);
-        if (tall && roll() < 0.5) put(r.x[i] + dx * t + nx * side * (off + big * 1.2), r.lv[i] - drop * t + big * 0.2, r.z[i] + dz * t + nz * side * (off + big * 1.2), big * (0.4 + roll() * 0.35), 1.0);
+        if (tall && !r.heart && roll() < 0.5) put(r.x[i] + dx * t + nx * side * (off + big * 1.2), r.lv[i] - drop * t + big * 0.2, r.z[i] + dz * t + nz * side * (off + big * 1.2), big * (0.4 + roll() * 0.35), 1.0);
       }
-      for (const side of [-1, 1]) put(r.x[i] - tx * 0.6 + nx * side * (hw + 0.3), r.lv[i] - 0.05, r.z[i] - tz * 0.6 + nz * side * (hw + 0.3), 0.3 + roll() * 0.3); // (the lip)
-      const foot = tall ? 5 : 3;
-      for (let k = 0; k < foot; k++) { const a = (roll() - 0.5) * 2.4, d = hw * (0.9 + roll() * 0.9) + (tall ? 0.8 : 0.2); put(r.x[i + 1] + tx * (0.8 + roll() * 2.5) + nx * Math.sin(a) * d * 1.3, r.lv[i + 1] - 0.1, r.z[i + 1] + tz * (0.8 + roll() * 2.5) + nz * Math.sin(a) * d * 1.3, 0.22 + roll() * (tall ? 0.7 : 0.35)); }
+      if (!(i > 0 && r.fall[i - 1])) for (const side of [-1, 1]) put(r.x[i] - tx * 0.6 + nx * side * (hw + 0.3), r.lv[i] - 0.05, r.z[i] - tz * 0.6 + nz * side * (hw + 0.3), 0.3 + roll() * 0.3); // (the lip: where the fall begins)
+      const foot = r.fall[i + 1] ? 0 : r.heart && tall ? 13 : tall ? 5 : 3; // (round the pool: where the fall ends; a ring of them round a heart's broad pool)
+      for (let k = 0; k < foot; k++) { const a = (roll() - 0.5) * 2.4, d = (r.heart && tall ? r.w[i + 1] / 2 * (0.75 + roll() * 0.4) : hw * (0.9 + roll() * 0.9)) + (tall ? 0.8 : 0.2); put(r.x[i + 1] + tx * (0.8 + roll() * 2.5) + nx * Math.sin(a) * d * 1.3, r.lv[i + 1] - 0.1, r.z[i + 1] + tz * (0.8 + roll() * 2.5) + nz * Math.sin(a) * d * 1.3, 0.22 + roll() * (tall ? 0.7 : 0.35)); }
     } else {
       // calm and quick water: a stone on the bank now and then; in quick water more of them, some in the stream
       const quick = Math.min(1, Math.max(0, drop / len) * 6);
@@ -215,7 +234,7 @@ function ribbon(r) {
   geo.setAttribute('aW', new THREE.BufferAttribute(wid, 1));
   geo.setIndex(idx);
   geo.computeBoundingSphere();
-  const u = Object.assign({}, waterU, { uIce: { value: 0 } });
+  const u = Object.assign({}, waterU, { uIce: { value: 0 }, uHeart: { value: new THREE.Vector4(0.48, 0.55, 0.74, r.heart ? 1 : 0) } });
   const mat = new THREE.ShaderMaterial({ uniforms: u, vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 2 });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(ox, 0, oz);
@@ -251,19 +270,54 @@ function ribbon(r) {
     mesh.add(sheet); own.push(sg, sm);
   }
 
+  // a heart's side falls: a rill from the stream on top to the lip, then a veil down the face (widening as it drops) to the pool
+  const feet = [];
+  if (r.sides && r.sides.length) {
+    const NS = 3, vp = [], vf = [], va = [], vw = [], vi = [];
+    const row = (x, y, z, px, pz, w, s, pour) => { for (let c = 0; c < NS; c++) { const uu = c - 1; vp.push(x + px * uu * w / 2 - ox, y, z + pz * uu * w / 2 - oz); vf.push(s, uu); va.push(pour, 0); vw.push(w); } };
+    const strip = (from, rows) => { for (let k = 0; k < rows - 1; k++) for (let c = 0; c < NS - 1; c++) { const a = from + k * NS + c, b = a + 1, d = a + NS, e = d + 1; vi.push(a, d, b, b, d, e); } };
+    r.sides.forEach((q, n) => {
+      const px = -q.oz, pz = q.ox, top = height(q.x - q.ox * 0.6, q.z - q.oz * 0.6);
+      // the rill: lying on the grass of the top, from the stream to the lip
+      let base = vp.length / 3; const RL = 7;
+      for (let k = 0; k < RL; k++) { const t = k / (RL - 1), x = q.bx + (q.x - q.bx) * t, z = q.bz + (q.z - q.bz) * t; row(x, Math.max(height(x, z), top - 0.4) + 0.07, z, px, pz, 0.9 + 0.4 * t, t * 12 + n * 31, 0); }
+      strip(base, RL);
+      // the face as it stands (the pool's bed is cut into its foot): how far out the rock is at each height
+      const prof = []; for (let d = 0; d <= 9; d += 0.3) prof.push(height(q.x + q.ox * d, q.z + q.oz * d));
+      const drop = top - q.pool, FL = 12; base = vp.length / 3;
+      for (let k = 0; k < FL; k++) {
+        const t = k / (FL - 1), y = top - drop * t; let d = 0; while (d < prof.length - 1 && prof[d] > y + 0.2) d++;
+        const out = k ? d * 0.3 + 0.35 + 0.5 * Math.sin(Math.PI * Math.min(1, t * 1.2)) : 0; // (it stands off the rock, most a little below the lip)
+        row(q.x + q.ox * out, k ? y + 0.05 : top + 0.07, q.z + q.oz * out, px, pz, q.w * (1 + 1.1 * t), 12 + drop * t + n * 31, 1);
+        if (k === FL - 1) feet.push({ x: q.x + q.ox * out, z: q.z + q.oz * out, y: q.pool, drop });
+      }
+      strip(base, FL);
+    });
+    const vg = new THREE.BufferGeometry();
+    vg.setAttribute('position', new THREE.Float32BufferAttribute(vp, 3));
+    vg.setAttribute('aFlow', new THREE.Float32BufferAttribute(vf, 2));
+    vg.setAttribute('aFall', new THREE.Float32BufferAttribute(va, 2));
+    vg.setAttribute('aW', new THREE.Float32BufferAttribute(vw, 1));
+    vg.setIndex(vi);
+    const veil = new THREE.Mesh(vg, mat);
+    veil.frustumCulled = false;
+    mesh.add(veil); own.push(vg);
+  }
+
   // mist rising from the foot of each fall: more and bigger puffs, climbing higher, below a tall one
   let mist = null;
   if (falls.length) {
     const mp = [], puff = [];
     let n = 0;
     for (const i of falls) {
-      const drop = r.lv[i] - r.lv[i + 1], count = Math.max(3, Math.min(9, Math.round(2 + drop * 0.5)));
+      const drop = r.lv[i] - r.lv[i + 1], count = Math.max(3, Math.min(14, Math.round(2 + drop * 0.5 + r.w[i] * 0.25))); // (more across a wide fall)
       for (let k = 0; k < count; k++) {
         const j = hash(i * 17 + k, 5 + n++), F = frame(i + 1, 0);
         mp.push(r.x[i + 1] - ox + F.tx * (j * 1.6 - 0.2) - F.tz * (hash(k, i) - 0.5) * r.w[i] * 0.9, r.lv[i + 1] + 0.25, r.z[i + 1] - oz + F.tz * (j * 1.6 - 0.2) + F.tx * (hash(k, i) - 0.5) * r.w[i] * 0.9);
         puff.push(1.2 + drop * 0.45 * (0.5 + j), 2.6 + Math.min(7, drop * 0.5) * (0.6 + 0.6 * j), hash(i + k * 3, 91));
       }
     }
+    for (const f of feet) for (let k = 0; k < 3; k++) { const j = hash(k * 7 + 3, Math.round(f.x * 5) + k); mp.push(f.x - ox + (j - 0.5) * 2, f.y + 0.25, f.z - oz + (hash(k, 77) - 0.5) * 2); puff.push(1.2 + f.drop * 0.3 * (0.5 + j), 2.6 + 5 * (0.6 + 0.6 * j), hash(k * 3 + 1, 91)); } // (and at the side falls' feet)
     const mg = new THREE.BufferGeometry();
     mg.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3));
     mg.setAttribute('aPuff', new THREE.Float32BufferAttribute(puff, 3));

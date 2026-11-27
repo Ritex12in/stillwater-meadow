@@ -26,7 +26,9 @@ const TREE_SLOTS = 512;               // how many trees of one shape can be draw
 export const TREE_COLOURS = {
   pine: ['#2f5a3a', '#3b6a40', '#2a4e37', '#456f43'].map(col),
   round: ['#5b8f3e', '#6fa04a', '#4d7f3a', '#86a948', '#7a9c3c'].map(col),
-  blossom: ['#f2b8c6', '#eaa3b8', '#f7cdd8'].map(col),
+  // (lifted past white where the light is: the leaf picture is grey, and the pale pinks this once had read as lilac-grey under it)
+  // (the owner, 2026-11-28: every blossom tree the colour of the great cherry at the home shrine, world/shrine.js: one hot pink, lifted the same way. They were four paler pinks: '#ff9cbf', '#ffb0cd', '#fb92b6', '#ffc4da', lifted by BLOSSOM_LIFT.)
+  blossom: [col('#ff6ea0').multiply(new THREE.Color(1.5, 1.24, 1.34))],
 };
 export const GRASS_FADE = [18, 66];   // grass thins out gradually between these distances
 export const FLOWER_FADE = [30, 70];

@@ -273,7 +273,7 @@ test('rivers: springs in the hills run down to a lake or the sea, never near hom
     return { count: list.length, ends: [...ends], rising, nearHome, falls, stand, tries, bed: SH.height(calm.x[i], calm.z[i]) - calm.lv[i], spot: { x: calm.x[i] + nx * 6, z: calm.z[i] + nz * 6, fx: calm.x[i], fz: calm.z[i] }, id: calm.id };
   });
   expect(r.count, 'rivers within 2.5 km of home').toBeGreaterThanOrEqual(3);
-  expect(r.ends.every((e) => e === 'lake' || e === 'sea'), 'each ends in a lake or the sea').toBe(true);
+  expect(r.ends.every((e) => e === 'lake' || e === 'sea' || e === 'pool'), 'each ends in a lake or the sea (or, the fall of a grove\'s heart, in its pool)').toBe(true);
   expect(r.rising, 'the water never runs uphill').toBe(0);
   expect(r.nearHome, 'none near home').toBeGreaterThan(440);
   expect(r.falls, 'some fall in steps').toBeGreaterThan(0);

@@ -1,3 +1,10 @@
+// THE YEAR DOES NOT TURN (the owner, 2026-11-28: "remove the season concept, season will be fixed for
+// places"). The year is held at midsummer for good, so every place shows what its own land makes it: cold
+// country and the high peaks lie under snow with their lakes frozen (winter, always), a blossom grove is
+// in blossom (spring, always), everywhere else is in summer leaf. The calendar and the save no longer
+// reach it. The engine below is kept, and a season can still be held for a look or a test (`?season=`,
+// the `season` command, `holdPhase`): that is a debug tool, it is not saved.
+//
 // Seasons, place by place. The time of year (core/year.js) is the same everywhere; what it does
 // depends on where you are: a cold upland is white while the valley below is in autumn colour, and
 // a warm coast stays green all winter. This module keeps the year moving (or held at a picked
@@ -7,7 +14,7 @@
 import * as THREE from 'three';
 import { clamp, damp, rnd, mulberry32, hash } from '../core/math.js';
 import { query } from '../core/env.js';
-import { glowTex } from '../core/materials.js';
+import { glowTex, neonU } from '../core/materials.js';
 import { hooks, seasonState as st, world } from '../core/state.js';
 import { coldAt, coldBase, northness, ASPECT, HOME, lakeChill, height, groveAt, biomesAt, yearAt, yearOf, latitudeAt, beltOf, wetSeasonAt } from '../core/shape.js';
 import { yearPhase, seasonValue, isCooling, phaseName, dayOfPhase, chillNow, snowFrom, iceFrom, flowersOut, leavesAt, SEASON_PHASE, ICE_LAG, seasonU, yearHereU, seasonHere, phaseHere } from '../core/year.js';
@@ -31,6 +38,7 @@ const P = {
 /** How much snow cover (on trees, rocks and things) a full snow where you stand gives. */
 const COVER = 0.72;
 
+const FIXED_PHASE = 0.5; // (midsummer: a place's own chill, and nothing added)
 let mode = 'auto', held = null, particleAmt = 0, ready = false, falling = null, fallingKind = '';
 
 // Every round tree has a crown colour for each state of its leaves (`pal`) and the colour it is
@@ -41,9 +49,10 @@ const SPRING_BLOSSOM = ['#f4c1d0', '#f7d6e0', '#ffffff', '#eeb0c4'], SPRING_GREE
 const AUTUMN = { maple: ['#c4422a', '#d9582b', '#b8352c', '#e0722e'], birch: ['#e8c547', '#f0d35a', '#e3b03b'], other: ['#d9822b', '#e3a33b', '#c4542d', '#e8c547', '#b0452a', '#cf6a2c', '#9aa040'] };
 const WINTER = ['#7d7264', '#6f665a', '#857a6a'];
 const pickWith = (roll) => (arr) => new THREE.Color(arr[Math.floor(roll() * arr.length)]);
-const springOf = (it, roll) => (it.type === 'blossom' || roll() < 0.3 ? pickWith(roll)(SPRING_BLOSSOM) : pickWith(roll)(SPRING_GREEN));
+// (a blossom tree is in blossom from spring to autumn, in its own pink: world/vegetation.js; other trees may flower pale in spring)
+const springOf = (it, roll) => (it.type === 'blossom' ? it.color.clone() : roll() < 0.3 ? pickWith(roll)(SPRING_BLOSSOM) : pickWith(roll)(SPRING_GREEN));
 // maples blaze red and orange, birches turn gold, the rest a mix
-const autumnOf = (it, roll) => pickWith(roll)(AUTUMN[it.family] || AUTUMN.other);
+const autumnOf = (it, roll) => (it.type === 'blossom' ? it.color.clone().multiplyScalar(0.9) : pickWith(roll)(AUTUMN[it.family] || AUTUMN.other));
 function palOf(it) {
   if (!it.pal) {
     const roll = mulberry32(Math.floor(hash(Math.round(it.x * 9) + 5, Math.round(it.z * 9) - 3) * 4294967296));
@@ -82,7 +91,8 @@ function syncUi() {
 
 /** Move the year on (or hold it at the picked season), and write it where everything reads it. */
 function turnYear() {
-  const p = held !== null ? held : mode === 'auto' ? yearPhase() : SEASON_PHASE[mode];
+  const p = held !== null ? held : mode === 'auto' ? FIXED_PHASE : SEASON_PHASE[mode];
+  st.fixed = held === null && mode === 'auto'; // (as the places have it: nothing held for a look)
   st.phase = p;
   st.season = seasonValue(p);
   st.lagged = seasonValue(p - ICE_LAG);
@@ -103,6 +113,8 @@ function readHere(x, z) {
   st.phaseHere = phaseHere(st.phase, y);
   st.beltHere = beltOf(latitudeAt(x, z));
   st.nameHere = st.beltHere === 'polar' ? '' : st.beltHere === 'tropical' ? (wetSeasonAt(x, z, st.season) > 0.5 ? 'Wet season' : 'Dry season') : phaseName(st.phaseHere);
+  // (the season a place keeps: winter where the snow lies, spring in a blossom grove, summer elsewhere)
+  if (st.fixed && st.beltHere !== 'polar') st.nameHere = now > 0.47 ? 'Winter' : groveAt(x, z) > 0.5 ? 'Spring' : st.beltHere === 'tropical' ? st.nameHere : 'Summer';
   // (in and out at different chills, so clothes and music do not flicker along a snow line)
   winterHere = winterHere ? now > 0.42 : now > 0.5;
   st.winterHere = winterHere;
@@ -125,18 +137,16 @@ export const setSeasonMode = (m) => { if (ORDER.includes(m)) setMode(m); };
 function setMode(m) {
   mode = m;
   held = null;
-  store.season = m;
-  saveSoon();
-  turnYear();
+  turnYear(); // (not kept in the save: a held season is for a look)
   recolourIn = 0; hereIn = 0; // (straight away: the trees, and how it is here)
-  toast(m === 'auto' ? `The year turns on its own: ${phaseName(st.phase).toLowerCase()} now.` : `${phaseName(st.phase)} comes to the land.`);
+  toast(m === 'auto' ? 'Each place keeps its own season.' : `${phaseName(st.phase)} is held everywhere, for a look.`);
   syncUi();
 }
 
 let recolourIn = 0, hereIn = 0, blend = 1;
 export function initSeasons() {
   const q = query.get('season');
-  mode = ORDER.includes(q) ? q : ORDER.includes(store.season) ? store.season : 'auto';
+  mode = ORDER.includes(q) ? q : 'auto'; // (the save's old choice of season is not read: an old save that held winter does not bring it back)
   turnYear();
   ready = true;
   world.tintTree = tintTree;
@@ -200,7 +210,7 @@ export function initSeasons() {
     const want = kind === 'autumn' ? 1 : kind === 'spring' ? 0.6 : 0;
     particleAmt = damp(particleAmt, want * (1 - wx.rain * 0.7), 0.6, dt);
     falling.update(dt, t, camera.position, particleAmt, 0.75, 0.4 + wx.wind * 2, 0);
-    if (falling.obj.visible) falling.u.uOpacity.value = Math.min(1, particleAmt * 1.3) * (0.35 + 0.65 * Math.max(cur.day, 0.2));
+    if (falling.obj.visible) falling.u.uOpacity.value = Math.min(1, particleAmt * 1.3) * Math.max(0.35 + 0.65 * Math.max(cur.day, 0.2), fallingKind === 'spring' ? 0.4 + 0.6 * neonU.value : 0); // (petals in the air glow by night with the trees)
   });
 
   // rain or snow, by how cold it is where you stand

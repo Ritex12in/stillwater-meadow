@@ -335,6 +335,40 @@ test('seasons by place: the year turns every 8 days; cold uplands whiten and the
   noErrors(errors);
 });
 
+test('the year does not turn: every place keeps its own season, whatever the date and whatever an old save held; a held season is only for a look', async ({ page }) => {
+  // (the owner, 2026-11-28: "remove the season concept, season will be fixed for places")
+  await page.addInitScript(() => { const now = Date.now.bind(Date); Date.now = () => now() + 4 * 86400000; }); // (half a game year on)
+  const errors = await open(page, 'weather=clear', '#12');
+  const r = await page.evaluate(async () => {
+    const url = (name) => performance.getEntriesByType('resource').map((e) => e.name).find((n) => n.includes(name));
+    const SH = await import(url('/src/core/shape.js')), Y = await import(url('/src/core/year.js')), m = window.__meadow, st = m.year.state, H = SH.HOME;
+    const heart = SH.sitesNear(H.x, H.z, 8000, 'heart')[0], hc = SH.coldAt(heart.x, heart.z, SH.height(heart.x, heart.z)), hy = Object.assign({}, SH.yearAt(heart.x, heart.z));
+    let halves = 0, cold = null;
+    for (let z = H.z - 30000; z < H.z + 30000; z += 700) { halves = Math.max(halves, SH.yearAt(H.x, z).m); }
+    for (let z = -2800; z < 2800 && !cold; z += 41) for (let x = -2800; x < 2800; x += 41) { const h = SH.height(x, z), c = SH.coldAt(x, z, h); if (c > 0.65 && h > 0) { cold = { c, y: Object.assign({}, SH.yearAt(x, z)) }; break; } }
+    const out = { phase: st.phase, season: st.season, name: st.nameHere, halves, heartSnow: Y.snowFrom(hc, st.season, hy), heartLeaves: Y.leavesAt(hc, st.season, st.cooling, hy), coldSnow: cold ? Y.snowFrom(cold.c, st.season, cold.y) : null, heartRiverIce: SH.riverIce(SH.riversNear(heart.x, heart.z, 200).find((q) => q.heart)) };
+    m.command('season winter'); out.held = m.year.state.phase; m.command('season auto'); out.after = m.year.state.phase;
+    return out;
+  });
+  expect(r.phase, 'the year is held at midsummer').toBe(0.5);
+  expect(r.season).toBe(0);
+  expect(r.name, 'summer at home').toBe('Summer');
+  expect(r.halves, 'no place is half a year apart').toBe(0);
+  expect(r.heartSnow, 'no snow at the heart of a grove').toBe(0);
+  expect(r.heartLeaves, 'and its trees in leaf (so in blossom)').toBe('summer');
+  expect(r.heartRiverIce, 'its falls never frozen').toBe(0);
+  expect(r.coldSnow, 'cold country lies under snow').toBeGreaterThan(0.9);
+  expect(r.held, 'a season can be held for a look').toBe(0);
+  expect(r.after, 'and let go').toBe(0.5);
+  await page.reload();
+  await page.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });
+  expect(await page.evaluate(() => { window.__meadow.command('season winter'); return 1; })).toBe(1);
+  await page.reload();
+  await page.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });
+  expect(await page.evaluate(() => window.__meadow.year.state.phase), 'a held season is not kept in the save').toBe(0.5);
+  noErrors(errors);
+});
+
 test('weather moves over the land: the same for everyone at a moment, carried by the wind, rain here and sun there, and Auto is the weather where you stand', async ({ page }) => {
   const errors = await open(page, 'season=summer', '#12');
   const r = await page.evaluate(async () => {

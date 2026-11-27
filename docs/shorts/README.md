@@ -28,7 +28,7 @@ A short moves through these in order. It does not move on until the stage's chec
 | 1 | Idea | either | A row in IDEAS.md | It tells one thing, and the story behind it is in HISTORY.md. |
 | 2 | Brief | Claude drafts | `briefs/NNN-name.md`: story, hook, script, shots | Every line of the script passes CLAIMS.md. Every shot names the version of the game it is filmed from. |
 | 3 | Approval | the owner | Brief marked `approved` | **Nothing is filmed before this** ([ADR 0009](adr/0009-nothing-is-filmed-before-its-brief-is-approved.md)). |
-| 4 | Voice | the owner | A recording of the script's lines | Every line is there, in order. |
+| 4 | Voice | Claude | The script's lines spoken by the AI voice ([ADR 0010](adr/0010-an-ai-voice-reads-the-script.md)), with each sentence's time | Every line is there, in order, and sounds right to the owner. |
 | 5 | Film | Claude | Frames for each shot, from the real versions of the game | Each shot looked at as stills before the whole is rendered. |
 | 6 | Edit | Claude | One vertical video with voice, captions and the game's sound | Captions inside the safe areas; length within the brief's; plays without sound and still makes sense. |
 | 7 | Review | the owner | A yes, or changes | The owner has watched it through. |
@@ -42,7 +42,7 @@ Story first, then a hook, then the video ([ADR 0003](adr/0003-story-then-hook-th
 1. **The story** is what really happened: a want, a difficulty, a turn, a result. It is written in the
    brief before anything else, with the commits that show it.
 2. **The hook** is the first two seconds: the one picture and line that make someone stay.
-3. **The video** is the story told in 15 to 35 seconds, with a voice and captions
+3. **The video** is the story told in 40 to 60 seconds, opening on "I'm building a whole game with AI", then the hook, then the story ([ADR 0013](adr/0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md)), with a voice and captions
    ([ADR 0004](adr/0004-voice-and-captions-both.md)), in a tall frame
    ([ADR 0002](adr/0002-vertical-short-and-safe.md)).
 
@@ -58,5 +58,6 @@ Story first, then a hook, then the video ([ADR 0003](adr/0003-story-then-hook-th
 
 ## Status
 
-The pipeline is set up on paper (2026-11-27). No tool for vertical video exists yet and no short has
-been made: see [PLAN.md](PLAN.md).
+The pipeline is set up on paper (2026-11-27). Two tools exist (2026-11-28): one that runs and opens any
+past version of the game, and a test of the tall frame with its safe areas. The maker is built and three shorts are made (2026-11-28), waiting for
+the owner's review: see [PLAN.md](PLAN.md).

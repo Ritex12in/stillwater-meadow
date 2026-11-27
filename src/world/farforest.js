@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { hash } from '../core/math.js';
-import { weatherize, camU, softEdges } from '../core/materials.js';
+import { weatherize, camU, softEdges, neonU } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { world } from '../core/state.js';
 import { TREE_HEIGHT } from './kitplants.js';
@@ -86,6 +86,7 @@ function cardMaterial(atlas, cells, distant) {
     sh.uniforms.uAutumn = groundU.autumn;
     sh.vertexShader = `uniform vec3 uCamF; uniform float uAutumn;
       attribute vec3 aPos; attribute vec2 aSize; attribute float aCell; attribute float aRand; attribute float aLeafy;
+      varying float vBloss;
       ${distant ? 'varying vec3 vMW;' : ''}
     ` + sh.vertexShader
       .replace('#include <beginnormal_vertex>', `vec3 toCam = uCamF - aPos; toCam.y = 0.0; toCam = normalize(toCam + vec3(1e-4, 0.0, 0.0));
@@ -100,7 +101,14 @@ function cardMaterial(atlas, cells, distant) {
         vUv = vec2((aCell + uv.x) / ${cells.toFixed(1)}, uv.y);`)
       .replace('#include <color_vertex>', `#include <color_vertex>
         // autumn: the broadleaf trees (not pines) turn orange, red and gold
+        vBloss = aLeafy < -0.5 ? 1.0 : 0.0; // (a blossom tree: its card glows by night as the tree does)
         if (aLeafy > 0.5) vColor.rgb = mix(vColor.rgb, mix(vec3(0.85, 0.36, 0.14), vec3(0.95, 0.72, 0.26), aRand), uAutumn * 0.85);`);
+    sh.uniforms.uNeon = neonU;
+    sh.fragmentShader = 'uniform float uNeon; varying float vBloss;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `if (uNeon * vBloss > 0.001) {
+        vec3 bc = diffuseColor.rgb; float bm = max(max(bc.r, bc.g), bc.b);
+        gl_FragColor.rgb = max(gl_FragColor.rgb, mix(bc / max(bm, 1e-3), vec3(1.0, 0.58, 0.82), 0.4) * (0.58 + 0.3 * min(bm, 1.0)) * uNeon * vBloss);
+      }
+      #include <fog_fragment>`);
     if (distant) {
       sh.fragmentShader = 'uniform vec3 uHaze; uniform vec3 uGlow; uniform vec3 uSun;\nvarying vec3 vMW;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `
         vec3 fdir = vMW - cameraPosition;
@@ -156,7 +164,7 @@ export function setFarTrees(trees) {
     // change as you walk up and its card gives way to the real thing); pines keep their card's green
     if (t.type !== 'pine' && world.tintTree) world.tintTree(t);
     const season = t.type !== 'pine' && t.shown;
-    a.aLeafy[i] = season ? 0 : c.leafy;
+    a.aLeafy[i] = t.type === 'blossom' ? -1 : season ? 0 : c.leafy;
     a.color[i * 3] = season ? t.shown.r : c.c[0]; a.color[i * 3 + 1] = season ? t.shown.g : c.c[1]; a.color[i * 3 + 2] = season ? t.shown.b : c.c[2];
   }
   set.geo.instanceCount = n;

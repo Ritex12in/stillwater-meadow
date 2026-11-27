@@ -177,7 +177,16 @@ export function updatePlayer(dt, petting) {
   }
   if (!(player.slide && player.slide.rescue)) player.move = damp(player.move, mag > 0.05 ? speed : 0, 8, dt);
   const floor = player.slide ? player.slide.minY : -99;
-  player.y = damp(player.y, Math.max(groundAt(player.x, player.z), onIce(player.x, player.z) ? ICE_Y : -99, floor), 14, dt);
+  // (the height follows the ground: closely over a slope, whatever the speed, so you neither sink into a hill climbing it nor float
+  // over it going down (at the `speed` command's 10 a fixed rate fell 0.8 m behind up a slope and 0.5 m above one going down);
+  // smoothly only over a real step, a ledge or the edge of a jetty, so that is not a jerk)
+  const gy = Math.max(groundAt(player.x, player.z), onIce(player.x, player.z) ? ICE_Y : -99, floor);
+  // (a slope, not a step, is ground that changed no more than walking up or down a slope can change it, for how far you went this frame)
+  const went = Math.hypot(player.x - (player.lastGX ?? player.x), player.z - (player.lastGZ ?? player.z));
+  const slope = Math.abs(gy - (player.lastGY ?? gy)) <= went * 1.3 + 0.05; // (1.3: just over the steepest walkable slope, MAX_SLOPE)
+  player.lastGX = player.x; player.lastGZ = player.z; player.lastGY = gy;
+  const eased = damp(player.y, gy, 14 * Math.max(1, player.move / 5.4), dt);
+  player.y = slope && Math.abs(player.y - gy) < 0.6 ? Math.min(Math.max(eased, gy - 0.03), gy + 0.03) : Math.max(eased, gy - 0.03);
   poseHero(dt);
 }
 

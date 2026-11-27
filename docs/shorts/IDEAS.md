@@ -4,6 +4,9 @@ Every short that could be made. One row each; the story behind it is in [HISTORY
 Status: `idea` → `brief` (being written) → `approved` → `filming` → `review` → `posted`, or `dropped`
 (with why).
 
+The "Live on the site?" columns below are from 2026-11-27; since the owner published everything on
+2026-11-28, every row is live.
+
 New ideas go at the bottom of their series. An idea needs a story, not just a picture
 ([ADR 0003](adr/0003-story-then-hook-then-video.md)).
 
@@ -13,12 +16,13 @@ One thing, shown as it was in each real version of the game.
 
 | # | Short | The story in a line | Live on the site? | Status |
 |---|---|---|---|---|
-| A1 | The character | A simple figure; two sets of downloaded characters tried and thrown out; rebuilt from the owner's own drawings; the hair redone six times, then given physics. | yes | brief ([001](briefs/001-the-character.md)) |
+| A1 | The character | A simple figure; rebuilt from the owner's own drawings; the hair redone six times, then given physics. | yes | re-making at 40 to 60 s ([001](briefs/001-the-character.md)) |
 | A2 | The pets | Cats and dogs before and after they were redrawn in the children's style. | yes | idea |
-| A3 | The waterfall | A flat cyan ribbon with white stripes; then white water, mist and rocks. | no | idea |
-| A4 | The mountains | A painted ridge on the horizon; then peaks you can walk to. | yes | idea |
-| A5 | One valley to a whole world | A single hand-placed meadow; then land without an edge; then continents and harbours. | partly | idea |
+| A3 | The waterfall | A flat cyan ribbon with white stripes; then white water, mist and rocks; then three falls that glow. | yes | filming ([005](briefs/005-the-waterfall.md)) |
+| A4 | The mountains | A painted ridge on the horizon; then peaks you can walk to. | yes | filming ([012](briefs/012-the-mountains.md)) |
+| A5 | One valley to a whole world | A single hand-placed meadow; then land without an edge; then continents and harbours. | partly | re-making at 40 to 60 s ([003](briefs/003-one-valley.md)) |
 | A6 | The whole journey | One view of the home lake at every milestone, first commit to today, cut to the music. | partly | idea |
+| A8 | The cherry blossom valley | From a picture the owner showed, a grove built step by step at the same spot. | yes | filming ([006](briefs/006-cherry-blossom-valley.md)) |
 
 ## Series B: The bug that...
 
@@ -28,9 +32,11 @@ Something broken, shown broken; one line on why; the fix.
 |---|---|---|---|---|
 | B1 | One endless continent | Continents from plain noise all joined into one landmass, until each got its own square of sea. | no | idea |
 | B2 | The sea with an edge | The ocean stopped at a straight pale line a kilometre out. | no | idea |
-| B3 | The roll that went underground | A forward roll that turned about the feet and took the boy through the floor. | no | idea |
+| B3 | The roll that went underground | A forward roll that turned about the feet and took the boy through the floor. | no | re-making at 40 to 60 s ([002](briefs/002-through-the-floor.md)) |
 | B4 | Snow that followed you | Fast travel to the tropics, and the snow came too. | no | idea |
 | B5 | Boulders far too big | The first rocks by the waterfalls. | no | idea |
+| B6 | Into the hill | At ten times speed he sank into a slope climbing it, then floated going down. | yes | filming ([008](briefs/008-into-the-hill.md)) |
+| B7 | Grey falls at night | The owner's report from a winter night: frozen grey slabs; icicles; then falls that never freeze and glow. | yes | filming ([013](briefs/013-grey-falls-at-night.md)) |
 
 A bug's broken state is in the history only if it was committed. B1 was (as a picture tool, `cb721ac`)
 and B3 was (`abed753`, fixed in `f8d77d0`); the others were fixed before a commit, so the broken state would have to be brought back by undoing the fix in
@@ -45,15 +51,17 @@ The owner's own words on screen, then what came of them.
 |---|---|---|---|---|
 | C1 | "The world feels so random" | Continents, islands, harbours. | no | idea |
 | C2 | "Rivers and waterfall literally need better visual" | The new falls. | no | idea |
-| C3 | "He can't climb, jump, glide" | The frame-by-frame sheets, then the moves at full speed. | no | idea |
-| C4 | "Waiting for a season is annoying" | Seasons by latitude: walk north into winter. | no | idea |
-| C5 | "Remove Vroid" | Two words that ended a day's work on downloaded characters. | yes | idea (part of A1's story) |
+| C3 | "He can't climb, jump, glide" | The frame-by-frame sheets, then the moves at full speed. | yes | filming ([010](briefs/010-the-moves.md)) |
+| C4 | "Waiting for a season is annoying" | Seasons by latitude: walk north into winter. | no | dropped: overturned; the year no longer turns (see C9) |
+| C7 | "I want wide rivers and waterfalls" | Streams of 2.4 to 5.8 m become rivers of 20 m with broad cascades. | yes | filming ([004](briefs/004-wide-rivers.md)) |
+| C8 | "Why can't we just paint the petals on the ground, like grass?" | The petals that flickered, the fix that hid them, and the owner's own fix. | yes | filming ([007](briefs/007-shaking-petals.md)) |
+| C9 | "Remove the season concept" | The blossom valley bare in winter; seasons fixed by place. | yes | filming ([009](briefs/009-the-year-that-stopped.md)) |
 
 ## Series D: How it works, in twenty seconds
 
 | # | Short | The idea | Live? | Status |
 |---|---|---|---|---|
-| D1 | One number makes the world | The seed: type any word, get a world. | yes | idea |
+| D1 | One number makes the world | The seed: type any word, get a world. | yes | filming ([011](briefs/011-one-number.md)) |
 | D2 | Why it snows at the poles | Latitude belts across an endless flat world. | no | idea |
 | D3 | A waterfall from nothing | The layers of a fall, added one at a time. | no | idea |
 | D4 | A map that remembers | Only where you have walked is drawn. | no | idea |

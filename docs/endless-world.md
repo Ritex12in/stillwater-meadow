@@ -312,6 +312,8 @@ or dropped once a pack is chosen.
 
 ## Plan: seasons and weather by place (decided 2026-11-22, built the same night)
 
+> **Overturned 2026-11-28.** The owner: "remove the season concept, season will be fixed for places". The year no longer turns: see "The year does not turn" below. What follows is kept as the record of how it was and of the engine, which is still in the code and can be held at a season for a look.
+
 **What is wrong today.** One season for the whole world, from the calendar or picked: in winter every
 lake freezes, snow covers everything and flowers go everywhere; walking never changes the season.
 One weather state follows you everywhere, changing on a timer by a table of what follows what, the
@@ -598,6 +600,8 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
 
 ## How seasons and weather work (built 2026-11-22)
 
+> **Overturned 2026-11-28.** The owner: "remove the season concept, season will be fixed for places". The year no longer turns: see "The year does not turn" below. What follows is kept as the record of how it was and of the engine, which is still in the code and can be held at a season for a look.
+
 - **The year** (`core/year.js`): a phase, 0 midwinter, 0.5 midsummer, the same for every player at
   the same real moment (UTC), one year every 8 real days. A picked season holds the phase at its
   middle (`?season=` too; tests are held at summer unless they ask, `tests/helpers.js`).
@@ -814,6 +818,352 @@ are the country's in summer whatever the season; rivers are drawn, trails and br
   on a place chooses it; "Go there" shows for home, your camp and woken waystones.
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
+
+## The cherry blossom valley: the owner's picture, analysed (2026-11-28; steps 1 to 4 built)
+
+The owner: "time to work on the biome examples I gave; pick one and start analysing". Picked: "Enchanted
+Cherry Blossom Valley" (in the owner's Downloads), the plan's first biome, since the game already has
+blossom trees, pagodas, a shrine with stone lanterns, and deer. Measured from the picture itself (its
+colours counted by hue, 320 pixels wide) and set against the game's blossom grove as it is today
+(`e:/Games/_assets/previews/grove-now.png`, `grove-pagoda-now.png`: seed 1, spring, 6.12 pm).
+
+### The colours, counted
+
+| | The picture | The game's grove today |
+|---|---|---|
+| Pink and magenta | 34% | 2 to 6% |
+| Red, orange, warm brown | 29% | 24 to 42% (sunset sky and bark) |
+| Violet | 12% | 2 to 3% |
+| Blue | 12% | 0% |
+| Gold | 7% | 3 to 10% |
+| Green | **1%** | **34 to 65%** |
+| Bright pixels (over 80% bright) | 34% | 3 to 7% |
+| Brightness, mean | 0.62 | 0.36 to 0.42 |
+| Saturation, mean | 0.38 | 0.41 to 0.47 |
+
+The picture is not more saturated than the game: it is far lighter, and its hues are different ones.
+Almost nothing in it is green. Its grass reads as moss in shadow (`#473a3d`) under a carpet of petals.
+
+Colours picked from it: blossom in light `#dc93aa`, in the distance `#c594b0`, in shadow `#773749`;
+sky `#f1b5d8` to `#fbcad0` by the sun; snow on the peak `#ccb0d4` (lilac, not white); far mountains
+`#8780b8`; cliff rock `#6b655b`; falling water `#7a8bb3` (blue-violet, not white); mist `#ac9cb3`;
+path `#c59a65`; near rock `#9e7585` (pink light on grey); stream `#646474`; trunk `#603b3d`; moss on
+the trunk `#735914`; lantern glow `#b6763d`; deer `#9d5a3b`; bridge `#a2837d`.
+
+### How it is put together
+
+- **Three depths.** Near: one huge old cherry as a frame (its trunk fills the left sixth, its boughs
+  the whole top third), blossoms and a mossy boulder at the bottom edge. Middle: a stream with low
+  falls, an arched bridge, a deer, a stone path, lanterns. Far: cliffs with tall waterfalls, pagodas
+  on top of them, one snow peak, the sun low behind it.
+- **The eye's way in:** the path from the bottom left corner and the stream from the bottom right
+  both lead to the bridge, a third of the way up; above it the falls; above them the pagodas.
+- **Height in steps:** stream, then meadow, then a cliff of perhaps 25 to 40 m with the falls, then a
+  plateau with the buildings, then the peak. Every step has blossom trees on it.
+- **Light:** a low sun behind the scene, so things are rimmed with pink and their near sides are in
+  soft shadow; warm points of light (windows, lanterns) against the cool violet distance.
+- **Air:** mist at the foot of every fall and between the depths, taking the far things toward
+  lilac; petals in the air and lying on everything (path, rocks, water).
+
+### What is in it
+
+| Thing | In the picture | In the game today |
+|---|---|---|
+| Blossom trees | Many sizes: one giant, mid trees with broad flat crowns on dark twisting trunks, small far ones; all pink | Blossom trees exist; today they read pale lilac-grey, not pink, and are all of a size |
+| Petals | In the air, and lying thick on path, rocks, grass and water | Falling petals at the home shrine's cherry only; none lie on the ground |
+| Ground | Moss and short grass, nearly hidden; a worn stone path; mossy boulders | Plain green grass (65% of the picture is green) |
+| Water | A stream with low stepped falls and rocks in it; tall cliff falls, several side by side | Rivers and falls exist (redrawn 2026-11-28) but are ramps, not cliffs; none placed in the groves |
+| Cliffs and a plateau | The heart of it | None in the groves: they lie on ordinary rolling ground |
+| Pagodas | Several, on the cliff tops, windows lit | One to a grove at most, on level ground, windows lit at dusk |
+| Bridge | Arched, wooden, railed, over the stream | Footbridges exist where trails cross rivers (flat) |
+| Stone lanterns | Along the path and by the water, lit | At the shrine only |
+| Deer | Spotted, grazing by the path | Deer exist (by country), not spotted |
+| A snow peak | One cone on the horizon, lilac | Mountains exist; none placed for a view |
+| Sky | Pink to lavender, soft clouds, a low sun | The sky's own sunset colours (orange); nothing by biome |
+
+### What stands between the game and the picture, largest first
+
+1. **The hues.** The grove's blossom is the wrong colour and its ground is green. Pink blossom,
+   petal-covered ground and a sky, fog and light tinted for the place where you stand would move the
+   picture's numbers most, and none of it moves the land.
+2. **The lightness.** Mist, a pale sky and a bright ground: the game's scene is half as bright.
+3. **The land's shape.** Cliffs, a plateau, falls dropping off it, a stream below: this needs the
+   land changed (the plan's "hearts"), and the cliffs the waterfalls were waiting for.
+4. **The things:** a giant cherry, stepped stream falls, an arched bridge, lanterns along a path,
+   several pagodas on the heights, spotted deer.
+5. **The composition** is a painter's; in a game the player's eye is wherever they stand. What can be
+   done is to lay the heart out so that the way in (the trail) gives that view: path and stream
+   converging on the bridge, the falls and pagodas above it, the peak behind.
+
+### Step 1 built: the grove's colour and light (2026-11-28, on "yes, go with your picks")
+
+No land is moved and nothing is saved differently.
+
+- **Blossom trees are pink** (`world/vegetation.js` `TREE_COLOURS.blossom`, lifted past white: the
+  leaf picture is grey, and the pale pinks it had read as lilac-grey under it), in blossom from
+  spring to autumn (`features/seasons.js`), bare in winter; and **of many sizes**, saplings to great
+  old ones (0.7 to 1.85 times, `world/wilds.js`).
+- **The ground of a grove** (`world/terrain.js`: a new `grove` value at every point of the ground):
+  greyed and darkened toward moss, with petals lying on it, each drawn in its own small square of
+  ground at its own spot and angle, in two sizes of square so they do not sit in rows, thick where
+  they have drifted; beyond about 50 m, where they would be too small to draw, a pink cast instead.
+- **The air of the place** (`main.js` `airOfPlace`): as you walk into a grove the sky, the horizon,
+  the haze, the light and the clouds ease toward pink and lavender at the brightness they already
+  have (so night stays night), the fill light rises by a fifth, and the mist comes a third nearer.
+  Less under snow.
+
+The same two views, counted again (`grove-after-dusk.png`, `grove-after-day.png` against
+`grove-now.png`; the picture's own numbers alongside):
+
+| | The picture | The grove before | The grove now, dusk | now, by day |
+|---|---|---|---|---|
+| Pink and magenta | 34% | 6% | 44% | 35% |
+| Green | 1% | 34% | 5% | 15% |
+| Blue and violet | 24% | 3% | 0% | 7% |
+| Gold | 7% | 10% | 30% | 24% |
+| Bright pixels | 34% | 3% | 10% | 22% |
+| Brightness, mean | 0.62 | 0.42 | 0.49 | 0.61 |
+
+Pink and green are where the picture has them. **Still off:** there is no blue or violet (the
+picture's comes from water, mist and far mountains, which the grove does not have yet); too much gold
+(the bare hillside behind, and the moss reading olive); and at dusk it is still darker than the
+picture, which is lit as bright as our noon. **Not done in this step:** the grass blades themselves
+are still green (they stand over the petals); the distant tree cards were not looked at; the pagoda
+stands at a grove's edge, where little of this shows. Speed on the owner's laptop was not measured
+(the ground shader does more in a grove: two small loops a pixel).
+
+### Step 2 built: the things that need no cliff (2026-11-28, on "finish the coded ones now")
+
+The owner asked for better assets to be looked for on the internet first; several packs were found
+but none with a licence that could be checked from here, and nothing could be downloaded, so the
+coded ones were finished. They can be swapped for downloaded models later. No land is moved.
+
+- **Stone lanterns along the trails** (`world/trailside.js`, new): where a trail runs through a
+  grove, a lantern every sixteen metres, one each side by turns, lit at dusk. In seed 1, five to
+  twelve stand within 300 m of most pagodas; the grove goes on for 30 to 150 m along a pagoda's
+  trail. Two instanced meshes, up to 96 lanterns. You can walk through them (they block nothing).
+  Pictures: `grove2-lanterns-day.png`, `-dusk.png` (`tools/grove-view.mjs`).
+- **Great old cherries** (`world/wilds.js`): deep in a grove, about one blossom tree in ten is two
+  and a half to three times the size of the rest (17 to 20 m). It is the same tree model enlarged,
+  not the gnarled, mossy giant of the picture.
+- **A garden bridge** (`core/shape.js` bridgesOf, `world/crossings.js`): where a trail crosses a
+  river in a grove the footbridge arches two and a half times as high and is lacquered vermilion,
+  with a second rail and dark caps on its posts. **Not seen:** no such crossing lies within 5 km of
+  home in seed 1, so there is no picture of one.
+- **A spotted deer** (`features/wildlife.js`): the deer at a lake that lies in a grove has pale
+  flecks along its back and flanks. **Not seen** in a picture either.
+
+### Step 3 built: the heart of a grove (2026-11-27, on "go with step 3, your picks")
+
+**This one moves land**, so `WORLD_GEN` is 4: a world made before it has its map, places, waystones,
+harbours, tracking, camp and lanterns cleared once more (the second clearing after the continents).
+It is on `endless-world` only; it does not go to `main` until the owner says so.
+
+- **The heart** (`core/shape.js`: a new kind of site, `heart`, laid out as the volcano is). Deep in a
+  grove (0.7 or more), on ground 4 to 70 m up, with no sea, snow or lake near and fairly even country
+  round it, the land is raised into a **terrace** 90 to 115 m across and about 24 m above what lies in
+  front of it. The front is a **cliff** (7 to 8 m of rise per metre); round the back it comes down as a
+  slope you walk up (0.3 to 0.56). One to a square of 1100 m, in four squares of five where the land
+  fits. Other places, waystones, shrines and rivers keep off it.
+- **The fall** (`heartRiver`): a stream laid by hand, not by the river-maker: it rises on the terrace,
+  runs to the lip, drops the whole cliff in one fall (20 to 26 m) into a pool at the foot, and runs a
+  few metres on. Rocks at the lip and round the pool; none hung on the face
+  (`world/rivers.js stonesFor`).
+- **The pagodas** (`world/buildings.js heartPlace`, `world/landmarks.js`): a large one and a smaller
+  one beside it on the terrace, with four stone lanterns. Named "Blossom terrace"; on the map with a
+  pagoda mark; a trail leads to it; `goto heart` in the command line takes you to the nearest.
+- **Sheer faces are bare stone** (`world/terrain.js`): the ground's rock picture is a mossy green and
+  is laid flat, so on a cliff it drew as a green smear. A face steeper than about 1.4 m per metre is
+  now drawn in the ground shader as stone in level beds, each its own shade, with dark seams and
+  upright cracks, and carries no moss or petals. **This applies everywhere** but on desert sand and a
+  volcano's black rock, so the steepest mountain faces change too (no clear picture of one was got).
+  No boulder is set on such a face (`world/wilds.js`). Far off, where the ground is drawn too coarse
+  to measure a 3 m wide cliff as steep, a heart's cliff is told by the drop from one point to the
+  next: counted, with the ground in 4.8 m squares (500 m off), 24 of the 35 points along the rim
+  are stone. At 900 m no ground of this kind was found drawn there, so that distance is unchecked.
+
+Counted with `tools/hearts.mjs` in seeds 1, 7 and 42: one or two hearts within 6 km of home (the
+nearest 1096 m, 3890 m and 870 m off); every top walkable; nothing else standing on any of them.
+Pictures (`tools/heart-view.mjs`, seed 1): `heart-below.png`, `heart-fall.png`, `heart-top.png`,
+`heart-pagodas.png`. The tool's shots from 150, 400 and 900 m and from above show nothing of it
+(trees, the player's head): there is no picture of the whole heart from a distance.
+
+**Against the owner's picture, still off:** the terrace is a round drum, not a broken, stepped
+crag with trees on its ledges; there is one fall, not several; the pool is small and there is no
+lake or mist at its foot; no far mountains behind; the fall's water steps sideways half way down,
+where its two lengths meet; the pagodas stand back from the lip and do not show from below. The view
+from 300 m off is shut in by trees (`heart-far.png` shows none of it). **Measured:** the land's
+height costs the same on a heart as off it (1.1 to 2.1 against 1.2 to 2.4 millionths of a second a
+point, five runs each in one page). **Not measured:** speed on the owner's laptop.
+
+Tests, by name: boot, places, trails, rivers, ways across water, the map, waystones, harbours, the
+shrine, one seed one world, travelling far and back, a world from before the land changed, settled
+lakes, fishing in a river: all pass. The rivers test was **changed**: a river may now end in a lake,
+the sea, or a heart's pool. Fishing in a river failed once (page errors) and passed twice after.
+
+### Step 4 built: the way in (2026-11-27, on "go with step 4, your picks")
+
+The plan below stops at (c); **step 4 is our own definition**, added to it as (d): lay the heart out so
+that walking in gives the picture's view (gap 5 above, the composition). It **moves land again**, still
+under `WORLD_GEN` 4, which has not gone to `main`: so it costs players nothing more than step 3 did.
+Nothing here is on `main`.
+
+- **A shelf before the cliff** (`core/shape.js heartRise`): in front, toward the stream's side, the
+  land is eased to one level out to about 60 m from the rim (fading by 92 m), whatever was there: the
+  pool, the stream and the way in lie on a meadow. (In seed 42 a 10 m gully ran across the front.)
+  The cliff stands 24 m over the shelf.
+- **Two doors and a path** (`heartLayout`, `doorOf`, `trailsOfCell`): a trail from another place no
+  longer runs to the middle of the terrace (from in front that painted it up the cliff). It ends at
+  the **front door**, 52 m before the cliff, looking up at the fall, or at the **back door** at the
+  foot of the slope behind, whichever side it comes from. From the front door the heart's own path
+  crosses the stream, goes round the side clear of the terrace's flank, up the slope behind and in to
+  a court in the middle of the top (about 400 m); the back door has a short way up to the same. The
+  path is made of ordinary trail lengths (`inner`: no signposts), so trees keep off it and the
+  grove's lanterns line it.
+- **The stream goes on** (`heartRiver`): the cliff's face is one length, so the water falls in one
+  sheet (it stepped sideways twice before); the pool is broader (11 m); below it the stream runs on
+  down the shelf past the way in, 64 to 103 m beyond the rim, with a low step where the ground
+  drops, never uphill, to a small pool of its own. No step is put where the path crosses, and it
+  always runs at least that far, so there is always a bridge: the **garden bridge** of step 2
+  (always the garden kind on a heart's stream), now seen in a picture.
+- **The pagodas at the lip** (`heartLayout`, `world/landmarks.js place`): the large one 10 m back
+  from the rim just to one side of the fall, the small one on the other side, each set for its own
+  heart (the rim differs). Both show from below. Trees keep off their ground. The lanterns stand in
+  the court.
+- **A lane kept open** (`gladeAt`, `world/wilds.js`): no tree within 15 m of the line from the front
+  door to the fall; the trees to its sides frame the view.
+- **The grove spreads round its heart** (`groveAt`, over `groveRaw`): within about 120 m of a heart
+  it is all grove (blossom trees, the mossy ground, the pink air), fading by 150 m. Places are still
+  chosen by the grove as the noise has it (`groveRaw`).
+- **In any grove** (not only at a heart): the grass is thinned by 70% so the moss and petals show
+  (`world/grassfield.js`), and the ground is a little greyer.
+
+Counted (`tools/hearts.mjs`, seeds 1, 7, 42; four hearts): the path 397 to 442 m, every metre
+walkable, its steepest metre 0.34 to 0.66; trails from outside end at a door in every case; one
+garden bridge on each; the stream never uphill. One outside trail in seed 42 crosses a steep bank
+120 m beyond the heart (the land as it was; not ours).
+
+Pictures (`tools/heart-view.mjs`, seed 1, 4.30 pm): `heart-way-in.png` (from the front door),
+`heart-way-in-wide.png`, `heart-bridge.png`, `heart-bridge-fall.png`, `heart-fall.png`,
+`heart-top.png`, `heart-lip.png`. Colours by hue (`tools/hue-count.mjs`, new: the same rule for all):
+
+| | The picture | Grove before step 1 | From the front door | By the bridge |
+|---|---|---|---|---|
+| Pink and magenta | 37% | 6% | 19% | 21% |
+| Red, orange, warm brown | 25% | 41% | 23% | 37% |
+| Gold | 10% | 11% | 33% | 21% |
+| Green | 1% | 34% | 3% | 7% |
+| Blue | 12% | 0% | 0% | 0% |
+| Violet | 9% | 2% | 12% | 8% |
+| Bright | 34% | 3% | 30% | 22% |
+| Brightness, mean | 0.62 | 0.42 | 0.67 | 0.60 |
+
+**Still off:** half the picture's pink (the cliff and ground fill the frame where the picture has
+blossom); too much gold (the ground still reads olive; pushed fully to mauve it looked dead, so it
+is half way); no blue at all (the water is pale, there is no mist to speak of at the fall's foot,
+no far blue mountains); the terrace is still a round drum with one fall; no deer was seen.
+**Not seen in a picture:** the back door and the way up; the stream's lower steps and its end; a
+heart in another seed; night. **Not measured:** speed on the owner's laptop.
+
+### The falls of a heart, to a description (2026-11-27)
+
+The owner: "I wanted to ask how the waterfall should look, then build according to that." The
+description we wrote and built to (ours, from the picture):
+
+> A group of falls: one broad main fall with a thinner one each side, a few metres apart, landing in
+> one pool. The water blue-violet in its body with white ropes running down it, narrow at the lip
+> and widening into a veil, breaking into spray at the foot. A soft lilac mist at the foot. A broad
+> pool, about 20 m across, churned white where the water lands, ringed with boulders. The rock dark
+> and wet beside the water, with streaks of green moss down the face; the rest of the cliff dry grey
+> stone. Blossom trees and the pagodas at the rim above; the stream leaving under the red bridge.
+
+Left out on purpose: a cliff broken into ledges with the water in two leaps, and a lake at the foot
+(both reshape the land much more). Dropped: trees leaning over the falls (the game has no way to
+lean a tree).
+
+What was built, still under `WORLD_GEN` 4 and not on `main`:
+
+- **Three falls** (`core/shape.js heartLayout`, `heartRiver`; `world/rivers.js ribbon`): the main
+  fall as before, and a thinner one 7.5 m along the rim to each side. The side falls are not rivers
+  (the land answers for the one nearest river only, so three would cut ridges between their beds):
+  they are drawn with the main stream's water, each a rill lying on the top from the stream to the
+  lip and a veil down the face as the rock stands, widening to twice its width, with mist at its foot.
+- **A pool 22 m across** reaching the cliff's foot under all three, with thirteen boulders by the
+  falls' feet. The main fall is 3.4 m at the lip and 7 m at the foot.
+- **The water's colour**: at a heart, blue-violet (`#7a8bbd`, after the picture's `#7a8bb3`) in the
+  falls' veins, the pool and the stream, at the brightness it had; more of it shows between the white
+  ropes. Every other river is as it was (each river's own `uHeart`, nought elsewhere).
+- **Mist**: lilac at a heart and half as thick again. No more puffs than a tall fall had (9, and 3 at
+  each side fall), for the laptop's sake.
+- **Wet rock and moss** (`world/terrain.js`): where the nearest heart's three falls leave the lip is
+  given to the ground's shader, which darkens the stone within about 9 m of each and runs streaks of
+  moss down it. By the pixel, so it is the same at any distance.
+- **The ground's `grove` number is now two**: the grove, and how sheer the ground is (it was one
+  number, sheer below nought, and the ground between a stone point and a grove point passed through
+  plain grass: the green wedges along the cliff's foot). The stone is drawn over the grove's ground.
+
+Pictures (seed 1): `heart-bridge-fall.png`, `heart-fall.png`, `heart-pool.png`, `heart-way-in.png`.
+Blue, which was 0% in every view against the picture's 12%: 1 to 2% from the path, 6% close to the
+falls, 27% standing at the pool.
+
+**Still off:** from the path the falls are a small part of the view, so blue stays low there; the
+mist is faint (it does not blur the base of the rock as the description asks); the boulders sit in a
+row at the falls' feet, not round the pool; the pool's outline is angular; the side veils kink
+outward at the bottom; a rill lies on the grass with no bed of its own. **Not seen:** the rills on
+top; the falls frozen in winter; night. **Speed:** frames at the pool and at the front door came at
+either 60 or 30 a second in turn, 60 away from the heart (the measure only reads those two steps, so
+it does not say how close to the line it is).
+
+### A way to build it (ours; nothing agreed)
+
+Colour first, since it is the largest gap and changes no land: (a) the grove's own look where you
+stand (blossom pink, petals on the ground, sky, fog and light), judged by pictures; then (b) the
+things that need no cliff (lanterns along trails in a grove, the giant cherry, spotted deer, an
+arched bridge); then (c) the heart itself, which changes the land (a cliffed plateau with falls and a
+stream, the pagodas set on it), with the other changes to the land; then (d), added by us after (c)
+was built: the way in, the heart laid out so that walking to it gives the picture's view.
+
+## The year does not turn: a season for each place, for good (2026-11-28)
+
+The owner, on seeing the blossom grove bare under snow in the game's winter: "winter cherry blossom
+trees are not looking good, that place is losing its purpose. Remove the season concept, season will
+be fixed for places." And of the grove's falls: "waterfall should not change with season."
+
+**What it is now.** Nothing changes with the date. The year is held at midsummer for good
+(`features/seasons.js`, `FIXED_PHASE`), so each place shows what its own land makes it:
+
+| A place | Its season, always | Why |
+|---|---|---|
+| Cold country, the poles, high peaks | Winter: snow lies, lakes and rivers frozen, trees bare | its own cold (`coldAt`), with nothing added |
+| A blossom grove | Spring: in blossom, petals falling and lying | blossom trees flower in everything but winter, and a grove is mild |
+| Everywhere else | Summer: in leaf, flowers out, water open | |
+| The tropics | Their wet season | the dry one was the other half of the year |
+| The warm subtropics | Parched gold | their summer drought, now for good |
+
+These are **our picks** of what "fixed for places" means; the owner may overturn any.
+
+**What was changed.** The calendar (`yearPhase`) and the save's old choice of season no longer reach
+the year: an old save that held winter does not bring it back. No place is half a year apart any
+more (`core/shape.js yearAt`: `m` is nought everywhere; it was the other side of an equator, which
+held at midsummer would have lain under snow for good). The "Here:" line names the season a place
+keeps. A grove's falls, pool and stream never freeze (`riverIce`). No land moved: `WORLD_GEN` stays 4.
+
+**What is kept.** The whole engine of the year (`core/year.js`), and a way to hold one season
+everywhere **for a look or a test**: `?season=winter` in the address, the `season` command, the
+tests' `holdPhase`. It is a debug tool: it is not saved, and `season auto` lets go.
+
+**What the owner loses** (to be decided, not built):
+- **Autumn** is nowhere: no turned leaves, no falling leaves, no leaf litter. A kind of country that
+  is autumn for good would bring it back.
+- **Winter at home** never comes: the **snowman** and the **skating dance** on the home lake cannot
+  be reached in play (only with the season held). Skating itself still works on the frozen lakes of
+  cold country.
+- The pike's hint ("storms and autumn") names a season that never comes.
+
+Checked (`tools/season-check.mjs`): loaded as a player loads it on two real dates four days apart
+(half a game year), home, a grove's heart and a tropical, subtropical, temperate and polar spot far to
+the south read the same on both: summer at home, no snow and trees in leaf at the heart, snow in the
+cold. A test holds it ("the year does not turn"). The picture tools no longer ask for spring.
 
 ## How the pines are grown from code (2026-11-28; made and measured; the owner keeps the kit's)
 
@@ -1218,6 +1568,8 @@ cyan ribbon with white stripes, lying on a grass slope. Now (`world/rivers.js`):
 
 ## How seasons by latitude work (built 2026-11-28)
 
+> **Overturned 2026-11-28.** The owner: "remove the season concept, season will be fixed for places". The year no longer turns: see "The year does not turn" below. What follows is kept as the record of how it was and of the engine, which is still in the code and can be held at a season for a look.
+
 Built from the plan below, with the owner's "go with your picks" on the pictures (stripes
 accepted; belt edges wandering about 900 m; the old patches adding half) and on the three
 decisions (old worlds cleared once; the sun one for the whole world).
@@ -1264,6 +1616,8 @@ decisions (old worlds cleared once; the sun one for the whole world).
   land as it then was; now that the rule is the game's, its "as it is" views show the new land.
 
 ## Plan: seasons by latitude (decided 2026-11-27; built 2026-11-28, see above)
+
+> **Overturned 2026-11-28.** The owner: "remove the season concept, season will be fixed for places". The year no longer turns: see "The year does not turn" below. What follows is kept as the record of how it was and of the engine, which is still in the code and can be held at a season for a look.
 
 **Why.** The owner: a player who wants spring in winter has to wait, which is annoying (the World
 panel's season picker is a debugging tool, not for players); and in the real world seasons vary

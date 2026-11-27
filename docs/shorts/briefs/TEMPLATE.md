@@ -2,7 +2,7 @@
 
 - **Status:** draft | approved | filming | review | posted | dropped
 - **Idea:** the row in [IDEAS.md](../IDEAS.md) (e.g. A1)
-- **Length:** seconds (15 to 35)
+- **Length:** seconds (40 to 60: [ADR 0013](../adr/0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md))
 - **Shows only what is live on the site?** yes | no (then: "coming soon", or held)
 - **Approved by the owner on:** (date; nothing is filmed before this)
 
@@ -21,7 +21,9 @@ Said aloud and shown as captions, the same words. About 2.5 words a second.
 
 | # | Time | Line (voice and caption) | On screen | Filmed from (commit) |
 |---|---|---|---|---|
-| 1 | 0–2 s | | | |
+| 1 | 0–5 s | I'm building a whole game with AI. I haven't written a single line of code. (the opener, the same in every short) | | |
+| 2 | 5–9 s | (the hook) | | |
+| 3 | | (the story, in full) | | |
 
 Words: N. Length: N s.
 

@@ -4,7 +4,7 @@
 // need not have been to the far harbour before: that is how you reach a continent the first time.
 // A harbour you have been to is a point you can travel to from the map, as a woken waystone is
 // (`store.harbours`, per world: features/waypoints.js knownHarbours).
-import { harboursNear, passagesFrom, harbourById } from '../core/shape.js';
+import { harboursNear, passagesFrom, harbourById, harbourWork, continentAt } from '../core/shape.js';
 import { hooks } from '../core/state.js';
 import { player } from '../characters/player.js';
 import { activity } from '../systems/activity.js';
@@ -27,13 +27,14 @@ function learn(h) {
   return true;
 }
 /** The harbour whose jetty you stand at, or null. */
-const atHarbour = () => { const h = harboursNear(player.x, player.z, 40)[0]; return h && Math.hypot(h.x - player.x, h.z - player.z) < SAIL_REACH ? h : null; };
+const atHarbour = () => { const h = harboursNear(player.x, player.z, 40, true)[0]; return h && Math.hypot(h.x - player.x, h.z - player.z) < SAIL_REACH ? h : null; };
 
 /** Sail from a harbour to another (one of its passages). */
 export function sail(to) {
   if (!to) return false;
-  learn(to);
-  return travelToPoint({ id: to.id, kind: 'harbour', name: to.name, x: to.x, z: to.z, ax: to.ax, az: to.az, say: `You sail across the sea to ${to.name}, on ${to.cont.name}.`, ms: SAIL_MS });
+  const ok = travelToPoint({ id: to.id, kind: 'harbour', name: to.name, x: to.x, z: to.z, ax: to.ax, az: to.az, say: `You sail across the sea to ${to.name}, on ${to.cont.name}.`, ms: SAIL_MS });
+  if (ok) learn(to); // (only if you do set sail)
+  return ok;
 }
 
 let here = null; // (the harbour the panel was opened at)
@@ -69,14 +70,22 @@ export function initHarbours() {
     run: () => { here = atHarbour(); if (here) { learn(here); togglePanel('harbourPanel', true); } },
   });
   // coming to a harbour: it is noted, and the skipper says where he sails
+  // worked out a little each frame (core/shape.js harbourWork), ahead of need: the harbours of the
+  // continent you are on, and, as you near one of them, those of the continents it sails to
   let lookIn = 0;
+  const work = [];
   hooks.frame.push((dt) => {
+    while (work.length && harbourWork(work[0], 2)) work.shift();
     lookIn -= dt;
     if (lookIn > 0) return;
     lookIn = 0.5;
-    const h = harboursNear(player.x, player.z, 40)[0];
-    if (!h || Math.hypot(h.x - player.x, h.z - player.z) > VISIT || !learn(h)) return;
-    const to = passagesFrom(h).map((t) => t.cont.name);
+    const c = continentAt(player.x, player.z);
+    if (c && !c.harbours && !work.includes(c)) work.unshift(c);
+    const near = harboursNear(player.x, player.z, 400, true)[0];
+    if (near) for (const o of near.serves) if (!o.harbours && !work.includes(o)) work.push(o);
+    const h = near && Math.hypot(near.x - player.x, near.z - player.z) < VISIT ? near : null;
+    if (!h || !learn(h)) return;
+    const to = h.serves.every((o) => o.harbours) ? passagesFrom(h).map((t) => t.cont.name) : h.serves.map((o) => o.name);
     toast(`${h.name}. A skipper here sails to ${to.length > 1 ? to.slice(0, -1).join(', ') + ' and ' + to[to.length - 1] : to[0] || 'nowhere just now'}: press E at the jetty. You can travel back here from the map (M).`, 6);
   });
 }

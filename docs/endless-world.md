@@ -1021,6 +1021,13 @@ The second step: a way across the sea (`core/shape.js` harboursOf, passagesFrom;
   changed.
 - **Waystones** now stand only on a continent's own land (`onContinent`), not on the islands, which
   nothing sails to yet.
+- **Cost.** Finding a continent's harbours means walking its coast along many bearings and looking
+  for rivers and buildings at each foothold; all at once that was 0.5 to 1 s on new land. So it is a
+  job done a bearing at a time (`harbourWork`), 2 ms a frame: the harbours of the continent you are
+  on, and, once you are within 400 m of a harbour, those of the continents it sails to. A single
+  step can still take up to about 100 ms where it is the first to trace that country's rivers (the
+  same work the ground does when you first walk there). Every harbour's landing spot in seeds 1, 7
+  and 42 (140 within 15 km of home) is dry, level ground.
 
 ### Decisions not yet answered by the owner
 

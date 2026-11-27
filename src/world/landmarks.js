@@ -118,7 +118,7 @@ export const landmarksView = () => Object.entries(made).flatMap(([kind, vs]) => 
 /** Now and then: the buildings near (x, z) stand at their sites; those left behind are put away. */
 export function updateLandmarks(x, z) {
   for (const kind in KINDS) {
-    const K = KINDS[kind], want = (kind === 'harbour' ? harboursNear(x, z, K.view) : sitesNear(x, z, K.view, kind)).slice(0, K.pool);
+    const K = KINDS[kind], want = (kind === 'harbour' ? harboursNear(x, z, K.view, true) : sitesNear(x, z, K.view, kind)).slice(0, K.pool);
     const ids = new Set(want.map((s) => s.id));
     for (const vs of made[kind] || []) if (vs) for (const c of vs.copies) if (c.site && !ids.has(c.site.id)) release(c);
     for (const s of want) {

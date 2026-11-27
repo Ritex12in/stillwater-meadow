@@ -418,34 +418,57 @@ function linked(c) {
   }
   return (c.links = out);
 }
-/** The foot of a harbour on a continent's coast along a bearing from its middle (or null where the coast will not take one). */
-function coastFoot(c, a) {
+/**
+ * The foot of a harbour on a continent's coast along a bearing from its middle (`out.foot`; null where
+ * the coast will not take one). A job: it stops (yields) between its costly parts, the walk out to the
+ * coast and each look round for rivers and buildings, so the work can be spread over frames.
+ */
+function* coastFoot(c, a, out) {
+  out.foot = null;
   const dx = Math.cos(a), dz = Math.sin(a), max = c.R * c.s * 2.6 + 1500;
   let land = false, r = 0;
-  for (; r < max; r += 30) {
+  for (; r < max; r += 30) { // (the sea from the grid: cheap; the depth only where it is sea)
     const x = c.x + dx * r, z = c.z + dz * r, s = seaAt(x, z);
-    if (!land) { if (s === 0 && rawHeight(x, z) > 0.6) land = true; continue; }
+    if (!land) { if (s === 0) land = true; continue; }
     if (s > 0.15 && rawHeight(x, z) < -1.5) break;
   }
-  if (!land || r >= max) return null;
-  for (let b = r; b > r - 240; b -= 2) {
-    const x = c.x + dx * b, z = c.z + dz * b, h = rawHeight(x, z);
-    if (h < 0.6) continue;
-    if (h > 2.6 || rawHeight(x - dx * 5, z - dz * 5) > h + 2.5) return null; // (no cliff: low ground, rising gently behind)
-    if (continentAt(x, z) !== c || lakeAt(x, z).t(x, z) < 2.5 || riverHere(x, z) || sitesNear(x, z, 60).length) return null;
-    return { x, z, dx, dz };
-  }
-  return null;
+  if (!land || r >= max) return;
+  let x = 0, z = 0, b = r;
+  for (; b > r - 240; b -= 2) { x = c.x + dx * b; z = c.z + dz * b; if (rawHeight(x, z) >= 0.6) break; }
+  if (b <= r - 240) return;
+  const h = rawHeight(x, z);
+  if (h > 2.6 || rawHeight(x - dx * 5, z - dz * 5) > h + 2.5) return; // (no cliff: low ground, rising gently behind)
+  if (continentAt(x, z) !== c || lakeAt(x, z).t(x, z) < 2.5) return;
+  yield;
+  if (riverHere(x, z)) return;
+  for (const k in SITE_KINDS) { yield; if (sitesNear(x, z, 60, k).length) return; } // (clear of every building)
+  out.foot = { x, z, dx, dz };
 }
 const COMPASS = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West'];
-/** A continent's harbours, each facing the neighbours it serves: `{ id, kind: 'harbour', name, x, z, y, turn, ax, az, cont, serves }`. */
-export function harboursOf(c) {
-  if (c.harbours) return c.harbours;
-  const list = [], toward = new Map(), ns = linked(c).slice().sort((p, q) => Math.atan2(p.z - c.z, p.x - c.x) - Math.atan2(q.z - c.z, q.x - c.x));
+/**
+ * A continent's harbours, each facing the neighbours it serves: `{ id, kind: 'harbour', name, x, z, y,
+ * turn, ax, az, cont, serves }`. Working them out means walking the coast along many bearings, so it
+ * is done a bearing at a time (harbourWork), a few milliseconds a frame, before you need them; this
+ * finishes the work at once.
+ */
+export function harboursOf(c) { harbourWork(c, Infinity); return c.harbours; }
+/** Work at a continent's harbours for up to `ms` milliseconds. Returns whether they are all worked out. */
+export function harbourWork(c, ms) {
+  if (c.harbours) return true;
+  const until = performance.now() + ms;
+  if (!c.job) c.job = harbourJob(c);
+  while (!c.job.next().done) if (performance.now() >= until) return false;
+  c.job = null;
+  return true;
+}
+/** The continents joined to this one by passages (their harbours are wanted next: harbourWork). */
+export const linkedContinents = (c) => linked(c);
+function* harbourJob(c) {
+  const got = {}, list = [], toward = new Map(), ns = linked(c).slice().sort((p, q) => Math.atan2(p.z - c.z, p.x - c.x) - Math.atan2(q.z - c.z, q.x - c.x));
   for (const o of ns) {
     const a0 = Math.atan2(o.z - c.z, o.x - c.x);
     let foot = null;
-    for (const off of [0, 15, -15, 30, -30, 45, -45, 60, -60]) if ((foot = coastFoot(c, a0 + off * Math.PI / 180))) break;
+    for (const off of [0, 15, -15, 30, -30, 45, -45, 60, -60]) { yield* coastFoot(c, a0 + off * Math.PI / 180, got); yield; if ((foot = got.foot)) break; }
     let h = foot && list.find((q) => Math.hypot(q.x - foot.x, q.z - foot.z) < HARBOUR_MERGE);
     if (foot && !h) {
       const k = list.length, turn = Math.atan2(foot.dx, foot.dz);
@@ -457,9 +480,9 @@ export function harboursOf(c) {
   // a neighbour whose bearing found no coast: served by the nearest harbour there is
   for (const o of ns) if (!toward.has(o) && list.length) { const h = list.reduce((p, q) => (Math.hypot(q.x - o.x, q.z - o.z) < Math.hypot(p.x - o.x, p.z - o.z) ? q : p)); h.serves.push(o); toward.set(o, h); }
   // a continent whose every bearing failed: any foothold round its coast
-  if (!list.length) for (let k = 0; k < 24 && !list.length; k++) { const f = coastFoot(c, (k / 24) * TAU); if (f) { const h = { id: `harbour:${c.cx}:${c.cz}:0`, kind: 'harbour', name: `${c.name} Harbour`, x: f.x, z: f.z, y: 0, turn: Math.atan2(f.dx, f.dz), variant: 0, flat: 0, out: 0, ax: f.x - f.dx * 3, az: f.z - f.dz * 3, cont: c, serves: ns.slice() }; list.push(h); for (const o of ns) toward.set(o, h); } }
+  if (!list.length) for (let k = 0; k < 24 && !list.length; k++) { yield* coastFoot(c, (k / 24) * TAU, got); yield; const f = got.foot; if (f) { const h = { id: `harbour:${c.cx}:${c.cz}:0`, kind: 'harbour', name: `${c.name} Harbour`, x: f.x, z: f.z, y: 0, turn: Math.atan2(f.dx, f.dz), variant: 0, flat: 0, out: 0, ax: f.x - f.dx * 3, az: f.z - f.dz * 3, cont: c, serves: ns.slice() }; list.push(h); for (const o of ns) toward.set(o, h); } }
   c.toward = toward;
-  return (c.harbours = list);
+  c.harbours = list;
 }
 /** Where a passage from a harbour goes: the harbours facing it on the continents it serves. */
 export function passagesFrom(h) {
@@ -476,10 +499,10 @@ export function continentsNear(x, z, r) {
   }
   return out;
 }
-/** Every harbour within `r` metres of a spot, nearest first. */
-export function harboursNear(x, z, r) {
+/** Every harbour within `r` metres of a spot, nearest first (`ready`: only those of continents already worked out, so it never stops to work). */
+export function harboursNear(x, z, r, ready = false) {
   const out = [];
-  for (const c of continentsNear(x, z, r)) for (const h of harboursOf(c)) if (Math.hypot(h.x - x, h.z - z) < r) out.push(h);
+  for (const c of continentsNear(x, z, r)) { if (ready && !c.harbours) continue; for (const h of harboursOf(c)) if (Math.hypot(h.x - x, h.z - z) < r) out.push(h); }
   return out.sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
 }
 /** The harbour with this id (ids name their continent's square), or null. */

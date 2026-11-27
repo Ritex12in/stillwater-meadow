@@ -11,7 +11,7 @@
 // country's own in summer (meadow, lush wood, heath, grove, snow, desert, swamp and the rest), lit
 // from the north-west so the hills stand out, with a faint line every 20 m of height.
 import { clamp, smooth } from '../core/math.js';
-import { sitesNear, continentsNear, harboursOf, WAYSTONE_CELL, rawHeight, seaAt, lakeAt, coldBase, coldAt, rainAt, snowCold, snowOf, dryOf, lushOf, groveAt, biomesAt, aboveTrees, TREE_COLD, ASPECT, riverNear } from '../core/shape.js';
+import { sitesNear, continentsNear, harbourWork, WAYSTONE_CELL, rawHeight, seaAt, lakeAt, coldBase, coldAt, rainAt, snowCold, snowOf, dryOf, lushOf, groveAt, biomesAt, aboveTrees, TREE_COLD, ASPECT, riverNear } from '../core/shape.js';
 import { hooks } from '../core/state.js';
 import { player } from '../characters/player.js';
 import { camState } from '../systems/input.js';
@@ -175,7 +175,7 @@ function loadStones(ms) {
   for (let cz = q.z0; cz <= q.z1; cz++) for (let cx = q.x0; cx <= q.x1; cx++) if (!stoneCells.has(cx + ',' + cz)) todo.push([cx, cz, Math.hypot((cx + 0.5) * WAYSTONE_CELL - view.x, (cz + 0.5) * WAYSTONE_CELL - view.z)]);
   // (and the harbours of the continents in view: a continent's are worked out once, a few at a time)
   const t0 = performance.now();
-  for (const c of continentsNear(view.x, view.z, viewReach())) if (!c.harbours) { harboursOf(c); dirty = true; if (performance.now() - t0 > ms) return true; }
+  for (const c of continentsNear(view.x, view.z, viewReach())) if (!c.harbours) { const left = ms - (performance.now() - t0); if (harbourWork(c, Math.max(0, left))) dirty = true; if (performance.now() - t0 > ms) return true; }
   if (!todo.length) return false;
   todo.sort((p, r) => p[2] - r[2]);
   for (const [cx, cz] of todo) {

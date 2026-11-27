@@ -89,15 +89,20 @@ const FRAG = GRADE_GLSL + HAZE_GLSL + UNIFORMS + NOISE + `
     c = mix(c, vec3(0.94, 0.96, 0.97) * uLight, foamCalm * (1.0 - vFall.x));
     c = mix(c, fallC, vFall.x);
     // frozen: pale ice
-    vec3 ice = mix(vec3(0.72, 0.82, 0.9), vec3(0.86, 0.92, 0.97), 0.5 + 0.2 * sin(vWP.x * 0.3 + sin(vWP.z * 0.2) * 2.0)) * uIceLight;
+    vec3 ice = mix(vec3(0.72, 0.82, 0.9), vec3(0.86, 0.92, 0.97), 0.5 + 0.2 * sin(vWP.x * 0.3 + sin(vWP.z * 0.2) * 2.0) + 0.3 * (vn(vWP.xz * 0.6) - 0.5)) * max(uIceLight, 0.56) * mix(vec3(1.0), vec3(0.82, 0.9, 1.14), night); // (by night it holds the moon's light as the snow about it does: not a dark slab)
     ice = mix(ice, skyc * vec3(0.9, 1.0, 1.15), 0.12 + 0.3 * fres);
+    // a frozen fall: a curtain of icicles, pale and streaked down its length, bright in the moonlight (not a flat grey slab)
+    float icicle = vn(vec2(across * 4.5, vFlow.x * 0.03)) * 0.6 + vn(vec2(across * 11.0 + 3.0, vFlow.x * 0.07)) * 0.4;
+    vec3 iceFall = mix(vec3(0.56, 0.7, 0.92), vec3(0.95, 0.98, 1.0), smoothstep(0.28, 0.66, icicle)) * max(uIceLight, 0.74);
+    ice = mix(ice, iceFall, vFall.x);
     c = mix(c, ice, uIce);
     float dist = length(cameraPosition - vWP);
     c = mix(c, meadowHaze(fogColor, fogGlow, vWP - cameraPosition, fogSun), smoothstep(fogNear, fogFar, dist));
     // the calm water thins to nothing at its edges (the bed shows through: no hard border); a fall's edge is ragged spray
     float calmA = (1.0 - smoothstep(0.6, 1.0, edge)) * 0.94 + lace * 0.25;
     float fallA = 1.0 - smoothstep(0.62, 1.0, edge + (vn(vec2(across * 6.0, along * 0.6)) - 0.5) * 0.4);
-    float a = mix(mix(calmA, fallA, vFall.x), 1.0 - smoothstep(0.8, 1.0, edge) * 0.7, uIce);
+    float iceA = mix(1.0 - smoothstep(0.8, 1.0, edge) * 0.7, 1.0 - smoothstep(0.5, 1.0, edge + (icicle - 0.5) * 0.7), vFall.x); // (a frozen fall's edges: ragged, in points)
+    float a = mix(mix(calmA, fallA, vFall.x), iceA, uIce);
     gl_FragColor = vec4(meadowGrade(c), clamp(a, 0.0, 1.0));
   }`;
 // The falling sheet over a fall's face: clumps and ropes of white water standing off the face and moving faster than it.

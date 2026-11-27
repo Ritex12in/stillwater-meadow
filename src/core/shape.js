@@ -1166,7 +1166,7 @@ function siteOfCell(kind, cx, cz) {
   return site;
 }
 /** The building site whose levelled ground reaches a spot (within its `out`, or `reach` if given), or null. */
-export function siteAt(x, z, reach) {
+export function siteAt(x, z, reach, more = 0) { // (`more`: metres beyond its levelled ground, for a wide river's breadth)
   for (const kind in SITE_KINDS) {
     const K = SITE_KINDS[kind];
     if (reach === undefined && !K.out) continue; // (no levelled ground: nothing to reach; and a river being traced never asks after a waystone, whose place depends on the rivers)
@@ -1174,7 +1174,7 @@ export function siteAt(x, z, reach) {
     let s;
     if (m && m.cx === cx && m.cz === cz) s = m.s; else { s = siteOfCell(kind, cx, cz); lastSite[kind] = { cx, cz, s }; }
     if (!s) continue;
-    const r = reach === undefined ? s.out : reach < 0 ? Math.max(s.flat, 8) + 4 : reach; // (reach < 0: the ground kept clear round it)
+    const r = reach === undefined ? s.out + more : reach < 0 ? Math.max(s.flat, 8) + 4 : reach; // (reach < 0: the ground kept clear round it)
     if (r > 0 && (x - s.x) ** 2 + (z - s.z) ** 2 < r * r) return s;
   }
   return null;
@@ -1420,6 +1420,10 @@ const RIVER_CELL = 800, RIVER_STEP = 6, RIVER_MAX = 2000, RIVER_HOME = 450, RIVE
 /** Below the land along its middle, the water (m); how deep the water is in the middle; how steeply the banks rise from the water's edge. */
 export const RIVER_SINK = 0.15, RIVER_DEPTH = 0.35, RIVER_BANK = 0.35;
 const RIVER_IDX = 32, RIVER_PAD = 26, RIVER_SPAN = Math.ceil((RIVER_MAX + RIVER_CELL) / RIVER_CELL);
+/** How wide a river is `along` metres from its spring (the owner, 2026-11-28: "I want wide rivers and waterfalls"): a rill at the spring, a wide river (20 m) by the time it has run half a kilometre. It was 2.4 m to 5.8 m, over 1.6 km. */
+export const riverWidth = (along) => 2.4 + 17.6 * smooth(20, 500, along);
+/** How deep the water is in its middle, by its width: a rill ankle-deep, a wide river waist-deep (you can still wade it). */
+const riverDepth = (w) => RIVER_DEPTH + 0.022 * Math.max(0, w - 2.4);
 const riverCells = new Map(), riverIdx = new Map(), riverRegions = new Set();
 export const rivers = []; // every river worked out so far
 const ikey = (i, j) => (i + 1e5) * 4e5 + (j + 1e5);
@@ -1437,9 +1441,9 @@ function springOf(cx, cz) {
   return best;
 }
 /** Is a spot somewhere a river must not run (see above)? */
-function riverBarred(x, z) {
-  if (Math.hypot(x - HOME.x, z - HOME.z) < RIVER_HOME) return true;
-  if (shrineSiteAt(x, z, PAD_OUT + 8) || siteAt(x, z) || volcanoAt(x, z) || heartAt(x, z, 20)) return true;
+function riverBarred(x, z, hw = 0) {
+  if (Math.hypot(x - HOME.x, z - HOME.z) < RIVER_HOME + hw) return true;
+  if (shrineSiteAt(x, z, PAD_OUT + 8 + hw) || siteAt(x, z, undefined, hw) || volcanoAt(x, z) || heartAt(x, z, 20 + hw)) return true; // (`hw`: half its width, so a wide river keeps its whole breadth off them)
   const L = lakeAt(x, z);
   return !!L.settled && L.t(x, z) < 2.3; // (a settled lake's shore, path and landmarks: kept clear altogether, since where they stand is worked out from the height rivers change)
 }
@@ -1531,14 +1535,14 @@ function traceRiver(cx, cz) {
   const n = X.length, lv = new Float32Array(n), gr = new Float32Array(n), w = new Float32Array(n), S = new Float32Array(n);
   let lvl = Infinity, along = 0;
   for (let i = 0; i < n; i++) {
-    if (riverBarred(X[i], Z[i])) return rfail('barred'); // (every point: a small building's ground could lie between every fourth)
+    if (riverBarred(X[i], Z[i], riverWidth(along) / 2)) return rfail('barred'); // (every point: a small building's ground could lie between every fourth)
     if (i > 0) along += Math.hypot(X[i] - X[i - 1], Z[i] - Z[i - 1]);
     // (below the land in its middle, and below both banks, so the water never stands above the ground beside it)
-    const g = rawHeight(X[i], Z[i]), a = Math.max(0, i - 1), b = Math.min(X.length - 1, i + 1), tx = X[b] - X[a], tz = Z[b] - Z[a], tl = Math.hypot(tx, tz) || 1, hw = (2.4 + 3.4 * smooth(0, 1600, along)) / 2 + 0.6;
+    const g = rawHeight(X[i], Z[i]), a = Math.max(0, i - 1), b = Math.min(X.length - 1, i + 1), tx = X[b] - X[a], tz = Z[b] - Z[a], tl = Math.hypot(tx, tz) || 1, hw = riverWidth(along) / 2 + 0.6;
     const gl = rawHeight(X[i] - tz / tl * hw, Z[i] + tx / tl * hw), gr2 = rawHeight(X[i] + tz / tl * hw, Z[i] - tx / tl * hw);
     lvl = Math.max(0, Math.min(lvl, g - RIVER_SINK, gl - 0.08, gr2 - 0.08));
     if (g - lvl > RIVER_CUT && i < n - 3) return rfail('cut');
-    lv[i] = lvl; gr[i] = g; S[i] = along; w[i] = 2.4 + 3.4 * smooth(0, 1600, along);
+    lv[i] = lvl; gr[i] = g; S[i] = along; w[i] = riverWidth(along);
   }
   // (a spring on a brink: the river begins below the drop, not pouring off the top into the air)
   let s0 = 0;
@@ -1556,14 +1560,15 @@ function finishRiver(cx, cz, src, end, X, Z, lv, gr, w, S) {
   // Waterfalls: where the water runs steeply it goes down in steps, as a stream does over rock: a lip,
   // a fall of up to FALL_H metres, a pool, the next lip. (The pool is cut into the slope below the lip,
   // its banks steeper there.) `fall` marks the stretch that is a fall; `bk` is how steeply the banks rise.
-  const FALL_H = 3.2, seg = (i) => Math.max(0.5, S[i] - S[i - 1]), bk = new Float32Array(n).fill(RIVER_BANK), fall = new Uint8Array(n);
+  // (a wide river falls further in one go: up to 3.2 m from a rill, up to about 10 m from a wide river, so its falls are broad and tall)
+  const FALL_W = (i) => 3.2 + 0.38 * Math.max(0, w[i] - 2.4), seg = (i) => Math.max(0.5, S[i] - S[i - 1]), bk = new Float32Array(n).fill(RIVER_BANK), fall = new Uint8Array(n);
   for (let i = 1; i < n;) {
     if ((lv[i - 1] - lv[i]) / seg(i) <= 0.6) { i++; continue; }
     let b = i;
     while (b < n - 1 && (lv[b] - lv[b + 1]) / seg(b + 1) > 0.3) b++;
     let top = i - 1;
     for (let k = i; k <= b; k++) {
-      if (lv[top] - lv[k] < FALL_H && k < b) continue;
+      if (lv[top] - lv[k] < FALL_W(top) && k < b) continue;
       if (lv[top] - lv[k] > 1.2) { fall[top] = 1; for (let q = top + 1; q <= k; q++) { lv[q] = lv[k]; bk[q] = 0.75; } }
       top = k;
     }
@@ -1655,7 +1660,7 @@ export function riverNear(x, z) {
 /** The ground a river leaves at a spot near it: its bed, below the water, and banks rising from the water's edge (only ever lower than the land). */
 function riverBed(r) {
   const hw = r.w / 2;
-  return r.lv - RIVER_DEPTH * (1 - smooth(hw * 0.55, hw, r.d)) + r.bk * Math.max(0, r.d - hw);
+  return r.lv - riverDepth(r.w) * (1 - smooth(hw * 0.55, hw, r.d)) + r.bk * Math.max(0, r.d - hw);
 }
 /** How much a spot is in a river or on its bank (0 dry land .. 1 in the water), for the ground's look: `bank` metres of wet bank beyond the water. */
 export function riverBank(x, z, bank = 2.5) {

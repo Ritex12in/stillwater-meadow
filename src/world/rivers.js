@@ -310,7 +310,7 @@ function ribbon(r) {
     const mp = [], puff = [];
     let n = 0;
     for (const i of falls) {
-      const drop = r.lv[i] - r.lv[i + 1], count = Math.max(3, Math.min(9, Math.round(2 + drop * 0.5)));
+      const drop = r.lv[i] - r.lv[i + 1], count = Math.max(3, Math.min(14, Math.round(2 + drop * 0.5 + r.w[i] * 0.25))); // (more across a wide fall)
       for (let k = 0; k < count; k++) {
         const j = hash(i * 17 + k, 5 + n++), F = frame(i + 1, 0);
         mp.push(r.x[i + 1] - ox + F.tx * (j * 1.6 - 0.2) - F.tz * (hash(k, i) - 0.5) * r.w[i] * 0.9, r.lv[i + 1] + 0.25, r.z[i + 1] - oz + F.tz * (j * 1.6 - 0.2) + F.tx * (hash(k, i) - 0.5) * r.w[i] * 0.9);

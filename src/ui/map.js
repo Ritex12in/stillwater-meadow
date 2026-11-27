@@ -11,7 +11,7 @@
 // country's own in summer (meadow, lush wood, heath, grove, snow, desert, swamp and the rest), lit
 // from the north-west so the hills stand out, with a faint line every 20 m of height.
 import { clamp, smooth } from '../core/math.js';
-import { sitesNear, WAYSTONE_CELL, rawHeight, seaAt, lakeAt, coldBase, coldAt, rainAt, snowCold, snowOf, dryOf, lushOf, groveAt, biomesAt, aboveTrees, TREE_COLD, ASPECT, riverNear } from '../core/shape.js';
+import { sitesNear, continentsNear, harboursOf, WAYSTONE_CELL, rawHeight, seaAt, lakeAt, coldBase, coldAt, rainAt, snowCold, snowOf, dryOf, lushOf, groveAt, biomesAt, aboveTrees, TREE_COLD, ASPECT, riverNear } from '../core/shape.js';
 import { hooks } from '../core/state.js';
 import { player } from '../characters/player.js';
 import { camState } from '../systems/input.js';
@@ -22,7 +22,7 @@ import { CELL, SPAN, REGION, explored, exploredRegions, isExplored, reveal } fro
 import { KIND_LABEL } from '../features/places.js';
 import { freeTravel } from '../core/env.js';
 import { placeName } from '../world/landmarks.js';
-import { travelPoints, pointFor, travelToPoint, isAwake, tracked, track } from '../features/waypoints.js';
+import { travelPoints, pointFor, travelToPoint, isAwake, tracked, track, harbourKnown } from '../features/waypoints.js';
 
 const $ = (id) => document.getElementById(id);
 const PX = 8, M = CELL / PX, SIDE = SPAN * PX;   // pixels to a cell; metres to a pixel; a region's picture
@@ -141,6 +141,7 @@ const GLYPH = {
   ship: { d: 'M2 10h12l-2 4H4zM7.500 2v7h1V4l3.500 5H8.500' },
   camp: { d: 'M8 3l6 11H9l-1-4-1 4H2z' },
   waystone: { d: 'M5.500 14l1-11.500h3l1 11.500z' },
+  harbour: { d: 'M8 1.5a1.700 1.700 0 1 1 0 3.400a1.700 1.700 0 1 1 0-3.400zM7.200 5.200h1.600v7.300a4 4 0 0 0 3-2.400l-1.300-.600 2.600-1.400.500 2.900-1.100-.500A5.600 5.600 0 0 1 8 14.500a5.600 5.600 0 0 1-4.500-4l-1.100.500.500-2.900 2.600 1.400-1.300.600a4 4 0 0 0 3 2.400z' },
 };
 const paths = {};
 const glyph = (kind) => { const G = GLYPH[kind]; if (!G) return null; return paths[kind] || (paths[kind] = { path: new Path2D(G.d), line: !!G.line }); };
@@ -172,9 +173,11 @@ function loadStones(ms) {
   if (!cssW) return false;
   const q = stoneSquares(), todo = [];
   for (let cz = q.z0; cz <= q.z1; cz++) for (let cx = q.x0; cx <= q.x1; cx++) if (!stoneCells.has(cx + ',' + cz)) todo.push([cx, cz, Math.hypot((cx + 0.5) * WAYSTONE_CELL - view.x, (cz + 0.5) * WAYSTONE_CELL - view.z)]);
+  // (and the harbours of the continents in view: a continent's are worked out once, a few at a time)
+  const t0 = performance.now();
+  for (const c of continentsNear(view.x, view.z, viewReach())) if (!c.harbours) { harboursOf(c); dirty = true; if (performance.now() - t0 > ms) return true; }
   if (!todo.length) return false;
   todo.sort((p, r) => p[2] - r[2]);
-  const t0 = performance.now();
   for (const [cx, cz] of todo) {
     // (a stone stands in the middle half of its square: this reach takes in that square's and no other's)
     const st = sitesNear((cx + 0.5) * WAYSTONE_CELL, (cz + 0.5) * WAYSTONE_CELL, WAYSTONE_CELL * 0.36, 'waystone')[0];
@@ -183,10 +186,13 @@ function loadStones(ms) {
   }
   return true;
 }
-/** The places to mark: those you have found (your camp where it stands now), and the waystones in view: awake (`awake`) or asleep. */
+/** How far from the map's middle its corners are (m). */
+const viewReach = () => Math.hypot(cssW, cssH) / 2 / view.scale + 100;
+/** The places to mark: those you have found (your camp where it stands now), and the waystones and harbours in view: awake (`awake`: a harbour you have been to) or not. */
 function places() {
   const out = [], stones = new Map(stonesInView().map((st) => [st.id, st]));
-  for (const p of travelPoints()) if (p.kind === 'waystone') { stones.delete(p.id); out.push({ id: p.id, kind: 'waystone', name: p.name, x: p.x, z: p.z, awake: true }); }
+  for (const c of continentsNear(view.x, view.z, viewReach())) if (c.harbours) for (const h of c.harbours) stones.set(h.id, { id: h.id, kind: 'harbour', name: h.name, x: h.x, z: h.z });
+  for (const p of travelPoints()) if (p.kind === 'waystone' || p.kind === 'harbour') { stones.delete(p.id); out.push({ id: p.id, kind: p.kind, name: p.name, x: p.x, z: p.z, awake: true }); }
   for (const s of stones.values()) if (!isAwake(s.id)) out.push(Object.assign({ awake: false }, s));
   for (const f of store.found || []) {
     if (f.id === 'camp') { if (store.camp) out.push({ id: f.id, kind: 'camp', name: f.name, x: store.camp.x, z: store.camp.z }); continue; }
@@ -241,7 +247,7 @@ function draw() {
   marks = [];
   ctx.textAlign = 'center'; ctx.lineJoin = 'round';
   for (const m of list) {
-    const f = m.f, lake = f.kind === 'lake', G = glyph(f.kind), on = picked(f), stone = f.kind === 'waystone', ink = stone ? (f.awake ? '#9fe9ff' : 'rgba(247, 244, 236, 0.5)') : '#f7f4ec';
+    const f = m.f, lake = f.kind === 'lake', G = glyph(f.kind), on = picked(f), stone = f.kind === 'waystone' || f.kind === 'harbour', ink = stone ? (f.awake ? '#9fe9ff' : 'rgba(247, 244, 236, 0.5)') : '#f7f4ec';
     if (!lake) {
       if (stone && f.awake) { const halo = ctx.createRadialGradient(m.x, m.y, 4, m.x, m.y, 22); halo.addColorStop(0, 'rgba(127, 227, 255, 0.55)'); halo.addColorStop(1, 'rgba(127, 227, 255, 0)'); ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(m.x, m.y, 22, 0, 7); ctx.fill(); }
       ctx.beginPath(); ctx.arc(m.x, m.y, on ? 11 : 9.5, 0, 7);
@@ -322,16 +328,17 @@ function zoomBy(k, x = cssW / 2, y = cssH / 2) {
 }
 function say() {
   const sum = $('mapSummary'), km2 = (explored.cells * CELL * CELL) / 1e6, n = (store.found || []).length;
-  const stones = travelPoints().filter((p) => p.kind === 'waystone').length;
-  sum.textContent = `${km2 < 10 ? km2.toFixed(1) : Math.round(km2)} km² explored · ${n} ${n === 1 ? 'place' : 'places'} · ${stones} ${stones === 1 ? 'waystone' : 'waystones'} awake`;
+  const stones = travelPoints().filter((p) => p.kind === 'waystone').length, ports = travelPoints().filter((p) => p.kind === 'harbour').length;
+  sum.textContent = `${km2 < 10 ? km2.toFixed(1) : Math.round(km2)} km² explored · ${n} ${n === 1 ? 'place' : 'places'} · ${stones} ${stones === 1 ? 'waystone' : 'waystones'} awake${ports ? ` · ${ports} ${ports === 1 ? 'harbour' : 'harbours'}` : ''}`;
   const place = $('mapPlace'), go = $('mapGo'), tr = $('mapTrack'), T = tracked();
   if (chosen) {
     const far = Math.hypot(chosen.x - player.x, chosen.z - player.z), b1 = document.createElement('b');
     b1.textContent = chosen.name;
-    const asleep = chosen.kind === 'waystone' && !isAwake(chosen.id);
-    place.replaceChildren(b1, ` · ${chosen.kind === 'waystone' ? (asleep ? 'Waystone, asleep' : 'Waystone') : KIND_LABEL[chosen.kind] || chosen.kind} · ${far < 60 ? 'you are here' : farText(far) + ' to the ' + wayTo(chosen.x - player.x, chosen.z - player.z)}${asleep ? ' · track it and walk there to wake it' : ''}`);
-  } else place.textContent = T ? `Tracking ${T.name}: follow the marker. Choose another waystone to track it instead.` : 'Drag to move the map, scroll to zoom. Choose a waystone to track it; a woken one, home or your camp to travel there.';
-  tr.hidden = !chosen || chosen.kind !== 'waystone'; // (waystones are what you track)
+    const port = chosen.kind === 'harbour', asleep = (chosen.kind === 'waystone' && !isAwake(chosen.id)) || (port && !harbourKnown(chosen.id));
+    const what = chosen.kind === 'waystone' ? (asleep ? 'Waystone, asleep' : 'Waystone') : port ? (asleep ? 'Harbour, not yet visited' : 'Harbour') : KIND_LABEL[chosen.kind] || chosen.kind;
+    place.replaceChildren(b1, ` · ${what} · ${far < 60 ? 'you are here' : farText(far) + ' to the ' + wayTo(chosen.x - player.x, chosen.z - player.z)}${asleep ? (port ? ' · track it and walk there, or take a passage to it from a harbour facing it' : ' · track it and walk there to wake it') : ''}`);
+  } else place.textContent = T ? `Tracking ${T.name}: follow the marker. Choose another waystone or harbour to track it instead.` : 'Drag to move the map, scroll to zoom. Choose a waystone or a harbour to track it; a woken stone, a harbour you have been to, home or your camp to travel there.';
+  tr.hidden = !chosen || (chosen.kind !== 'waystone' && chosen.kind !== 'harbour'); // (waystones and harbours are what you track)
   tr.textContent = chosen && T && T.id === chosen.id ? 'Stop tracking' : 'Track';
   go.hidden = !chosen || !(freeTravel || pointFor(chosen.id));
 }

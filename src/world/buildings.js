@@ -314,3 +314,45 @@ export function skyIsles(variant = 0) {
   k.add(M.updraft, new THREE.CylinderGeometry(2, 2, 14, 16, 1, true).translate(0, 7, 0), false);
   return { group: k.build(), radius: 60, height: isles[0].y, top: { x: 0, z: 0, y: isles[0].y, r: isles[0].r - 1.2 } };
 }
+
+/**
+ * A harbour (features/harbours.js): a plank jetty on posts running out to sea from the shore, a
+ * lantern at its end (lit at dusk), a little sailing boat moored alongside with its sail furled, and
+ * crates, barrels and a signboard where it meets the land. Local +z runs out to sea; the deck stands
+ * 1.4 m above the water (the group sits at the sea's level).
+ */
+export function harbour(variant = 0) {
+  const R = mulberry32(9900 + variant * 61), m = buildingMats(), k = new Kit();
+  const L = 15 + R() * 4, deck = 1.4, W = 2.4;
+  // the deck: planks across, a little apart, each a shade off straight
+  for (let z = -2; z < L; z += 0.8) k.add(R() < 0.5 ? m.wood : m.darkWood, box(W, 0.12, 0.72, 0, deck - 0.12, z + 0.36).rotateY((R() - 0.5) * 0.03));
+  for (const sx of [-1, 1]) k.add(m.darkWood, box(0.18, 0.2, L + 2, sx * (W / 2 - 0.15), deck - 0.32, L / 2 - 1)); // (the beams under it)
+  // the posts, down into the sea bed; taller ones at the end
+  for (let z = 1; z < L + 0.1; z += 3.2) for (const sx of [-1, 1]) k.add(m.darkWood, cyl(0.15, 0.13, deck + 4.6 + (z > L - 3 ? 0.7 : 0), 6, sx * (W / 2 + 0.05), -4.5, Math.min(z, L - 0.2)));
+  // a rope along each side at the far end
+  if (!M.rope) M.rope = weatherize(std('#c9b48a', { flatShading: true }), 'std');
+  for (const sx of [-1, 1]) k.add(M.rope, new THREE.CylinderGeometry(0.03, 0.03, 6.4, 4).rotateX(Math.PI / 2).translate(sx * (W / 2 + 0.05), deck + 0.6, L - 3.4), false);
+  // the lantern at the end: a post, an arm and a lamp with glass that lights at dusk
+  k.add(m.darkWood, box(0.16, 3.0, 0.16, W / 2 - 0.2, deck, L - 0.3));
+  k.add(m.darkWood, box(0.7, 0.1, 0.1, W / 2 - 0.45, deck + 2.9, L - 0.3));
+  k.add(m.glass, box(0.34, 0.42, 0.34, W / 2 - 0.75, deck + 2.42, L - 0.3), false);
+  k.add(m.darkStone, cone(0.3, 0.22, 4, W / 2 - 0.75, deck + 2.84, L - 0.3).rotateY(0));
+  // the boat, moored alongside: a hull that narrows to its bow, a thwart, a mast, its sail furled on the boom
+  const bx = -(W / 2 + 1.3), bz = L * 0.55, hullLen = 4.4 + R() * 0.8, paint = [m.red, m.tealRoof, m.slate][variant % 3];
+  const hull = new THREE.CylinderGeometry(0.85, 0.55, hullLen, 8, 1, true).rotateX(Math.PI / 2).scale(1, 0.62, 1);
+  k.add(m.wood, hull.clone().translate(bx, 0.32, bz));
+  k.add(paint, new THREE.CylinderGeometry(0.88, 0.58, hullLen * 0.98, 8, 1, true).rotateX(Math.PI / 2).scale(1, 0.2, 1).translate(bx, 0.52, bz));
+  k.add(m.wood, cone(0.62, 1.1, 8, 0, 0, 0).rotateX(Math.PI / 2).scale(1, 0.62, 1).translate(bx, 0.32, bz + hullLen / 2 + 0.55));
+  k.add(m.darkWood, box(1.3, 0.08, 0.3, bx, 0.45, bz - 0.4));
+  k.add(m.darkWood, cyl(0.06, 0.05, 5.4, 5, bx, 0.3, bz + 0.6));
+  k.add(m.darkWood, new THREE.CylinderGeometry(0.04, 0.04, 2.6, 5).rotateX(Math.PI / 2).translate(bx, 1.5, bz - 0.6));
+  k.add(m.cloth, new THREE.CylinderGeometry(0.16, 0.12, 2.3, 6).rotateX(Math.PI / 2).translate(bx, 1.68, bz - 0.6));
+  k.add(M.rope, new THREE.CylinderGeometry(0.025, 0.025, 1.5, 4).rotateZ(Math.PI / 2 - 0.35).translate(bx + 0.75, 0.95, bz + 1.8), false);
+  // on the shore: crates and barrels, and a signboard on a post
+  k.add(m.wood, box(0.8, 0.8, 0.8, 1.9, -0.4, -1.6).rotateY(0.1));
+  k.add(m.darkWood, box(0.6, 0.6, 0.6, 2.0, 0.4, -1.55));
+  for (const [x, z] of [[2.9, -0.8], [2.6, -2.5]]) { k.add(m.darkWood, cyl(0.32, 0.36, 0.95, 9, x, -0.3, z)); k.add(m.wood, cyl(0.37, 0.37, 0.08, 9, x, 0.25, z)); }
+  k.add(m.darkWood, box(0.12, 2.6, 0.12, -1.9, -0.6, -1.4));
+  k.add(m.wood, box(1.2, 0.5, 0.08, -1.9, 1.35, -1.36));
+  return { group: k.build(), radius: L + 2, height: deck + 3 };
+}

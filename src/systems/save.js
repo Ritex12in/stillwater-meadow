@@ -79,7 +79,7 @@ export function seedOf(v) {
 /** A new world's seed, at random (never 1, the first world). */
 export const randomSeed = () => 2 + Math.floor(Math.random() * (MAX_SEED - 1));
 /** What belongs to one world rather than to you. */
-const WORLD_KEYS = ['gen', 'where', 'places', 'anchor', 'benchBouquet', 'boatBouquet', 'camp', 'lanterns', 'found', 'explored', 'waypoints', 'track'];
+const WORLD_KEYS = ['gen', 'where', 'places', 'anchor', 'benchBouquet', 'boatBouquet', 'camp', 'lanterns', 'found', 'explored', 'waypoints', 'track', 'harbours'];
 /**
  * The world this visit is in. The address wins; then the world last played; a save from before
  * worlds had numbers was world 1; someone new gets a world of their own, at random (never 1).
@@ -105,7 +105,7 @@ function chooseWorld() {
  * How the land is made, numbered: it goes up when the same seed would give different land (2: the
  * climate by latitude; 3: continents and islands). A world last visited under an older number has changed beyond the ground
  * round home, so what pointed at its land is cleared once: where you stood, the places found, the
- * explored map, the waystones woken, what was tracked, the camp and the lanterns (which go back in
+ * explored map, the waystones woken, the harbours visited, what was tracked, the camp and the lanterns (which go back in
  * the backpack: features/camp.js). What you carry, your journals, pets and settings are kept.
  */
 export const WORLD_GEN = 3;
@@ -113,9 +113,9 @@ export const WORLD_GEN = 3;
 export let landChanged = false;
 function checkLand() {
   if (store.gen === WORLD_GEN) return;
-  const had = (store.found && store.found.length > 1) || (store.waypoints && store.waypoints.length) || store.camp || (store.lanterns && store.lanterns.length) || (store.explored && Object.keys(store.explored).length > 1);
+  const had = (store.found && store.found.length > 1) || (store.waypoints && store.waypoints.length) || (store.harbours && store.harbours.length) || store.camp || (store.lanterns && store.lanterns.length) || (store.explored && Object.keys(store.explored).length > 1);
   if (store.lanterns && store.lanterns.length) store.lanternsBack = (store.lanternsBack || 0) + store.lanterns.length;
-  for (const k of ['where', 'found', 'explored', 'waypoints', 'track', 'camp', 'lanterns']) delete store[k];
+  for (const k of ['where', 'found', 'explored', 'waypoints', 'track', 'harbours', 'camp', 'lanterns']) delete store[k];
   landChanged = !!had;
   store.gen = WORLD_GEN;
 }

@@ -387,6 +387,108 @@ export function seaAt(x, z) {
 }
 /** The continent a spot belongs to (or the one whose shore it is off): { name, x, z, R, cx, cz }. */
 export function continentAt(x, z) { continentField(x, z); return lsC; }
+/** Is a spot on a continent's own land (not an island off it)? */
+export const onContinent = (x, z) => continentField(x, z) >= -0.01;
+
+// ── Harbours and passages ──────────────────────────────────────
+// (features/harbours.js.) Neighbouring continents are joined by passages: a skipper at a harbour on
+// one sails you to the harbour facing it on the other. Continents are neighbours when their squares
+// touch (six about each, the rows being pushed half along), or two squares off when either has fewer
+// than two that touch, so the joins always go both ways and every continent can be reached. Each
+// continent has a harbour on its coast facing each neighbour (two that would stand within 1200 m are
+// one); a harbour stands at the shore's edge on low dry ground, its jetty running out to sea.
+const HARBOUR_MERGE = 1200;
+/** The continents whose squares touch this one's (unjittered middles about one square apart). */
+function touching(c) {
+  if (c.touch) return c.touch;
+  c.touch = [];
+  const rx = (cx, cz) => cx + (cz & 1 ? 0.5 : 0);
+  for (let j = -1; j <= 1; j++) for (let i = -2; i <= 2; i++) { const cz = c.cz + j, cx = c.cx + i, d = Math.hypot(rx(cx, cz) - rx(c.cx, c.cz), j); if (d > 0 && d < 1.2) { const o = contCell(cx, cz); if (o) c.touch.push(o); } }
+  return c.touch;
+}
+/** The continents joined to this one by passages. */
+function linked(c) {
+  if (c.links) return c.links;
+  const out = touching(c).slice(), rx = (cx, cz) => cx + (cz & 1 ? 0.5 : 0);
+  for (let j = -2; j <= 2; j++) for (let i = -3; i <= 3; i++) {
+    const cz = c.cz + j, cx = c.cx + i, d = Math.hypot(rx(cx, cz) - rx(c.cx, c.cz), j);
+    if (d < 1.2 || d > 2.05) continue;
+    const o = contCell(cx, cz);
+    if (o && (touching(c).length < 2 || touching(o).length < 2)) out.push(o);
+  }
+  return (c.links = out);
+}
+/** The foot of a harbour on a continent's coast along a bearing from its middle (or null where the coast will not take one). */
+function coastFoot(c, a) {
+  const dx = Math.cos(a), dz = Math.sin(a), max = c.R * c.s * 2.6 + 1500;
+  let land = false, r = 0;
+  for (; r < max; r += 30) {
+    const x = c.x + dx * r, z = c.z + dz * r, s = seaAt(x, z);
+    if (!land) { if (s === 0 && rawHeight(x, z) > 0.6) land = true; continue; }
+    if (s > 0.15 && rawHeight(x, z) < -1.5) break;
+  }
+  if (!land || r >= max) return null;
+  for (let b = r; b > r - 240; b -= 2) {
+    const x = c.x + dx * b, z = c.z + dz * b, h = rawHeight(x, z);
+    if (h < 0.6) continue;
+    if (h > 2.6 || rawHeight(x - dx * 5, z - dz * 5) > h + 2.5) return null; // (no cliff: low ground, rising gently behind)
+    if (continentAt(x, z) !== c || lakeAt(x, z).t(x, z) < 2.5 || riverHere(x, z) || sitesNear(x, z, 60).length) return null;
+    return { x, z, dx, dz };
+  }
+  return null;
+}
+const COMPASS = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West'];
+/** A continent's harbours, each facing the neighbours it serves: `{ id, kind: 'harbour', name, x, z, y, turn, ax, az, cont, serves }`. */
+export function harboursOf(c) {
+  if (c.harbours) return c.harbours;
+  const list = [], toward = new Map(), ns = linked(c).slice().sort((p, q) => Math.atan2(p.z - c.z, p.x - c.x) - Math.atan2(q.z - c.z, q.x - c.x));
+  for (const o of ns) {
+    const a0 = Math.atan2(o.z - c.z, o.x - c.x);
+    let foot = null;
+    for (const off of [0, 15, -15, 30, -30, 45, -45, 60, -60]) if ((foot = coastFoot(c, a0 + off * Math.PI / 180))) break;
+    let h = foot && list.find((q) => Math.hypot(q.x - foot.x, q.z - foot.z) < HARBOUR_MERGE);
+    if (foot && !h) {
+      const k = list.length, turn = Math.atan2(foot.dx, foot.dz);
+      h = { id: `harbour:${c.cx}:${c.cz}:${k}`, kind: 'harbour', name: `${c.name} ${COMPASS[Math.round(((Math.atan2(foot.dx, -foot.dz) * 180 / Math.PI) + 360) / 45) % 8]} Harbour`, x: foot.x, z: foot.z, y: 0, turn, variant: k, flat: 0, out: 0, ax: foot.x - foot.dx * 3, az: foot.z - foot.dz * 3, cont: c, serves: [] };
+      list.push(h);
+    }
+    if (h) { h.serves.push(o); toward.set(o, h); }
+  }
+  // a neighbour whose bearing found no coast: served by the nearest harbour there is
+  for (const o of ns) if (!toward.has(o) && list.length) { const h = list.reduce((p, q) => (Math.hypot(q.x - o.x, q.z - o.z) < Math.hypot(p.x - o.x, p.z - o.z) ? q : p)); h.serves.push(o); toward.set(o, h); }
+  // a continent whose every bearing failed: any foothold round its coast
+  if (!list.length) for (let k = 0; k < 24 && !list.length; k++) { const f = coastFoot(c, (k / 24) * TAU); if (f) { const h = { id: `harbour:${c.cx}:${c.cz}:0`, kind: 'harbour', name: `${c.name} Harbour`, x: f.x, z: f.z, y: 0, turn: Math.atan2(f.dx, f.dz), variant: 0, flat: 0, out: 0, ax: f.x - f.dx * 3, az: f.z - f.dz * 3, cont: c, serves: ns.slice() }; list.push(h); for (const o of ns) toward.set(o, h); } }
+  c.toward = toward;
+  return (c.harbours = list);
+}
+/** Where a passage from a harbour goes: the harbours facing it on the continents it serves. */
+export function passagesFrom(h) {
+  const out = [];
+  for (const o of h.serves) { harboursOf(o); const t = o.toward.get(h.cont); if (t) out.push(t); }
+  return out;
+}
+/** The continents whose coasts may come within `r` metres of a spot (`c.harbours` is set once worked out: harboursOf). */
+export function continentsNear(x, z, r) {
+  const out = [], reach = r + CONTINENT_CELL * 1.2, z0 = Math.floor((z - reach - HOME.z) / CONTINENT_CELL + 0.5), z1 = Math.floor((z + reach - HOME.z) / CONTINENT_CELL + 0.5);
+  for (let cz = z0; cz <= z1; cz++) {
+    const row = cz & 1 ? 0.5 : 0, x0 = Math.floor((x - reach - HOME.x) / CONTINENT_CELL + 0.5 - row), x1 = Math.floor((x + reach - HOME.x) / CONTINENT_CELL + 0.5 - row);
+    for (let cx = x0; cx <= x1; cx++) { const c = contCell(cx, cz); if (c) out.push(c); }
+  }
+  return out;
+}
+/** Every harbour within `r` metres of a spot, nearest first. */
+export function harboursNear(x, z, r) {
+  const out = [];
+  for (const c of continentsNear(x, z, r)) for (const h of harboursOf(c)) if (Math.hypot(h.x - x, h.z - z) < r) out.push(h);
+  return out.sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
+}
+/** The harbour with this id (ids name their continent's square), or null. */
+export function harbourById(id) {
+  const m = /^harbour:(-?\d+):(-?\d+):\d+$/.exec(id || '');
+  if (!m) return null;
+  const c = contCell(+m[1], +m[2]);
+  return c ? harboursOf(c).find((h) => h.id === id) || null : null;
+}
 /** How much a spot is in the mountains (0 none .. 1 the heart of a range). */
 export function rangeAt(x, z) { return smooth(0.5, 0.72, fbm((x + SX * 31) * 0.0014 + 41.3, (z + SZ * 31) * 0.0014 - 17.9)); }
 let shaped = false; // (did the last rawHeight() land on a lake's own shaped ground: its bowl, shore and path?)
@@ -883,9 +985,10 @@ const SITE_KINDS = {
   // by the sea: a hut on stilts on the beach, and ships riding at anchor offshore (on the water, no levelled ground)
   beachhut: { cell: 700, flat: 5, out: 9, salt: 0xBEAC4, tries: 14, chance: 0.6, rule: (x, z, h) => h > 1.2 && h < 4.5 && seaAt(x, z) > 0.03 && snowOf(coldAt(x, z, h)) < 0.3 },
   ship: { cell: 1500, flat: 0, out: 0, ship: true, salt: 0x5419, tries: 12, chance: 0.7, rule: (x, z, h) => h < -6 && seaAt(x, z) > 0.5 },
-  // a waystone (features/waypoints.js): a standing stone to travel to, one to a square in every kind of country, on
+  // a waystone (features/waypoints.js): a standing stone to travel to, one to a square in every kind of country (on a
+  // continent's own land: nothing sails to the islands yet), on
   // fairly level dry ground clear of water, rivers and the other buildings (no levelled ground: it changes nothing of the land)
-  waystone: { cell: WAYSTONE_CELL, flat: 0, out: 0, salt: 0x3A75, tries: 48, rule: (x, z, h) => h > 1.5 && h < 220 && seaAt(x, z) < 0.02 && reliefAt(x, z, h) < 5 && !otherSiteNear(x, z, 70) && !riverHere(x, z) },
+  waystone: { cell: WAYSTONE_CELL, flat: 0, out: 0, salt: 0x3A75, tries: 48, rule: (x, z, h) => h > 1.5 && h < 220 && seaAt(x, z) < 0.02 && onContinent(x, z) && reliefAt(x, z, h) < 5 && !otherSiteNear(x, z, 70) && !riverHere(x, z) },
   skyisle: { cell: 1900, flat: 6, out: 11, salt: 0x5C15, tries: 12, rule: (x, z, h) => h > 4 && h < 90 && wonderAt(x, z).a > 0.3 && rangeAt(x, z) < 0.45 },
 };
 /** The volcano's cone: how much it raises the land (m) at a distance `r` from its middle; a crater at the top. */

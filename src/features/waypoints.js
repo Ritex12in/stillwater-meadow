@@ -23,17 +23,22 @@ import { placeName, setWaystoneAwake } from '../world/landmarks.js';
 
 const WAKE_REACH = 4.5, FADE_MS = 380;
 const woken = () => (Array.isArray(store.waypoints) ? store.waypoints : (store.waypoints = []));
-/** Is the waystone at this site awake? */
-export const isAwake = (siteId) => woken().some((w) => w.id === siteId);
+/** The harbours you have been to (features/harbours.js): `{ id, name, x, z, ax, az }`. */
+export const knownHarbours = () => (Array.isArray(store.harbours) ? store.harbours : (store.harbours = []));
+/** Have you been to this harbour? */
+export const harbourKnown = (id) => knownHarbours().some((h) => h.id === id);
+/** Is the waystone at this site awake (or the harbour one you have been to)? */
+export const isAwake = (siteId) => (/^harbour:/.test(siteId) ? harbourKnown(siteId) : woken().some((w) => w.id === siteId));
 
 /**
- * The points you can travel to: `{ id, kind ('home' | 'camp' | 'waystone'), name, x, z, ax, az }`
+ * The points you can travel to: `{ id, kind ('home' | 'camp' | 'waystone' | 'harbour'), name, x, z, ax, az }`
  * (`ax`, `az`: where you arrive, beside it and facing it).
  */
 export function travelPoints() {
   const out = [{ id: 'home', kind: 'home', name: HOME.name, x: HOME.x, z: HOME.z, ax: SPAWN.x, az: SPAWN.z }];
   if (store.camp) out.push({ id: 'camp', kind: 'camp', name: 'Your camp', x: store.camp.x, z: store.camp.z, ax: store.camp.x + 2.5, az: store.camp.z + 1.5 });
   for (const w of woken()) out.push({ id: w.id, kind: 'waystone', name: w.name, x: w.x, z: w.z, ax: w.x, az: w.z + 2.6 });
+  for (const h of knownHarbours()) out.push({ id: h.id, kind: 'harbour', name: h.name, x: h.x, z: h.z, ax: h.ax, az: h.az });
   return out;
 }
 /** The point a place found (features/places.js) or a mark on the map stands for, if you can travel to it. */
@@ -63,7 +68,7 @@ function chime(base = 392) {
 }
 
 let goTo = null, busy = false;
-/** Travel to a point (from `travelPoints`): the view fades out, you are there, it fades in. */
+/** Travel to a point (from `travelPoints`): the view fades out, you are there, it fades in. (`p.say`: what is said on arriving; `p.ms`: how long the view stays dark.) */
 export function travelToPoint(p) {
   if (!p || busy || !goTo) return false;
   if (!activity.free) { toast('Finish what you are doing first.', 2.5); return false; }
@@ -74,7 +79,7 @@ export function travelToPoint(p) {
       togglePanel('mapPanel', false);
       goTo(p.ax, p.az, p.x, p.z);
       chime(523);
-      toast(p.kind === 'home' ? `${p.name} · home` : p.name, 3);
+      toast(p.say || (p.kind === 'home' ? `${p.name} · home` : p.name), p.say ? 5 : 3);
     } finally { // (whatever happens, the view comes back)
       if (fade) fade.classList.remove('on');
       busy = false;
@@ -82,7 +87,7 @@ export function travelToPoint(p) {
   };
   if (reduceMotion || !fade) { arrive(); return true; }
   fade.classList.add('on');
-  setTimeout(arrive, FADE_MS);
+  setTimeout(arrive, p.ms || FADE_MS);
   return true;
 }
 

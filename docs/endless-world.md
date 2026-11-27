@@ -109,7 +109,7 @@ Each one leaves the game playable and tested.
 | M | **A map** (asked for by the owner, 2026-11-26): a screen opened with M showing the land you have explored, filling in as you walk, with the places you have found marked. | Explored land is kept per world; nothing unfound is marked (`tests/map.spec.js`). | done (see "How the map works"); its look is for the owner to judge |
 | T | **Teleport points** (asked for by the owner, 2026-11-27; the owner took our picks): waystones, standing stones you wake and then travel to from the map; the lists that took you anywhere at once are gone from play. | Stones are fixed by the seed and change nothing of the land; a woken stone stays woken per world (`tests/map.spec.js`). | done (see "How travelling works"); the stone's look is for the owner to judge |
 | L | **Seasons by latitude** (planned 2026-11-27, not started; see "Plan: seasons by latitude"). The endless world in lands 12 km north to south, each pole, equator, pole; the kind of year a place has follows its latitude, and the two halves of a land are half a year apart. | Pictures agreed by the owner before the build; every kind of country still findable; one full run of the suite; speed checked on the owner's computer. | built 2026-11-28 (see "How seasons by latitude work"); speed on the owner's computer not yet checked |
-| W | **A world worth looking at** (planned 2026-11-28; see "Plan: a world with places in it"). Oceans, continents and islands; regions each with a heart, a composed place like Stillwater Meadow; each biome's own look after the owner's six pictures; rivers that grow and real waterfalls. | Pictures agreed by the owner before each change to the land; all the changes to the land shipped as one. | begun: the waterfall's look; continents and islands in the land (no crossing yet) |
+| W | **A world worth looking at** (planned 2026-11-28; see "Plan: a world with places in it"). Oceans, continents and islands; regions each with a heart, a composed place like Stillwater Meadow; each biome's own look after the owner's six pictures; rivers that grow and real waterfalls. | Pictures agreed by the owner before each change to the land; all the changes to the land shipped as one. | begun: the waterfall's look; continents and islands; harbours and passages |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
@@ -989,10 +989,38 @@ before have their discoveries cleared once more.
   continent 43 to 46 km2 (about 7 km across); the others mostly 16 to 58 km2, 5 to 17 hearts each;
   about 10 km2 of islands in each 30 km square and 150 to 170 scraps of land under 2 km2.
   In the game: `coast-0.png` to `coast-3.png` (`tools/coast-view.mjs`).
-- **Not yet.** No way to cross the sea: waystones on other continents show on the map and can
-  be tracked but not reached (harbours and passages are next, and must come before this goes to
-  the live site). No pack ice on the sea toward the poles (the sea's sheet never freezes; far off,
+- **Not yet.** (Crossing the sea: see "Harbours and passages" below.) No pack ice on the sea toward the poles (the sea's sheet never freezes; far off,
   the painted sea does). The regions' hearts are still only in the picture.
+
+### Harbours and passages (built 2026-11-28, on "go with your picks")
+
+The second step: a way across the sea (`core/shape.js` harboursOf, passagesFrom; `features/harbours.js`;
+`world/buildings.js` harbour).
+
+- **Which continents are joined.** Those whose squares touch (six about each), and two squares off
+  where either has fewer than two that touch. The rule looks the same from both ends, so every
+  passage goes both ways; in seeds 1, 7 and 42 every continent within two squares of home has a
+  harbour and can be reached from home's (`tools/world-map.mjs` prints both counts, and draws the
+  harbours and passages).
+- **Where a harbour stands.** On the coast facing each neighbour: along the bearing from the
+  continent's middle to the neighbour's (or up to 60 degrees off it) to the first open sea, then
+  back to the shore's edge, on low dry ground (0.6 to 2.6 m, not under a cliff), on the
+  continent's own land, clear of lakes, rivers and every building by 60 m. Two that would stand
+  within 1200 m are one. Three to six a continent. Named by continent and side ("Thistlemoor East
+  Harbour").
+- **Its look.** A plank jetty on posts out to sea, a lantern at the end (lit at dusk), a little
+  sailing boat moored alongside, crates, barrels and a signboard on the shore
+  (`harbour-day.png`, `harbour-dusk.png`; an art decision for the owner).
+- **Using it.** Coming within 16 m notes it (and says where the skipper sails). At the jetty, E:
+  "Take a passage" lists the harbours facing it across the sea. **This changes the plan** (which said
+  "another you know of"): the skipper sails to the facing harbour whether or not you have been
+  there, or no one could ever reach a new continent. Sailing fades the view out for 1.5 s and you
+  stand at the far harbour; the sailing itself is not shown yet. A harbour you have been to is a
+  point you travel to from the map, as a woken waystone is; one not yet visited is marked and can be
+  tracked. Kept per world (`store.harbours`), cleared with the rest for a world from before the land
+  changed.
+- **Waystones** now stand only on a continent's own land (`onContinent`), not on the islands, which
+  nothing sails to yet.
 
 ### Decisions not yet answered by the owner
 

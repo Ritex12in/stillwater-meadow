@@ -217,3 +217,53 @@ test('waystones: one to a stretch of country, on the map from the start; track o
   expect(again.key).toBe(land.key);
   noErrors(errors);
 });
+
+test('harbours: one on each continent facing each neighbour; coming to one notes it; the skipper sails you over to the harbour facing it, visited or not; harbours you have been to are points to travel to', async ({ page }) => {
+  const errors = await open(page, 'weather=clear');
+  await step(page, 1);
+  const v0 = await page.evaluate(() => window.__meadow.harbours);
+  expect(v0.near.length, 'harbours on the coasts about home').toBeGreaterThan(2);
+  expect(v0.known).toEqual([]);
+  const h = v0.near[0];
+  expect(h.name).toMatch(/ Harbour$/);
+  expect(v0.passages.length, 'the nearest sails somewhere').toBeGreaterThan(0);
+  expect(v0.passages.every((t) => t.cont !== h.cont), 'to another continent').toBe(true);
+  // the map marks harbours you have not been to (they can be tracked, not travelled to)
+  await page.keyboard.press('KeyM');
+  await step(page, 0.2);
+  await page.evaluate(() => { for (let i = 0; i < 6; i++) document.getElementById('mapOut').click(); window.__meadow.map.settle(); }); // (out far enough to take in the coast)
+  const mk = (await state(page)).marks.find((k) => k.id === h.id);
+  expect(mk && mk.kind, 'marked on the map').toBe('harbour');
+  expect(mk.awake).toBe(false);
+  await page.keyboard.press('Escape');
+
+  // come to it: it is noted, and the skipper says where he sails
+  await page.evaluate((h) => { window.__meadow.travelTo(h.ax, h.az, h.x, h.z); }, h);
+  await step(page, 1.2);
+  expect((await page.evaluate(() => window.__meadow.harbours.known)).map((k) => k.id)).toEqual([h.id]);
+  expect(await toastText(page)).toContain('skipper');
+  expect((await actions(page)).map((a) => a.id)).toContain('harbour-sail');
+  await press(page, 'KeyE', 0.3);
+  await expect(page.locator('#harbourPanel')).toBeVisible();
+  await expect(page.locator('#harbourTitle')).toHaveText(h.name);
+  const to = v0.passages[0];
+  await expect(page.locator(`#harbourList button[data-harbour="${to.id}"]`)).toBeVisible();
+  await expect(page.locator('#harbourList')).toContainText('not yet visited');
+  // sail: the panel closes, the view fades, you stand at the far harbour, on another continent
+  await page.locator(`#harbourList button[data-harbour="${to.id}"]`).evaluate((el) => el.click());
+  await expect(page.locator('#harbourPanel')).toBeHidden();
+  await page.waitForTimeout(2200); // (the view stays dark while you sail)
+  await step(page, 1);
+  const there = await page.evaluate((to) => { const m = window.__meadow; return { far: Math.hypot(m.player.x - to.x, m.player.z - to.z), known: m.harbours.known.map((k) => k.id), points: m.waypoints.points.filter((p) => p.kind === 'harbour').map((p) => p.id), busy: m.waypoints.busy }; }, to);
+  expect(there.far, 'by the far harbour').toBeLessThan(8);
+  expect(there.busy).toBe(false);
+  expect(there.known.sort()).toEqual([h.id, to.id].sort());
+  expect(there.points.sort(), 'both are points to travel to').toEqual([h.id, to.id].sort());
+  expect(await toastText(page)).toContain('sail across the sea');
+  // and back, from the map's travel points
+  await page.evaluate((id) => { const m = window.__meadow; m.travelToPoint(m.waypoints.points.find((p) => p.id === id)); }, h.id);
+  await page.waitForTimeout(800);
+  await step(page, 0.5);
+  expect(await page.evaluate((h) => Math.hypot(window.__meadow.player.x - h.x, window.__meadow.player.z - h.z), h)).toBeLessThan(8);
+  noErrors(errors);
+});

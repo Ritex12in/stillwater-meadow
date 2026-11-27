@@ -6,7 +6,7 @@ import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug, query } from './core/env.js';
 import { scene, camera, createRenderer } from './core/render.js';
 import { timeU, updateDetail, neonU } from './core/materials.js';
-import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, moistAt, snowCold, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME, landNear, riverNear } from './core/shape.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, moistAt, snowCold, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME, landNear, riverNear, harbourById } from './core/shape.js';
 import { hooks, seasonState, seats, world, obstacles } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU } from './world/sky.js';
@@ -51,6 +51,7 @@ import { initBackpack, backpackView } from './ui/backpack.js';
 import { initFoundPlaces, foundView } from './features/places.js';
 import { initMap, mapView } from './ui/map.js';
 import { initWaypoints, waypointsView, travelToPoint, track } from './features/waypoints.js';
+import { initHarbours, harboursView, sail } from './features/harbours.js';
 import { initCamp } from './features/camp.js';
 import { initLandmarks, landmarksView, landmarkBlocks, landmarkSeats } from './world/landmarks.js';
 import { initSignposts, signsNear, signBlocks } from './world/signposts.js';
@@ -206,7 +207,7 @@ onQualityChange((o) => {
 window.addEventListener('resize', resize);
 
 // ── Features, each isolated so one failing can't take down the rest ──
-const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initMap: () => initMap((x, z) => travelTo(x, z)), initWaypoints: () => initWaypoints(travelTo), initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initIceDance, initDanceCam, initDanceMusic, initFoley };
+const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initMap: () => initMap((x, z) => travelTo(x, z)), initWaypoints: () => initWaypoints(travelTo), initHarbours, initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initIceDance, initDanceCam, initDanceMusic, initFoley };
 for (const [name, init] of Object.entries(features)) {
   try {
     const r = init();
@@ -391,6 +392,8 @@ window.__meadow = {
   get map() { return mapView(); },
   /** Waystones (features/waypoints.js): those awake, the points you can travel to, those asleep about you; and a way to travel to a point. */
   get waypoints() { return waypointsView(); }, travelToPoint, track,
+  /** Harbours (features/harbours.js): those about you, those visited, the passages from the nearest; and a way to sail one. */
+  get harbours() { return harboursView(); }, sail: (id) => { const h = harbourById(id); return !!h && sail(h); },
   /** The year: hold it at a phase (0 midwinter .. 0.5 midsummer; null lets it run), and how it is now. */
   year: { hold: holdPhase, get state() { return Object.assign({}, seasonState, { mapWeather: undefined }); } },
   /** The home lake's middle, and where you first arrive beside it. */

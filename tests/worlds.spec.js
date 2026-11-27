@@ -143,7 +143,7 @@ test('an older save moves what you carried into the backpack: the rod, the fish 
   noErrors(errors);
 });
 
-test('a world from before the land changed: its map, places, waystones, tracking, camp and lanterns are cleared once, the lanterns back in the backpack; what you carry and your journal are kept', async ({ page }) => {
+test('a world from before the land changed: its map, places, waystones, harbours, tracking, camp and lanterns are cleared once, the lanterns back in the backpack; what you carry and your journal are kept', async ({ page }) => {
   const errors = await visit(page, '/?seed=1&weather=clear#12');
   await page.evaluate(() => {
     const full = btoa(String.fromCharCode.apply(null, new Uint8Array(128).fill(255)));
@@ -151,15 +151,16 @@ test('a world from before the land changed: its map, places, waystones, tracking
     localStorage.setItem('stillwater-meadow', JSON.stringify({ version: 3, seed: 1, seedText: '1', lastVisit: Date.now() - 1000, settings: {}, journal: { perch: { n: 2, best: 24 } }, campKit: true, packUid: 3,
       pack: [{ uid: 1, type: 'rod', key: null, n: 1 }, { uid: 2, type: 'tent', key: null, n: 1 }, { uid: 3, type: 'lantern', key: null, n: 5 }].concat(Array.from({ length: 21 }, () => null)),
       where: { seed: 1, x: 1400, z: 900 }, found: [{ id: 'lake:home', kind: 'lake', name: 'Stillwater', x: 0, z: 0 }, { id: 'site:castle:0:0', kind: 'castle', name: 'Old castle', x: 900, z: 900 }],
-      waypoints: [{ id: 'waystone:9:9', name: 'Gone waystone', x: 5000, z: 5000 }], track: { id: 'waystone:9:9', name: 'Gone waystone', x: 5000, z: 5000 }, camp: { x: 800, z: 800 }, lanterns: [{ x: 1, z: 1 }, { x: 2, z: 2 }, { x: 3, z: 3 }], explored: { '0,0': full, '1,0': full } }));
+      waypoints: [{ id: 'waystone:9:9', name: 'Gone waystone', x: 5000, z: 5000 }], track: { id: 'waystone:9:9', name: 'Gone waystone', x: 5000, z: 5000 }, harbours: [{ id: 'harbour:9:9:0', name: 'Gone Harbour', x: 6000, z: 6000, ax: 6000, az: 6003 }], camp: { x: 800, z: 800 }, lanterns: [{ x: 1, z: 1 }, { x: 2, z: 2 }, { x: 3, z: 3 }], explored: { '0,0': full, '1,0': full } }));
     Storage.prototype.setItem = function () {}; // (this page must not write its own save over the old one as it goes)
   });
   await page.reload();
   await page.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });
-  const got = await page.evaluate(() => { const m = window.__meadow, s = m.store; for (let i = 0; i < 45; i++) m.tick(1 / 30); return { gen: s.gen, found: m.found().map((f) => f.id), awake: m.waypoints.awake.length, track: m.waypoints.track, camp: s.camp || null, lanterns: (s.lanterns || []).length, cells: m.map.cells, pack: m.pack.view().filter(Boolean).map((it) => `${it.type}:${it.n}`), journal: s.journal, far: Math.hypot(m.player.x - m.spawn.x, m.player.z - m.spawn.z) }; });
+  const got = await page.evaluate(() => { const m = window.__meadow, s = m.store; for (let i = 0; i < 45; i++) m.tick(1 / 30); return { gen: s.gen, found: m.found().map((f) => f.id), awake: m.waypoints.awake.length, harbours: m.harbours.known.length, track: m.waypoints.track, camp: s.camp || null, lanterns: (s.lanterns || []).length, cells: m.map.cells, pack: m.pack.view().filter(Boolean).map((it) => `${it.type}:${it.n}`), journal: s.journal, far: Math.hypot(m.player.x - m.spawn.x, m.player.z - m.spawn.z) }; });
   expect(got.gen, 'the number of the land is kept from now on').toBeGreaterThanOrEqual(2);
   expect(got.found, 'only what you find afresh (the home lake, where you now stand)').toEqual(['lake:home']);
   expect(got.awake).toBe(0);
+  expect(got.harbours, 'the harbours visited').toBe(0);
   expect(got.track).toBeNull();
   expect(got.camp).toBeNull();
   expect(got.lanterns).toBe(0);

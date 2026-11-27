@@ -216,6 +216,12 @@
     <div class="map-info"><span id="mapPlace"></span><button type="button" class="btn" id="mapTrack" hidden>Track</button><button type="button" class="btn primary" id="mapGo" hidden>Travel there</button></div>
   </section>
 
+  <section class="panel" id="harbourPanel" data-exclusive="1" hidden aria-label="Harbour">
+    <header><h2 id="harbourTitle">Harbour</h2><span class="sum" id="harbourSummary"></span><button type="button" class="close" data-close="harbourPanel" aria-label="Close">×</button></header>
+    <p class="harbour-note">The skipper sails to the harbours facing this one across the sea.</p>
+    <ul class="passages" id="harbourList"></ul>
+  </section>
+
   <div class="dialog" id="nameDialog" hidden>
     <form id="nameForm">
       <h2 id="nameTitle">Name this cat</h2>

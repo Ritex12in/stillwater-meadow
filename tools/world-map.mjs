@@ -4,8 +4,8 @@
 // One picture per seed, two views side by side, 30 km square with home in the middle:
 //   left   land and sea: the land in its country's colours (by latitude, as the game has it), shelf
 //          and deep water, pack ice toward the poles, each continent named with its size;
-//   right  the same, with the regions' hearts (a dot; a ring where it is a harbour), the trails
-//          joining neighbouring hearts, and home.
+//   right  the same, with the regions' hearts (a dot; proposed, not in the game), the trails joining
+//          neighbouring hearts, home, and the game's harbours (blue rings) and the passages between them.
 // And a table: how much is sea, and each continent's size and number of hearts.
 //   node tools/world-map.mjs            (dev server running; SEEDS=1,7,42)
 import { chromium } from 'playwright';
@@ -92,7 +92,7 @@ for (const seed of SEEDS) {
       ctx.strokeStyle = '#ff2fd0'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(hx, hy, 7, 0, 7); ctx.stroke();
     }
     ctx.fillStyle = '#f7f4ec'; ctx.font = '600 15px sans-serif'; ctx.textAlign = 'left';
-    ctx.fillText('Land and sea · seed ' + seed, 4, 20); ctx.fillText('Regions: hearts, harbours and trails', N + 20, 20);
+    ctx.fillText('Land and sea · seed ' + seed, 4, 20); ctx.fillText('Regions (proposed), harbours and passages', N + 20, 20);
     ctx.font = 'italic 600 15px Georgia, serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
     for (const c of big.filter((q) => q.label)) { const label = `${c.name} · ${c.km2} km²${c.edge ? '+' : ''}`; ctx.strokeStyle = 'rgba(12, 18, 22, 0.85)'; ctx.lineWidth = 3.5; ctx.strokeText(label, c.cx, 30 + c.cz); ctx.fillStyle = c.id === homeC ? '#ffd27a' : '#f7f4ec'; ctx.fillText(label, c.cx, 30 + c.cz); }
     // trails: each heart to its nearest two on the same continent, within 3.5 km
@@ -100,15 +100,31 @@ for (const seed of SEEDS) {
     ctx.strokeStyle = 'rgba(90, 60, 30, 0.85)'; ctx.lineWidth = 1.4; ctx.setLineDash([4, 3]);
     for (const h of hearts) { const near = hearts.filter((q) => q !== h && q.cont === h.cont).map((q) => [Math.hypot(q.x - h.x, q.z - h.z), q]).filter((q) => q[0] < 3500).sort((a, c) => a[0] - c[0]).slice(0, 2); for (const [, q] of near) { ctx.beginPath(); ctx.moveTo(...P(h.x, h.z, off)); ctx.lineTo(...P(q.x, q.z, off)); ctx.stroke(); } }
     ctx.setLineDash([]);
-    for (const h of hearts) { const [x, y] = P(h.x, h.z, off); ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 7); ctx.fillStyle = h.lake ? '#fff6d8' : '#e8c9a0'; ctx.fill(); ctx.strokeStyle = 'rgba(12, 18, 22, 0.9)'; ctx.lineWidth = 1; ctx.stroke(); if (h.harbour) { ctx.beginPath(); ctx.arc(x, y, 6.5, 0, 7); ctx.strokeStyle = '#1b3f8a'; ctx.lineWidth = 2; ctx.stroke(); } }
+    for (const h of hearts) { const [x, y] = P(h.x, h.z, off); ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 7); ctx.fillStyle = h.lake ? '#fff6d8' : '#e8c9a0'; ctx.fill(); ctx.strokeStyle = 'rgba(12, 18, 22, 0.9)'; ctx.lineWidth = 1; ctx.stroke(); }
+    // the game's harbours and passages (core/shape.js harboursNear, passagesFrom); and which continents lack one, or cannot be reached from home's
+    const inPic = (q) => q.x >= x0 && q.z >= z0 && q.x < x0 + N * STEP && q.z < z0 + N * STEP, HB = S.harboursNear(H.x, H.z, 22000).filter(inPic), byCont = new Map();
+    ctx.save(); ctx.beginPath(); ctx.rect(off, 30, N, N); ctx.clip();
+    for (const h of HB) { const k = h.cont.cx + ',' + h.cont.cz; byCont.set(k, (byCont.get(k) || 0) + 1); }
+    ctx.strokeStyle = 'rgba(160, 220, 255, 0.9)'; ctx.lineWidth = 1.6; ctx.setLineDash([6, 4]);
+    for (const h of HB) for (const t of S.passagesFrom(h)) { if (h.id > t.id) continue; ctx.beginPath(); ctx.moveTo(...P(h.x, h.z, off)); ctx.lineTo(...P(t.x, t.z, off)); ctx.stroke(); }
+    ctx.setLineDash([]);
+    for (const h of HB) { const [x, y] = P(h.x, h.z, off); ctx.beginPath(); ctx.arc(x, y, 6.5, 0, 7); ctx.fillStyle = '#1b3f8a'; ctx.fill(); ctx.strokeStyle = '#f7f4ec'; ctx.lineWidth = 2; ctx.stroke(); }
+    ctx.restore();
+    const homeCont = S.continentAt(H.x, H.z), seen = new Set([homeCont.cx + ',' + homeCont.cz]), todo = [homeCont], linksBad = [];
+    while (todo.length) { const c = todo.pop(); if (Math.hypot(c.x - H.x, c.z - H.z) > 40000) continue; for (const h of S.harboursOf(c)) for (const t of S.passagesFrom(h)) { if (!S.passagesFrom(t).includes(h)) linksBad.push(h.name + ' -> ' + t.name); const k = t.cont.cx + ',' + t.cont.cz; if (!seen.has(k)) { seen.add(k); todo.push(t.cont); } } }
+    const near = [], noHarbour = [], unreached = [];
+    for (let cz = -2; cz <= 2; cz++) for (let cx = -2; cx <= 2; cx++) { const c = S.continentAt(H.x + cx * 9000 + (cz & 1 ? 4500 : 0), H.z + cz * 9000); if (c && !near.includes(c)) near.push(c); }
+    for (const c of near) { if (!S.harboursOf(c).length) noHarbour.push(c.name); if (!seen.has(c.cx + ',' + c.cz)) unreached.push(c.name); }
+    const harbourInfo = { harbours: HB.length, continents: near.length, noHarbour, unreached, oneWay: linksBad.length, perCont: [...byCont.values()] };
     ctx.strokeStyle = '#f7f4ec'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(10, N + 18); ctx.lineTo(10 + 5000 / STEP, N + 18); ctx.stroke();
     ctx.font = '600 12px sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#f7f4ec'; ctx.fillText('5 km', 16 + 5000 / STEP, N + 22);
     let sea = 0, isles = 0; for (let k = 0; k < N * N; k++) { if (kind[k] < 2) sea++; if (kind[k] === 3) isles++; }
-    return { png: cv.toDataURL('image/png'), sea: +(sea / (N * N) * 100).toFixed(0), isleKm2: +(isles * STEP * STEP / 1e6).toFixed(1), home: big.find((c) => c.id === homeC), conts: big.slice(0, 8).map((c) => ({ name: c.name, km2: c.km2, runsOff: c.edge, hearts: c.hearts, harbours: c.harbours })), hearts: hearts.length, ms, smallLands: conts.filter((c) => c.km2 < 2).length };
+    return { png: cv.toDataURL('image/png'), sea: +(sea / (N * N) * 100).toFixed(0), isleKm2: +(isles * STEP * STEP / 1e6).toFixed(1), home: big.find((c) => c.id === homeC), conts: big.slice(0, 8).map((c) => ({ name: c.name, km2: c.km2, runsOff: c.edge, hearts: c.hearts, harbours: c.harbours })), hearts: hearts.length, ms, harbourInfo, smallLands: conts.filter((c) => c.km2 < 2).length };
   }, seed);
   writeFileSync('e:/Games/_assets/previews/worldmap-' + seed + (process.env.TAG || '') + '.png', Buffer.from(out.png.split(',')[1], 'base64'));
   delete out.png;
   console.log('seed ' + seed + ': ' + out.sea + '% sea; islands ' + out.isleKm2 + ' km² and ' + out.smallLands + ' scraps of land under 2 km²; ' + out.hearts + ' hearts; land sampled in ' + out.ms + ' ms; home on ' + (out.home ? out.home.name + ' (' + out.home.km2 + ' km²' + (out.home.edge ? ', runs off the picture' : '') + ')' : 'no continent!'));
+  console.log('   harbours ' + JSON.stringify(out.harbourInfo));
   for (const c of out.conts) console.log('   ' + c.name.padEnd(14) + String(c.km2).padStart(7) + ' km²' + (c.runsOff ? '+' : ' ') + '  hearts ' + String(c.hearts).padStart(3) + '  harbours ' + c.harbours);
   await p.close();
 }

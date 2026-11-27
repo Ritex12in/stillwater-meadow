@@ -449,19 +449,24 @@ function groundDetail(mat, textured) {
           diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb, vec3(gl), 0.6) * vec3(0.63, 0.59, 0.57) + vec3(0.045, 0.02, 0.045), gv * 0.8); // (moss in shadow, toward mauve: the picture's ground is 473a3d, not olive)
           // petals: one to a small square of ground, each at its own spot in it, thick where they have drifted
           float drift = smoothstep(0.3, 0.72, gNoise(vGround.xz * 0.09 + 7.0) * 0.6 + gNoise(vGround.xz * 0.37 + 2.0) * 0.5);
-          float lies = 0.0, h2 = 0.5;
+          float lies = 0.0, h2 = 0.5, sharp = 1.0;
           for (int layer = 0; layer < 2; layer++) { // (two sizes of square, so they do not sit in rows)
             vec2 pp = vGround.xz * (layer == 0 ? 4.3 : 7.1) + float(layer) * 13.7, ci = floor(pp), cf = fract(pp) - 0.5;
             float h1 = fract(sin(dot(ci, vec2(127.1, 311.7))) * 43758.5453), hb = fract(h1 * 57.31), h3 = fract(h1 * 131.7);
             vec2 d = cf - (vec2(hb, h3) - 0.5) * 0.6; float an = h3 * 6.283;
             d = vec2(d.x * cos(an) + d.y * sin(an), (d.y * cos(an) - d.x * sin(an)) * 1.9); // (longer than it is wide, lying any way round)
             float r = 0.17 + 0.12 * hb;
-            float on = step(h1, 0.2 + 0.6 * drift) * smoothstep(r, r * 0.6, length(d));
+            // (how much of a square one pixel of the screen covers here: where a petal is smaller than a pixel it would flicker on and off as the camera moves,
+            // so its edge is softened by that much, and past about a third of a square the petals give way to the even cast below)
+            float fw = max(fwidth(pp.x), fwidth(pp.y));
+            float on = step(h1, 0.2 + 0.6 * drift) * smoothstep(r + fw * 0.6, r * 0.6 - fw * 0.6, length(d));
+            sharp = min(sharp, 1.0 - smoothstep(0.1, 0.32, fw));
             if (on > lies) { lies = on; h2 = hb; }
           }
           float away = smoothstep(14.0, 50.0, length(vGround - uCam)); // (far off the petals are too small to draw one by one: a pink cast instead)
-          float petals = mix(lies, (0.22 + 0.62 * drift) * 0.42, away);
-          vec3 pink = mix(vec3(0.98, 0.6, 0.75), vec3(1.0, 0.86, 0.92), h2);
+          // (where they are too small for a pixel, as much pink as they cover on the whole, so nothing changes but the flicker; the stronger cast only far off)
+          float petals = mix(mix((0.2 + 0.6 * drift) * 0.17, lies, sharp), (0.22 + 0.62 * drift) * 0.42, away);
+          vec3 pink = mix(vec3(0.98, 0.6, 0.75), vec3(1.0, 0.86, 0.92), mix(0.5, h2, sharp)); // (each its own shade only where each can be seen)
           diffuseColor.rgb = mix(diffuseColor.rgb, pink, gv * petals * 0.92);
           gPetal = gv * petals; // (they glow by night: below)
         }

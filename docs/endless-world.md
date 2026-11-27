@@ -815,7 +815,7 @@ are the country's in summer whatever the season; rivers are drawn, trails and br
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
 
-## The cherry blossom valley: the owner's picture, analysed (2026-11-28; nothing built yet)
+## The cherry blossom valley: the owner's picture, analysed (2026-11-28; step 1, colour and light, built)
 
 The owner: "time to work on the biome examples I gave; pick one and start analysing". Picked: "Enchanted
 Cherry Blossom Valley" (in the owner's Downloads), the plan's first biome, since the game already has
@@ -890,6 +890,43 @@ the trunk `#735914`; lantern glow `#b6763d`; deer `#9d5a3b`; bridge `#a2837d`.
 5. **The composition** is a painter's; in a game the player's eye is wherever they stand. What can be
    done is to lay the heart out so that the way in (the trail) gives that view: path and stream
    converging on the bridge, the falls and pagodas above it, the peak behind.
+
+### Step 1 built: the grove's colour and light (2026-11-28, on "yes, go with your picks")
+
+No land is moved and nothing is saved differently.
+
+- **Blossom trees are pink** (`world/vegetation.js` `TREE_COLOURS.blossom`, lifted past white: the
+  leaf picture is grey, and the pale pinks it had read as lilac-grey under it), in blossom from
+  spring to autumn (`features/seasons.js`), bare in winter; and **of many sizes**, saplings to great
+  old ones (0.7 to 1.85 times, `world/wilds.js`).
+- **The ground of a grove** (`world/terrain.js`: a new `grove` value at every point of the ground):
+  greyed and darkened toward moss, with petals lying on it, each drawn in its own small square of
+  ground at its own spot and angle, in two sizes of square so they do not sit in rows, thick where
+  they have drifted; beyond about 50 m, where they would be too small to draw, a pink cast instead.
+- **The air of the place** (`main.js` `airOfPlace`): as you walk into a grove the sky, the horizon,
+  the haze, the light and the clouds ease toward pink and lavender at the brightness they already
+  have (so night stays night), the fill light rises by a fifth, and the mist comes a third nearer.
+  Less under snow.
+
+The same two views, counted again (`grove-after-dusk.png`, `grove-after-day.png` against
+`grove-now.png`; the picture's own numbers alongside):
+
+| | The picture | The grove before | The grove now, dusk | now, by day |
+|---|---|---|---|---|
+| Pink and magenta | 34% | 6% | 44% | 35% |
+| Green | 1% | 34% | 5% | 15% |
+| Blue and violet | 24% | 3% | 0% | 7% |
+| Gold | 7% | 10% | 30% | 24% |
+| Bright pixels | 34% | 3% | 10% | 22% |
+| Brightness, mean | 0.62 | 0.42 | 0.49 | 0.61 |
+
+Pink and green are where the picture has them. **Still off:** there is no blue or violet (the
+picture's comes from water, mist and far mountains, which the grove does not have yet); too much gold
+(the bare hillside behind, and the moss reading olive); and at dusk it is still darker than the
+picture, which is lit as bright as our noon. **Not done in this step:** the grass blades themselves
+are still green (they stand over the petals); the distant tree cards were not looked at; the pagoda
+stands at a grove's edge, where little of this shows. Speed on the owner's laptop was not measured
+(the ground shader does more in a grove: two small loops a pixel).
 
 ### A way to build it (ours; nothing agreed)
 

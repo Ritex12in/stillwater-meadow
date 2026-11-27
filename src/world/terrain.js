@@ -21,7 +21,7 @@ import { SEASON_GLSL, seasonU } from '../core/year.js';
 import { quality } from '../systems/quality.js';
 import { biomesAt } from '../core/biome.js';
 import { wxU, neonU } from '../core/materials.js';
-import { height, lakeAt, setGroundSampler, trailAt, riverNear, riverBank, isleQ, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, yearAt, seaAt } from '../core/shape.js';
+import { height, lakeAt, setGroundSampler, trailAt, riverNear, riverBank, isleQ, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, yearAt, seaAt, groveAt } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -118,13 +118,14 @@ function takePart() {
   if (p) return p;
   partsMade++;
   const geo = new THREE.BufferGeometry();
-  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, clm: new Float32Array(VERTS * 3), yr: new Float32Array(VERTS * 2), look: new Float32Array(VERTS * 4), h: new Float32Array(GRID) };
+  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, clm: new Float32Array(VERTS * 3), yr: new Float32Array(VERTS * 2), look: new Float32Array(VERTS * 4), grv: new Float32Array(VERTS), h: new Float32Array(GRID) };
   geo.setAttribute('position', new THREE.BufferAttribute(part.pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(part.nrm, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(part.col, 3));
   geo.setAttribute('clime', new THREE.BufferAttribute(part.clm, 3));
   geo.setAttribute('yearly', new THREE.BufferAttribute(part.yr, 2)); // (each spot's year: how much it moves it, and which half-year: core/shape.js yearAt)
-  geo.setAttribute('look', new THREE.BufferAttribute(part.look, 4)); // (the biomes here: desert, swamp, enchanted, volcanic: core/biome.js)
+  geo.setAttribute('look', new THREE.BufferAttribute(part.look, 4));
+  geo.setAttribute('grove', new THREE.BufferAttribute(part.grv, 1)); // (how much of a blossom grove: its petals lie on the ground) // (the biomes here: desert, swamp, enchanted, volcanic: core/biome.js)
   if (textured) geo.setAttribute('splat', new THREE.BufferAttribute(part.spl, 4));
   geo.setIndex(tileIndex);
   geo.boundingSphere = new THREE.Sphere();
@@ -139,7 +140,7 @@ function takePart() {
 /** Fill a tile's buffers from the land's formula. A generator: it yields every few rows so the work can be spread over frames. */
 function* fill(t) {
   const part = takePart(), s = tileSize(t.lv), cs = s / TILE_N, x0 = t.ix * s, z0 = t.iz * s;
-  const { pos, nrm, col: cols, spl, clm, yr, look, h: hOut } = part;
+  const { pos, nrm, col: cols, spl, clm, yr, look, grv, h: hOut } = part;
   // heights, one cell beyond the tile on every side: normals then come from the land itself, not
   // from this tile's triangles, so light runs unbroken across the joins
   for (let j = 0; j < W; j++) {
@@ -183,6 +184,7 @@ function* fill(t) {
       clm[k * 3] = cold; clm[k * 3 + 1] = dry; clm[k * 3 + 2] = pond;
       { const y = yearAt(x, z); yr[k * 2] = y.A; yr[k * 2 + 1] = y.m; }
       const bw = biomesAt(x, z, h, base, rain);
+      grv[k] = groveAt(x, z) * (1 - Math.max(bw.desert, bw.beach, bw.swamp, bw.volcanic));
       look[k * 4] = Math.max(bw.desert, bw.beach); look[k * 4 + 1] = bw.swamp; look[k * 4 + 2] = bw.enchanted; look[k * 4 + 3] = bw.volcanic;
       c.multiplyScalar(1 - lushOf(rain) * 0.16);
       if (textured) {
@@ -209,6 +211,7 @@ function* fill(t) {
       for (let q = 0; q < 3; q++) clm[to * 3 + q] = clm[from * 3 + q];
       yr[to * 2] = yr[from * 2]; yr[to * 2 + 1] = yr[from * 2 + 1];
       for (let q = 0; q < 4; q++) look[to * 4 + q] = look[from * 4 + q];
+      grv[to] = grv[from];
     }
   }
   const { geo, mesh } = part;
@@ -336,13 +339,14 @@ function groundDetail(mat, textured) {
       });
     }
     sh.uniforms.uNightGlow = neonU;
-    sh.vertexShader = 'varying vec3 vGround;\nattribute vec3 clime;\nvarying vec3 vClime;\nattribute vec2 yearly;\nvarying vec2 vYear;\nattribute vec4 look;\nvarying vec4 vLook;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+    sh.vertexShader = 'varying vec3 vGround;\nattribute vec3 clime;\nvarying vec3 vClime;\nattribute vec2 yearly;\nvarying vec2 vYear;\nattribute vec4 look;\nvarying vec4 vLook;\nattribute float grove;\nvarying float vGrove;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
       vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;
       vClime = clime;
       vYear = yearly;
       vLook = look;
+      vGrove = grove;
       ${textured ? 'vSplat = splat;' : ''}`);
-    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nvarying vec2 vYear;\nvarying vec4 vLook;\nuniform vec3 uCam;\nuniform float uFreshSnow;\nuniform float uNightGlow;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
+    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nvarying vec2 vYear;\nvarying vec4 vLook;\nvarying float vGrove;\nuniform vec3 uCam;\nuniform float uFreshSnow;\nuniform float uNightGlow;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
       // (wrapped first: far from the middle of the world the numbers get too big for sin() to scatter)
       float gHash(vec2 p) { return fract(sin(dot(mod(p, 1024.0), vec2(127.1, 311.7))) * 43758.5453); }
       float gNoise(vec2 p) {
@@ -422,6 +426,29 @@ function groundDetail(mat, textured) {
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.26, 0.31, 0.18) * (0.85 + 0.3 * broad), smoothstep(0.2, 0.8, vLook.y) * 0.75);
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.55, 0.82, 0.86), smoothstep(0.2, 0.8, vLook.z));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.12, 0.13) * (0.85 + 0.3 * mid), smoothstep(0.2, 0.75, vLook.w));
+        }
+        // a blossom grove: the ground mossy and dark in the trees' shade, petals lying on it in drifts
+        // (after the owner's picture: almost no green, pink over everything)
+        if (vGrove > 0.05) {
+          float gv = smoothstep(0.25, 0.8, vGrove);
+          float gl = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb, vec3(gl), 0.45) * vec3(0.66, 0.6, 0.56) + vec3(0.04, 0.012, 0.035), gv * 0.75);
+          // petals: one to a small square of ground, each at its own spot in it, thick where they have drifted
+          float drift = smoothstep(0.3, 0.72, gNoise(vGround.xz * 0.09 + 7.0) * 0.6 + gNoise(vGround.xz * 0.37 + 2.0) * 0.5);
+          float lies = 0.0, h2 = 0.5;
+          for (int layer = 0; layer < 2; layer++) { // (two sizes of square, so they do not sit in rows)
+            vec2 pp = vGround.xz * (layer == 0 ? 4.3 : 7.1) + float(layer) * 13.7, ci = floor(pp), cf = fract(pp) - 0.5;
+            float h1 = fract(sin(dot(ci, vec2(127.1, 311.7))) * 43758.5453), hb = fract(h1 * 57.31), h3 = fract(h1 * 131.7);
+            vec2 d = cf - (vec2(hb, h3) - 0.5) * 0.6; float an = h3 * 6.283;
+            d = vec2(d.x * cos(an) + d.y * sin(an), (d.y * cos(an) - d.x * sin(an)) * 1.9); // (longer than it is wide, lying any way round)
+            float r = 0.17 + 0.12 * hb;
+            float on = step(h1, 0.2 + 0.6 * drift) * smoothstep(r, r * 0.6, length(d));
+            if (on > lies) { lies = on; h2 = hb; }
+          }
+          float away = smoothstep(14.0, 50.0, length(vGround - uCam)); // (far off the petals are too small to draw one by one: a pink cast instead)
+          float petals = mix(lies, (0.22 + 0.62 * drift) * 0.42, away);
+          vec3 pink = mix(vec3(0.98, 0.6, 0.75), vec3(1.0, 0.86, 0.92), h2);
+          diffuseColor.rgb = mix(diffuseColor.rgb, pink, gv * petals * 0.92);
         }
         // a lake a long way off: no sheet of water is spared for it, so its bed is painted the colour of water
         // (frozen over when the season is cold there, as a near lake's sheet of water would be)

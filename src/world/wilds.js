@@ -76,6 +76,7 @@ export function growSquare(ix, iz) {
     const type = roll < pines ? 'pine' : roll > 0.975 - grove * 0.8 ? 'blossom' : 'round';
     const s = (0.8 + size * 0.7) * (1 + lush * 0.14 - snow * 0.12 + B.enchanted * 0.6) * (1 - 0.4 * smooth(TREELINE - 28, TREELINE, felt)), cols = TREE_COLOURS[type];
     const t = { x, z, y: h - 0.15, type, s, ry: turn * TAU, color: cols[Math.floor(tint * cols.length)], top: (kit ? 6.2 : 5.2) * s, wild: true, chill: cold };
+    if (type === 'blossom') { const k = 0.7 + 1.15 * size * size; t.s *= k; t.top *= k; } // (blossom trees of many sizes, saplings to great old ones)
     const wind = cliffsAt(x, z); if (wind > 0.2) t.rx = wind * (0.22 + 0.12 * tint); // (bent by the wind on the windy cliffs, all one way)
     if (kit) {
       // on the heath the broadleaf trees are the light, airy ones: birches and the open-crowned "normal" trees

@@ -41,9 +41,10 @@ const SPRING_BLOSSOM = ['#f4c1d0', '#f7d6e0', '#ffffff', '#eeb0c4'], SPRING_GREE
 const AUTUMN = { maple: ['#c4422a', '#d9582b', '#b8352c', '#e0722e'], birch: ['#e8c547', '#f0d35a', '#e3b03b'], other: ['#d9822b', '#e3a33b', '#c4542d', '#e8c547', '#b0452a', '#cf6a2c', '#9aa040'] };
 const WINTER = ['#7d7264', '#6f665a', '#857a6a'];
 const pickWith = (roll) => (arr) => new THREE.Color(arr[Math.floor(roll() * arr.length)]);
-const springOf = (it, roll) => (it.type === 'blossom' || roll() < 0.3 ? pickWith(roll)(SPRING_BLOSSOM) : pickWith(roll)(SPRING_GREEN));
+// (a blossom tree is in blossom from spring to autumn, in its own pink: world/vegetation.js; other trees may flower pale in spring)
+const springOf = (it, roll) => (it.type === 'blossom' ? it.color.clone() : roll() < 0.3 ? pickWith(roll)(SPRING_BLOSSOM) : pickWith(roll)(SPRING_GREEN));
 // maples blaze red and orange, birches turn gold, the rest a mix
-const autumnOf = (it, roll) => pickWith(roll)(AUTUMN[it.family] || AUTUMN.other);
+const autumnOf = (it, roll) => (it.type === 'blossom' ? it.color.clone().multiplyScalar(0.9) : pickWith(roll)(AUTUMN[it.family] || AUTUMN.other));
 function palOf(it) {
   if (!it.pal) {
     const roll = mulberry32(Math.floor(hash(Math.round(it.x * 9) + 5, Math.round(it.z * 9) - 3) * 4294967296));

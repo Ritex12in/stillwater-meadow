@@ -240,8 +240,26 @@ onSave((s) => {
 // ── Apply the time-of-day palette to the scene ──
 const waterLight = cur.light.clone();
 const sunScreen = new THREE.Vector3();
+// The air of a place: in a blossom grove the sky, the haze and the light turn toward pink and lavender, and
+// a mist closes in (after the owner's picture of a cherry blossom valley: a third of it pink, a third of
+// it bright, almost none of it green). Eased in as you walk into one; less at night, and under snow.
+let groveAir = 0;
+const airC = new THREE.Color(), lumOf = (c) => 0.3 * c.r + 0.59 * c.g + 0.11 * c.b;
+function airOfPlace() {
+  groveAir += ((seasonState.groveHere || 0) * (seasonState.winterHere ? 0.35 : 1) - groveAir) * 0.02;
+  const g = smooth(0.15, 0.7, groveAir);
+  if (g <= 0.002) return;
+  // toward a colour, at about the brightness the thing already has (so night stays night), a little lifted
+  const toward = (c, hex, k, lift = 1.12) => { airC.set(hex); c.lerp(airC.multiplyScalar(Math.min(1.7, (lumOf(c) + 0.03) / lumOf(airC) * lift)), k * g); };
+  toward(cur.top, '#c3a2ea', 0.6); toward(cur.horizon, '#f8c3dd', 0.75, 1.2); toward(cur.glow, '#ffc7dc', 0.5);
+  toward(cur.light, '#ffdfeb', 0.4); toward(cur.hemiSky, '#f5cde6', 0.55, 1.2); toward(cur.hemiGround, '#d6a0b6', 0.6, 1.25);
+  if (cur.cloud) toward(cur.cloud, '#ffe3ef', 0.5);
+  cur.fogNear *= 1 - 0.35 * g; cur.fogFar *= 1 - 0.3 * g;
+  cur.hemiI *= 1 + 0.22 * g; cur.amb *= 1 + 0.2 * g;
+}
 function applySky() {
   weatherModify(cur);
+  airOfPlace();
   skyU.sunDir.value.copy(sunDir);
   skyU.moonDir.value.copy(moonDir);
   skyU.moonAmt.value = (1 - smooth(-4, 8, solar.sunElev)) * (1 - wx.cloud * 0.9);

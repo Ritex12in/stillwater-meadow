@@ -65,14 +65,14 @@ The game's day music, low under the voice; the night take is not needed.
 ## To post
 
 - **Title:** I can't draw 3D. So I described him to an AI.
-- **Description:** The boy in my game has no 3D model. I drew him on paper, described him, and an AI wrote the code: his face, his clothes, every spike of his hair. Made with AI (Claude). Play free in your browser: link in bio.
+- **Description:** The boy in my game has no 3D model. I drew him on paper, described him, and an AI wrote the code: his face, his clothes, every spike of his hair. Made with AI (Claude); the voice is AI too. Play free in your browser: link in bio.
 - **Tags:** #indiegame #gamedev #devlog #madewithai #proceduralgeneration #cozygames #threejs
 - **End card:** Stillwater Meadow · free in your browser
 
 ## Needed from the owner
 
 1. Approval of this brief, or changes.
-2. The voice: the eight lines, recorded ([PLAN.md](../PLAN.md), question 1).
+2. The voice: which of the six AI voices ([ADR 0010](../adr/0010-an-ai-voice-reads-the-script.md); samples in `e:\Games\_assets\shorts\voice-samples\`).
 3. The character sheets: are they the owner's own drawings, may they be shown, and where are the files?
 4. Whether line 6 may show the jump (not live yet) or should show him running (live).
 

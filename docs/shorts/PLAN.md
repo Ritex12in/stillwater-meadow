@@ -28,7 +28,7 @@ agreed, and no short is filmed before its brief is approved
 | 2 ✔ | **Can the past be filmed?** *Done 2026-11-28: yes, all three run (see below).* Try three old versions (the baseline `620f25a`, the first children `c9b7c6f`, the day of the hair `d10efd5`): check out, install, run, take one still each with the same camera. | Three stills side by side, and a note in HISTORY.md of which versions run. Proves or breaks [ADR 0006](adr/0006-the-past-is-filmed-from-the-real-versions.md). | step 1 |
 | 3 ◐ | **A vertical frame.** *A test still is made (`e:\Games\_assets\shorts\frame-test.png`); the owner has still to look at it on their phone.* The film tool renders 1080 x 1920; cameras framed for a tall picture; the safe areas drawn as guides on a test still. | One test still with guides, checked on the owner's phone. | step 1 |
 | 4 | **Captions.** Burned in from a script's lines and timings; the game's display font; inside the safe areas. | A 5-second test clip. | step 3 |
-| 5 | **Voice.** A way to take the owner's recording (or a service's), cut it by line, and time the captions and cuts to it. | The test clip with a voice. | step 4, question 1 |
+| 5 | **Voice.** The script's lines spoken by the AI voice (`edge-tts`), with the time of each sentence, for the captions and cuts to follow. *Tried by hand 2026-11-28; not yet a tool.* | The test clip with a voice. | step 4, question 1 |
 | 6 | **One command per short.** A brief's shot list as data; `node tools/shorts/make.mjs 001` films, edits and writes the video and its text file. | The command, run on a throwaway test. | steps 2 to 5 |
 | 7 | **Short 001**, once its brief is approved. | The first short, for the owner's review. | step 6, the brief approved |
 | 8 | **Post, log, learn.** | A row in [LOG.md](LOG.md); after a week, what to change. | step 7 |
@@ -52,7 +52,7 @@ The packages have not changed since the first Vite commit, so old versions borro
 
 | # | Question | Claude's pick | Why it matters |
 |---|---|---|---|
-| 1 | **Whose voice?** | The owner's own, recorded on a phone, one take per line. | A person's voice makes the diary theirs. This PC's built-in voices are not good enough; a voice service would be a new thing to choose and perhaps pay for. |
+| 1 | ~~**Whose voice?**~~ **Answered 2026-11-28: an AI voice ([ADR 0010](adr/0010-an-ai-voice-reads-the-script.md)). Still open: which one, from the six samples in `e:\Games\_assets\shorts\voice-samples\`.** | The owner's own, recorded on a phone, one take per line. | A person's voice makes the diary theirs. This PC's built-in voices are not good enough; a voice service would be a new thing to choose and perhaps pay for. |
 | 2 | ~~**Unreleased features:** show them as "coming soon", or wait for the release?~~ **Settled 2026-11-28: the owner published everything; nothing in HISTORY.md is unreleased now.** | Start with stories that are live (A1, A2, A4, D1, D5); hold the rest. | The public site is at 23 November. Showing gliding or continents now promises what a visitor cannot find. |
 | 3 | ~~**"Everything is coded":** drop the claim, or make it true?~~ **Answered 2026-11-28: the downloaded art stays ("external assets are good"); the claim is dropped.** | Drop it; say what is code ([CLAIMS.md](CLAIMS.md)). | It is not true today: about 12 MB of downloaded plants, rocks, props and ground textures. Making it true is a project on the game, not on the videos. |
 | 4 | **The owner's character sheets:** may they appear, and where are the files? | Yes, for a second in A1. | They are the turn of the character's story. |
@@ -70,4 +70,4 @@ The packages have not changed since the first Vite commit, so old versions borro
 | Frame-by-frame rendering of a 30-second short takes long on the owner's laptop. | Measured in step 6; shots are rendered once and kept. |
 | The safe-area numbers are wrong for the owner's phone. | Checked in step 3 on the phone itself. |
 | A short says something that stops being true when the game changes. | CLAIMS.md is re-checked when the game changes; LOG.md records what each posted short said. |
-| The owner has no time to record a voice. | Question 1; a short can wait, or a service is chosen and recorded as an ADR. |
+| The AI voice's service changes, stops, or may not be used in videos that earn money (not checked). | [ADR 0010](adr/0010-an-ai-voice-reads-the-script.md); a paid service would be a new ADR. |

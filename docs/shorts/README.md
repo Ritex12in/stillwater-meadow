@@ -28,7 +28,7 @@ A short moves through these in order. It does not move on until the stage's chec
 | 1 | Idea | either | A row in IDEAS.md | It tells one thing, and the story behind it is in HISTORY.md. |
 | 2 | Brief | Claude drafts | `briefs/NNN-name.md`: story, hook, script, shots | Every line of the script passes CLAIMS.md. Every shot names the version of the game it is filmed from. |
 | 3 | Approval | the owner | Brief marked `approved` | **Nothing is filmed before this** ([ADR 0009](adr/0009-nothing-is-filmed-before-its-brief-is-approved.md)). |
-| 4 | Voice | the owner | A recording of the script's lines | Every line is there, in order. |
+| 4 | Voice | Claude | The script's lines spoken by the AI voice ([ADR 0010](adr/0010-an-ai-voice-reads-the-script.md)), with each sentence's time | Every line is there, in order, and sounds right to the owner. |
 | 5 | Film | Claude | Frames for each shot, from the real versions of the game | Each shot looked at as stills before the whole is rendered. |
 | 6 | Edit | Claude | One vertical video with voice, captions and the game's sound | Captions inside the safe areas; length within the brief's; plays without sound and still makes sense. |
 | 7 | Review | the owner | A yes, or changes | The owner has watched it through. |

@@ -13,3 +13,4 @@ One file each; never rewritten, only superseded ([0001](0001-we-record-decisions
 | [0007](0007-media-outside-the-repo.md) | Media outside the repo | accepted |
 | [0008](0008-the-games-own-sound.md) | The game's own sound | proposed |
 | [0009](0009-nothing-is-filmed-before-its-brief-is-approved.md) | Nothing is filmed before its brief is approved | accepted |
+| [0010](0010-an-ai-voice-reads-the-script.md) | An AI voice reads the script | accepted (which voice: open) |

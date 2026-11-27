@@ -941,6 +941,23 @@ and passages; (4) the biomes' looks, one at a time; (5) free sailing. What does 
 can be built and judged at once: the waterfall's and the river water's look (begun 2026-11-28),
 the biomes' palettes and textures.
 
+### The first pictures (2026-11-28, `tools/world-map.mjs`; for the owner to judge)
+
+`e:/Games/_assets/previews/worldmap-1.png`, `-7.png`, `-42.png`: 30 km square, home in the middle;
+left, land and sea; right, the regions' hearts, harbours and trails.
+
+- A plain field of noise will not do for continents: at about half land it joins into one
+  landmass without end (400 km2 and off the picture). So the sea is ruled into squares 9 km wide
+  and each has one continent or none (one in seven is open sea): a middle pushed about in its
+  square, a radius of 2.1 to 3.5 km, a coast bent by two fields of noise. Home's square always has
+  one (radius 3.3 to 3.8 km), home 900 m off its middle.
+- What came out, three seeds: 57 to 66% sea; continents mostly 14 to 28 km2 (4 to 6 km across),
+  6 to 10 hearts each, a third to a half of them harbours; home's continent 39 to 103 km2 (it
+  joins a neighbour in two of the three seeds).
+- Known faults: the continents sit in rows and columns, like blobs on a grid (more pushing about
+  and more varied sizes are the levers); two continents can draw the same name; islands show as
+  sand-coloured specks; the land's own shape and the game's sea are not in the picture.
+
 ### Decisions not yet answered by the owner
 
 How much sea; how big a continent; how to cross first; names and completion goals per continent;

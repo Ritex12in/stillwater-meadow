@@ -372,7 +372,7 @@ renderer.shadowMap.needsUpdate = true;
 renderNow();
 loadingFinished();
 quality.fast = true; // tune quickly while the start screen is up
-loadingDone(() => { quality.fast = false; if (landChanged) { toast('The land beyond home has changed since you were last here: the world now has poles and an equator. Your map, places and waystones start afresh; what you carry and your journals are kept.', 12); saveSoon(); } });
+loadingDone(() => { quality.fast = false; if (landChanged) setTimeout(() => { toast('The land beyond home has changed since you were last here: the world now has poles and an equator. Your map, places and waystones start afresh; what you carry and your journals are kept.', 12); saveSoon(); }, 6500); }); // (after the welcome's own line)
 requestAnimationFrame(frame);
 
 // A small handle for automated tests and the debug panel.

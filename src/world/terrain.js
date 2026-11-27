@@ -21,7 +21,7 @@ import { SEASON_GLSL, seasonU } from '../core/year.js';
 import { quality } from '../systems/quality.js';
 import { biomesAt } from '../core/biome.js';
 import { wxU, neonU } from '../core/materials.js';
-import { height, lakeAt, setGroundSampler, trailAt, riverNear, riverBank, isleQ, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, yearAt, seaAt, groveAt } from '../core/shape.js';
+import { height, lakeAt, setGroundSampler, trailAt, riverNear, riverBank, isleQ, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, yearAt, seaAt, groveAt, heartAt } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -170,7 +170,8 @@ function* fill(t) {
       const base = coldBase(x, z), lie = slopeLook(x, z, h, base, cs >= 3.6 ? grad : null), north = lie.north, scree = lie.scree, felt = feltHeight(x, z, h, north, base);
       // (bare rock on cliffs and high ground; grey scree at the foot of a cliff)
       // (and a face too steep for anything to grow on, as the cliff of a grove's heart is: bare rock)
-      const sheer = smooth(1.4, 2.4, slope), wRock = Math.max(rockAmt(h, slope, felt) * 0.85, scree * 0.8, sheer * 0.95), wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6 * (1 - sheer * 0.7);
+      // (seen from far off the ground is drawn too coarse to measure a 3 m wide cliff as steep: there, by a heart, it is the drop to the next point that tells)
+      const sheer = Math.max(smooth(1.4, 2.4, slope), cs >= 2.4 && heartAt(x, z, cs * 2) ? smooth(7, 14, Math.max(Math.abs(dx), Math.abs(dz))) : 0), wRock = Math.max(rockAmt(h, slope, felt) * 0.85, scree * 0.8, sheer * 0.95), wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6 * (1 - sheer * 0.7);
       // the climate here: snow lies longer on slopes facing north, and not on cliffs; lush country is a deeper green
       const rain = moistAt(x, z), dry = dryOf(rain), chill = coldAt(x, z, h + ASPECT * north, base), cold = snowCold(chill, rain) * (1 - smooth(0.9, 1.5, slope) * 0.55);
       // cold country where little snow lies (it is too dry) is tundra: low olive-brown moss and sedge
@@ -439,7 +440,7 @@ function groundDetail(mat, textured) {
           float joint = smoothstep(0.035, 0.0, abs(fract(along * (0.1 + 0.08 * kb) + kb * 7.0) - 0.5)) * step(0.35, gNoise(vec2(floor(along * (0.1 + 0.08 * kb) + kb * 7.0) * 3.1, nb * 5.3))); // (upright cracks, not through every bed)
           float grit = gNoise(vec2(along * 1.3, vGround.y * 2.6)) * 0.6 + gNoise(vec2(along * 0.21, vGround.y * 0.5 + 5.0)) * 0.4;
           vec3 stone = mix(vec3(0.43, 0.41, 0.43), vec3(0.64, 0.6, 0.57), kb * 0.6 + grit * 0.4) * (0.84 + 0.3 * grit) * (1.0 - 0.42 * max(seam, joint * 0.8));
-          diffuseColor.rgb = mix(diffuseColor.rgb, stone, smoothstep(0.05, 0.55, -vGrove));
+          diffuseColor.rgb = mix(diffuseColor.rgb, stone, smoothstep(0.05, 0.55, -vGrove) * (1.0 - max(vLook.x, vLook.w))); // (not over desert sand or a volcano's black rock)
         }
         // a blossom grove: the ground mossy and dark in the trees' shade, petals lying on it in drifts
         // (after the owner's picture: almost no green, pink over everything)

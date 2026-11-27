@@ -957,7 +957,7 @@ It is on `endless-world` only; it does not go to `main` until the owner says so.
 
 - **The heart** (`core/shape.js`: a new kind of site, `heart`, laid out as the volcano is). Deep in a
   grove (0.7 or more), on ground 4 to 70 m up, with no sea, snow or lake near and fairly even country
-  round it, the land is raised into a **terrace** 44 to 58 m across and about 24 m above what lies in
+  round it, the land is raised into a **terrace** 90 to 115 m across and about 24 m above what lies in
   front of it. The front is a **cliff** (7 to 8 m of rise per metre); round the back it comes down as a
   slope you walk up (0.3 to 0.56). One to a square of 1100 m, in four squares of five where the land
   fits. Other places, waystones, shrines and rivers keep off it.
@@ -971,18 +971,31 @@ It is on `endless-world` only; it does not go to `main` until the owner says so.
 - **Sheer faces are bare stone** (`world/terrain.js`): the ground's rock picture is a mossy green and
   is laid flat, so on a cliff it drew as a green smear. A face steeper than about 1.4 m per metre is
   now drawn in the ground shader as stone in level beds, each its own shade, with dark seams and
-  upright cracks, and carries no moss or petals. **This applies everywhere**, so the steepest mountain
-  faces change too (not looked at in a picture). No boulder is set on such a face (`world/wilds.js`).
+  upright cracks, and carries no moss or petals. **This applies everywhere** but on desert sand and a
+  volcano's black rock, so the steepest mountain faces change too (no clear picture of one was got).
+  No boulder is set on such a face (`world/wilds.js`). Far off, where the ground is drawn too coarse
+  to measure a 3 m wide cliff as steep, a heart's cliff is told by the drop from one point to the
+  next: counted, with the ground in 4.8 m squares (500 m off), 24 of the 35 points along the rim
+  are stone. At 900 m no ground of this kind was found drawn there, so that distance is unchecked.
 
 Counted with `tools/hearts.mjs` in seeds 1, 7 and 42: one or two hearts within 6 km of home (the
 nearest 1096 m, 3890 m and 870 m off); every top walkable; nothing else standing on any of them.
-Pictures (`tools/heart-view.mjs`, seed 1): `heart-below.png`, `heart-fall.png`, `heart-top.png`.
+Pictures (`tools/heart-view.mjs`, seed 1): `heart-below.png`, `heart-fall.png`, `heart-top.png`,
+`heart-pagodas.png`. The tool's shots from 150, 400 and 900 m and from above show nothing of it
+(trees, the player's head): there is no picture of the whole heart from a distance.
 
 **Against the owner's picture, still off:** the terrace is a round drum, not a broken, stepped
 crag with trees on its ledges; there is one fall, not several; the pool is small and there is no
-lake or mist at its foot; no far mountains behind. The view from 300 m off is shut in by trees
-(`heart-far.png` shows none of it). **Not measured:** speed on the owner's laptop; how long a square
-of ground takes to build with the heart in it.
+lake or mist at its foot; no far mountains behind; the fall's water steps sideways half way down,
+where its two lengths meet; the pagodas stand back from the lip and do not show from below. The view
+from 300 m off is shut in by trees (`heart-far.png` shows none of it). **Measured:** the land's
+height costs the same on a heart as off it (1.1 to 2.1 against 1.2 to 2.4 millionths of a second a
+point, five runs each in one page). **Not measured:** speed on the owner's laptop.
+
+Tests, by name: boot, places, trails, rivers, ways across water, the map, waystones, harbours, the
+shrine, one seed one world, travelling far and back, a world from before the land changed, settled
+lakes, fishing in a river: all pass. The rivers test was **changed**: a river may now end in a lake,
+the sea, or a heart's pool. Fishing in a river failed once (page errors) and passed twice after.
 
 ### A way to build it (ours; nothing agreed)
 

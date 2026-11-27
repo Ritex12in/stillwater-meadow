@@ -1060,7 +1060,7 @@ function heartRise(s, x, z, h) {
 }
 let lastHeart = null;
 /** The heart whose terrace reaches a spot (or comes within `pad` metres of it), or null. */
-function heartAt(x, z, pad = 0) {
+export function heartAt(x, z, pad = 0) {
   const K = SITE_KINDS.heart, cx = Math.floor(x / K.cell), cz = Math.floor(z / K.cell);
   if (!lastHeart || lastHeart.cx !== cx || lastHeart.cz !== cz) lastHeart = { cx, cz, s: siteOfCell('heart', cx, cz) };
   const s = lastHeart.s, far = HEART.reach + pad;

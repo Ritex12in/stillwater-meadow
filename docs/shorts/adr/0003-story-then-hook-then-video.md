@@ -1,6 +1,6 @@
 # 0003. Story first, then a hook, then the video
 
-- **Status:** accepted
+- **Status:** accepted; the order on screen superseded by [0013](0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md) (the opener, then the hook, then the story)
 - **Date:** 2026-11-27
 - **Who decided:** The owner's words, 2026-11-27.
 

@@ -5,15 +5,17 @@
 //   node tools/film/film.mjs                     every shot (needs `npm run dev`)
 //   SHOT=dawn,boat node tools/film/film.mjs       only these
 //   PREVIEW=1 node tools/film/film.mjs            four small stills per shot, to check the framing
+//   FILM=world node tools/film/film.mjs           another film: its shots from shots-world.mjs, to e:/Games/_assets/film-world/
 //
 // Frames go to e:/Games/_assets/film/frames/<shot>/00000.jpg; previews to e:/Games/_assets/film/preview/.
 import { chromium } from 'playwright';
 import { mkdirSync, readFileSync, rmSync, existsSync } from 'node:fs';
-import { shots } from './shots.mjs';
+const SET = process.env.FILM || '';
+const { shots } = await import(SET ? `./shots-${SET}.mjs` : './shots.mjs');
 
 const P = JSON.parse(readFileSync(new URL('./places.json', import.meta.url)));
 const FPS = 30, W = 1920, H = 1080, preview = !!process.env.PREVIEW, DSF = preview ? 0.5 : +(process.env.DSF || 1.5);
-const OUT = 'e:/Games/_assets/film';
+const OUT = 'e:/Games/_assets/film' + (SET ? '-' + SET : '');
 const only = process.env.SHOT ? process.env.SHOT.split(',') : null;
 
 const RUNTIME = async ({ shot, P }) => {
@@ -89,7 +91,7 @@ for (const shot of shots) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('  ERR', shot.name, e.message));
   const u = shot.url || {}, at = shot.at || [P.spawn.x, P.spawn.z];
-  await page.goto(`http://127.0.0.1:8080/?seed=1&weather=${u.weather || 'clear'}&season=${u.season || 'summer'}&at=${at[0].toFixed(1)},${at[1].toFixed(1)}#${u.hour ?? 12}`);
+  await page.goto(`http://127.0.0.1:8080/?seed=1&weather=${u.weather || 'clear'}${u.season ? '&season=' + u.season : SET ? '' : '&season=summer'}&at=${at[0].toFixed(1)},${at[1].toFixed(1)}#${u.hour ?? 12}`);
   await page.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 180000 });
   await page.waitForTimeout(4000); // (the models and the fonts)
   const src = { name: shot.name, dur: shot.dur, text: shot.text, setup: shot.setup && shot.setup.toString(), frame: shot.frame && shot.frame.toString() };

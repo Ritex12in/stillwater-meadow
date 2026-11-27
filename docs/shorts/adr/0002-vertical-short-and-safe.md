@@ -1,6 +1,6 @@
 # 0002. Vertical, short, inside the safe areas
 
-- **Status:** proposed
+- **Status:** proposed; its length (15 to 35 s) superseded by [0013](0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md) (40 to 60 s)
 - **Date:** 2026-11-27
 - **Who decided:** Claude's pick, offered on 2026-11-27; the owner has not objected, nor said yes.
 

@@ -42,7 +42,7 @@ Story first, then a hook, then the video ([ADR 0003](adr/0003-story-then-hook-th
 1. **The story** is what really happened: a want, a difficulty, a turn, a result. It is written in the
    brief before anything else, with the commits that show it.
 2. **The hook** is the first two seconds: the one picture and line that make someone stay.
-3. **The video** is the story told in 15 to 35 seconds, with a voice and captions
+3. **The video** is the story told in 40 to 60 seconds, opening on "I'm building a whole game with AI", then the hook, then the story ([ADR 0013](adr/0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md)), with a voice and captions
    ([ADR 0004](adr/0004-voice-and-captions-both.md)), in a tall frame
    ([ADR 0002](adr/0002-vertical-short-and-safe.md)).
 

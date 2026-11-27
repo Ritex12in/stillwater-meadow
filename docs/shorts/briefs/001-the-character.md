@@ -1,8 +1,8 @@
 # 001. The character
 
-- **Status:** review: the rewritten script was approved by the owner on 2026-11-28 ("yes, film it"); filmed and edited the same day; waits for the owner to watch it
+- **Status:** re-making: rewritten on 2026-11-28 to 40 to 60 seconds, the opener first ([ADR 0013](../adr/0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md)), at the owner's word ("too short and missing some points"); the earlier cut waits to be replaced
 - **Idea:** A1 in [IDEAS.md](../IDEAS.md)
-- **Length:** 27 seconds
+- **Length:** about 50 seconds (to be set by the voice when made)
 - **Shows only what is live on the site?** yes
 - **Approved by the owner on:** 2026-11-28
 
@@ -16,37 +16,45 @@ not", `36e98f0`), then "sharp spikes with a curve" (`da8f185`), then "few, big, 
 (`905b641`), then flame shapes from the flame's own maths (`d9e1567`), then given springs and
 collision (`d10efd5`). About 25 commits in a day, and no modelling program opened.
 
+## The opener
+
+The first line of every short ([ADR 0013](../adr/0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md)): "I'm building a whole game with AI. I haven't written a single line of code."
+
 ## The hook
 
-Today's boy, close, his hair moving. "Fifteen days ago, this boy was made of boxes."
+Today's boy, close, his hair moving. "Two weeks ago, this boy was a stack of boxes." ("Fifteen days" became "two weeks", which ages better.)
 
 ## The script
 
-Rewritten 2026-11-28 at the owner's word: the story of how he changed, told for itself (see Notes).
+Rewritten 2026-11-28 to 40 to 60 seconds: the opener, the hook, then the story in full.
 
 | # | Line (voice and caption) | On screen | Filmed from |
 |---|---|---|---|
-| 1 | Fifteen days ago, this boy was made of boxes. | Today's boy, close up, a slow quarter turn. | today |
-| 2 | Day one. | The first version: a figure of boxes by the lake, his dog beside him. | `620f25a` (13 Nov) |
-| 3 | Day two, he was sculpted, in code. | The first sculpted child, close, same framing as today's. | `c9b7c6f` (14 Nov) |
-| 4 | Then I drew him on paper, and we rebuilt him to match. Round head. No, oval. Bigger hair. Spikes. With a curve. | Six real versions of him, one per phrase, same pose and camera. | `e469097`, `20fcba4`, `9d2b54f`, `36e98f0`, `da8f185`, `d9e1567` (22 Nov) |
-| 5 | Then his hair learned to move. | He jumps and lands; the hair bounces. | today |
-| 6 | Now he jumps, and he glides. | He drops from a height and the glider opens. | today |
-| 7 | I describe him. An AI writes the code. | Wide: him by the lake at dusk. | today |
-| 8 | Stillwater Meadow. Free, in your browser. | End card over the same shot. | today |
+| 1 | I'm building a whole game with AI. I haven't written a single line of code. | Today's boy by the home lake in the late sun, the camera coming round to him. | today |
+| 2 | Two weeks ago, this boy was a stack of boxes. | Today's boy, close up, a slow quarter turn. | today |
+| 3 | Day one. A few boxes, and his dog. | The first version: a figure of boxes by the lake, his dog beside him. | `620f25a` (13 Nov) |
+| 4 | Day two, he was sculpted, all in code. | The first sculpted child, close. | `c9b7c6f` (14 Nov) |
+| 5 | But he didn't feel like mine. So I drew him on paper, and described what I saw. | The first version of 22 November, the camera closing in. | `e469097` (22 Nov) |
+| 6 | Round head. No, oval. Bigger hair. Spikes. With a curve. | Five real versions, one per phrase, same pose and camera. | `20fcba4`, `9d2b54f`, `36e98f0`, `da8f185`, `d9e1567` (22 Nov) |
+| 7 | About twenty five tries in one day, and not one modelling program. | The flame-spiked version, the camera going round him. | `d9e1567` |
+| 8 | Then his hair got springs, so it bounces when he lands. | He jumps and lands; the hair bounces. | today |
+| 9 | Now he rolls out of long falls, and he glides. | A 14 m fall and the roll; then a drop and the glider opening. | today |
+| 10 | I describe him. The AI writes the code. | Wide: him by the lake at dusk; the end card. | today |
 
-Words: 62. Length: 27 s (set by the voice: en-US-Andrew).
+Words: 115, with the end card. About 50 s at the voice's pace.
 
 ## Claims check
 
 | Line | Claim | Allowed? |
 |---|---|---|
-| 1 | Fifteen days ago he was a figure of boxes. | Yes: `620f25a` is 13 November and the figure in it is built of boxes; the short is dated 28 November. The number must be changed if the short is posted much later ("In two weeks" would age better). |
-| 2, 3 | Day one; day two he was sculpted in code. | Yes: `620f25a` is the first day in the history, `c9b7c6f` the second (14 November), and the children are built in code (`src/characters/kid.js`). |
-| 4 | The owner drew him and he was rebuilt to match, in those steps. | Yes: the commits of 22 November, made from the owner's character sheets. "We" is the owner and the AI. |
-| 5 | His hair moves. | Yes: hair with springs and collision, `d10efd5`. |
-| 6 | He jumps and glides. | Yes, and live on the site. |
-| 7 | The owner describes; an AI writes the code. | Yes. |
+| 1 | The owner is building a whole game with AI and has written no code. | Yes ([CLAIMS.md](../CLAIMS.md)): the AI writes all the code. Not "AI made everything". |
+| 2 | Two weeks ago he was boxes. | Yes: `620f25a`, 13 November, fifteen days before 28 November. |
+| 3, 4 | Day one boxes and the dog; day two sculpted in code. | Yes: `620f25a`, `c9b7c6f`; `src/characters/kid.js`. |
+| 5, 6 | The owner drew him and described him; the steps. | Yes: the commits of 22 November, from the owner's sheets. |
+| 7 | About 25 tries in a day; no modelling program. | Yes: about 25 commits on 22 November; the figure is code, no model file. |
+| 8 | His hair has springs and bounces. | Yes: `d10efd5`. |
+| 9 | He rolls out of long falls and glides. | Yes, and live. |
+| 10 | The owner describes; the AI writes the code. | Yes. |
 
 ## Shots
 
@@ -82,3 +90,4 @@ To watch `e:\Games\_assets\shorts\001-the-character\001-the-character.mp4` and s
 - The title's "The title says" note above is about the earlier title and no longer applies.
 - 2026-11-28: filmed and edited (`node tools/shorts/make.mjs 001`): 27.1 s, 1080 x 1920, 27 MB, 12 shots from 9 versions of the game, 24 captions, the AI voice over the game's day music. The six versions of line 4 cut in on the words they show (Round, oval, Bigger, Spikes, With). Claude has looked at it only as stills (a strip of one frame every two seconds, and single frames): the motion, the voice and the mix have not been heard or seen by anyone yet.
 - Day one (`620f25a`) cannot be driven by script, so it is framed as that version opens: from behind, further off than the rest.
+- 2026-11-28: the owner, having seen the shorts: "too short and missing some points; 40 to 60 seconds; mention at the start that I am building a game using AI completely, then a hook, then the story" ([ADR 0013](../adr/0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md)). Rewritten: the opener first (worded so it is true: the AI writes all the code; the downloaded kit art means "AI made everything" would not be), then the hook, then the story with the steps the 25-second cut skipped. The earlier script is in the file's history.

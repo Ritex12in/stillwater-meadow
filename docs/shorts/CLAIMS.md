@@ -9,10 +9,12 @@ code on 2026-11-27 and must be checked again whenever the game changes what is t
 | Claim | Why it is true |
 |---|---|
 | "Made with AI": the code is written by an AI (Claude) that the owner directs. | The commit history; the owner's decision to say so. |
+| "I'm building a whole game with AI. I haven't written a single line of code." (the opener, [ADR 0013](adr/0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md)) | The AI writes all the code; the owner directs, draws and judges. Not "AI made everything": see the downloaded art below. |
+| Rivers run from the hills to a lake or the sea, up to 20 m wide, with broad waterfalls; a cherry blossom valley has a cliff with three falls that glow at night; every blossom tree glows at night. | `src/core/shape.js`, `src/world/rivers.js`. **Live only from the publish of 2026-11-28** (world version 4); not before. |
 | The owner did not write the code, model or animate; they described what they wanted, drew character sheets, and judged pictures. | docs/endless-world.md records the owner's words and decisions. |
 | The characters (the boy, the girl, the skipper), the cats and dogs, and their hair, faces and clothes are made in code: no 3D model files. | `src/characters/kid.js`, `animals.js`. |
 | All the animation is code: walking, sitting, jumping, climbing, gliding. No animation files. | `src/characters/kidpose.js`, `movepose.js`. |
-| The shape of the land, the mountains, the lakes, rivers, waterfalls, the sea, the sky, the weather and the seasons are made in code. (The grass and soil painted on the ground are picture files: see below.) | `src/core/shape.js`, `src/world/`. |
+| The shape of the land, the mountains, the lakes, rivers, waterfalls, the sea, the sky and the weather are made in code. (Seasons no longer turn: each place keeps its own, for good, since 2026-11-28.) (The grass and soil painted on the ground are picture files: see below.) | `src/core/shape.js`, `src/world/`. |
 | The buildings (pagodas, castles, windmills, harbours, waystones) are made in code. | `src/world/buildings.js`. |
 | The whole world comes from one seed; any word is a seed; the world has no edge. | `src/systems/save.js`, `src/core/shape.js`. |
 | It runs in a web browser, free, with nothing to install. | The public site. |

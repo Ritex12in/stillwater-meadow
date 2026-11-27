@@ -1,8 +1,8 @@
 # 003. One valley
 
-- **Status:** review: made on 2026-11-28 at the owner's word ("if it's done, work on 003"; the choice of idea and the script are Claude's); waits for the owner to watch it
+- **Status:** re-making: rewritten on 2026-11-28 to 40 to 60 seconds, the opener first ([ADR 0013](../adr/0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md)), at the owner's word ("too short and missing some points"); the earlier cut waits to be replaced
 - **Idea:** A5 in [IDEAS.md](../IDEAS.md)
-- **Length:** 25.6 seconds
+- **Length:** about 55 seconds (to be set by the voice when made)
 - **Shows only what is live on the site?** yes
 - **Approved by the owner on:** 2026-11-28, by asking for it to be made; the script itself they have not read
 
@@ -14,34 +14,44 @@ valley was replaced by land grown from one number (`1dbed87` to `f878351`). On 2
 said "currently the world feels so random", and the land was given a shape: oceans, continents and
 islands (`738d87d`), and harbours with passages between them (`6c4aa93`).
 
+## The opener
+
+The first line of every short ([ADR 0013](../adr/0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md)): "I'm building a whole game with AI. I haven't written a single line of code."
+
 ## The hook
 
-He hangs under a glider high over forest, mountains ahead. "This world has no edge. Two weeks ago, it
-was one small valley."
+He hangs under a glider high over the woods, the land running to the horizon. "This world has no edge. Two weeks ago, it was one small valley."
 
 ## The script
 
+Rewritten 2026-11-28 to 40 to 60 seconds: the opener, the hook, then the story in full.
+
 | # | Line (voice and caption) | On screen | Filmed from |
 |---|---|---|---|
-| 1 | This world has no edge. Two weeks ago, it was one small valley. | Gliding high over the woods round home, the camera behind him. | today |
-| 2 | Day one. A meadow, a lake, and mountains you could never reach. | The first version: the valley as it opened, the box figure and his dog by the lake. | `620f25a` |
-| 3 | Then the land was grown from a single number. Walk any way, for ever. | Open grassland two kilometres from home, hills to the horizon, the camera turning. | today |
-| 4 | But endless felt random. So it got oceans, and continents. | A beach, the sea, a far shore. | today |
-| 5 | And harbours, to sail between them. | A jetty at dusk, the sea beyond. | today |
-| 6 | Type any word, and it grows a world of your own. Stillwater Meadow, free in your browser. | End card over the harbour. | today |
+| 1 | I'm building a whole game with AI. I haven't written a single line of code. | Gliding high over the woods round home. | today |
+| 2 | This world has no edge. Two weeks ago, it was one small valley. | Gliding on, the land to the horizon. | today |
+| 3 | Day one. A meadow, a lake, and mountains painted round it, that you could never reach. | The first version: the valley as it opened. | `620f25a` |
+| 4 | Then the land was grown from one number. Type any word, and you get a different world. | Open grassland 2 km from home, the camera turning. | today |
+| 5 | But endless felt random. So it got oceans, continents and islands. | A beach, the sea, a far shore. | today |
+| 6 | And harbours, where a skipper sails you to the next continent. | A jetty at dusk, the sea beyond. | today |
+| 7 | Rivers run from the hills to the sea, some twenty metres wide, falling in broad waterfalls. | The broadest fall near home (river 1:-1, 9.4 m tall, 13 m wide), from below. | today (from the publish of 28 Nov) |
+| 8 | And deep in a cherry blossom valley, a cliff with three waterfalls that glow at night. | The grove's heart at night, from its front door. | today (from the publish of 28 Nov) |
+| 9 | All of it grown from that one number. | Gliding high at dusk; the end card. | today |
 
-Words: 71. Length: 25.6 s (set by the voice: en-US-Andrew).
+Words: 129, with the end card. About 56 s at the voice's pace.
 
 ## Claims check
 
 | Line | Claim | Allowed? |
 |---|---|---|
-| 1 | The world has no edge; two weeks ago it was one valley. | Yes: the land is made from the seed wherever you go; `620f25a` is 13 November, fifteen days before this was made. |
-| 2 | Day one's mountains could not be reached. | Yes: in `620f25a` they are scenery round the valley. |
-| 3 | The land is grown from a single number; you can walk any way for ever. | Yes: the seed. "For ever" on a continent ends at its coast; the land itself has no end, and the harbours carry you on. Said loosely; see Notes. |
-| 4 | It felt random; it got oceans and continents. | Yes: the owner's words of 27 November, and `738d87d`. |
-| 5 | Harbours to sail between them. | Yes: `6c4aa93`, live. |
-| 6 | Any word grows a world. | Yes: any text is a seed (`ad37abc`). |
+| 1 | The owner is building a whole game with AI and has written no code. | Yes ([CLAIMS.md](../CLAIMS.md)): the AI writes all the code. Not "AI made everything". |
+| 2 | No edge; two weeks ago one valley. | Yes: the seed; `620f25a`, 13 November. |
+| 3 | Day one's mountains were painted and could not be reached. | Yes: scenery round the valley in `620f25a`. |
+| 4 | Grown from one number; any word gives a different world. | Yes: the seed; any text is a seed (`ad37abc`). |
+| 5, 6 | Oceans, continents, islands; a skipper sails you to the next continent. | Yes: `738d87d`, `6c4aa93`, live. |
+| 7 | Rivers to the sea, up to 20 m wide, broad falls. | Yes from the publish of 28 November (`f508d5a`); not before. Most end in a lake: "to the sea" holds for some. If that bothers, "to the lakes and the sea". |
+| 8 | A cherry blossom valley with a cliff and three falls that glow at night. | Yes from the publish of 28 November. |
+| 9 | All of it grown from one number. | Yes: the land, rivers, harbours and the valley all follow from the seed. |
 
 ## Shots
 
@@ -74,3 +84,5 @@ To watch `e:\Games\_assets\shorts\003-one-valley\003-one-valley.mp4` and say yes
 - "Walk any way, for ever" is loose: on today's land a walk ends at the coast. If that bothers,
   "the land goes on for ever" is exact.
 - The caption "for ever." falls just after the cut to the coast.
+- 2026-11-28: the owner, having seen the shorts: "too short and missing some points; 40 to 60 seconds; mention at the start that I am building a game using AI completely, then a hook, then the story" ([ADR 0013](../adr/0013-ai-said-first-then-hook-then-story-40-to-60-seconds.md)). Rewritten: the opener first (worded so it is true: the AI writes all the code; the downloaded kit art means "AI made everything" would not be), then the hook, then the story with the steps the 25-second cut skipped. The earlier script is in the file's history.
+- Lines 7 and 8 show what goes live with the publish of 28 November; this short is made only after it.

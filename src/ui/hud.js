@@ -126,7 +126,7 @@ const wake = () => { idle = 0; document.body.classList.remove('quiet'); };
 
 export function initHud() {
   $('promptMore').addEventListener('click', () => { moreOpen = !moreOpen; lastKey = ''; renderPrompts(shown); });
-  document.querySelectorAll('[data-panel]').forEach((b) => b.addEventListener('click', () => togglePanel(b.dataset.panel)));
+  document.querySelectorAll('[data-panel]').forEach((b) => b.addEventListener('click', (e) => { togglePanel(b.dataset.panel); if (e.detail > 0) b.blur(); })); // (clicked with the mouse, it lets go of the keyboard: Space is to jump, not to press it again)
   document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => togglePanel(b.dataset.close, false)));
   $('errorClose').addEventListener('click', () => { $('error').hidden = true; });
   ['controls', 'journal', 'worldPanel', 'settingsPanel', 'menuPanel'].forEach((id) => { if (!panels.has(id)) panels.set(id, () => {}); });

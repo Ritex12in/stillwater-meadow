@@ -9,8 +9,8 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { query } from '../core/env.js';
-import { HOME, sitesNear, continentAt, groundAt } from '../core/shape.js';
-import { hooks } from '../core/state.js';
+import { HOME, sitesNear, continentAt, groundAt, walkable, slopeAt } from '../core/shape.js';
+import { hooks, pushOut } from '../core/state.js';
 import { std, glowTex } from '../core/materials.js';
 import { player, hero } from '../characters/player.js';
 import { setMovesWorld, mv } from '../characters/moves.js';
@@ -87,7 +87,15 @@ function* search() {
   spots.sort((p, q) => p[2] - q[2]);
   for (const kind of KINDS) for (const [x, z] of spots) {
     const s = sitesNear(x, z, 520, kind).find((q) => Math.hypot(q.x - HOME.x, q.z - HOME.z) > 500 && continentAt(q.x, q.z) === home);
-    if (s) { const a = s.turn + 2.2, r = (s.flat || 2) * 0.6 + 2.2; spot = { site: s, name: placeName(s), x: s.x + Math.cos(a) * r, z: s.z + Math.sin(a) * r }; return; }
+    if (s) {
+      // beside it, on ground you can stand on, clear of what stands there: the first such spot round it, going outward
+      for (let r = (s.flat || 2) * 0.6 + 2.2; r < 16 && !spot; r += 1.5) for (let k = 0; k < 10 && !spot; k++) {
+        const a = s.turn + 2.2 + k * 0.63, x = s.x + Math.cos(a) * r, z = s.z + Math.sin(a) * r, q = { x, z };
+        pushOut(q, 0.9);
+        if (walkable(x, z) && slopeAt(x, z) < 0.6 && q.x === x && q.z === z) spot = { site: s, name: placeName(s), x, z };
+      }
+      if (spot) return;
+    }
     yield;
   }
 }

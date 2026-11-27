@@ -236,7 +236,7 @@ restoreWeather(store.weather);
 onSave((s) => {
   s.time = { live: timeCtl.live, hour: timeCtl.target };
   s.weather = { auto: wx.auto, type: wx.type };
-  s.where = { seed: WORLD.seed, x: +player.x.toFixed(2), z: +player.z.toFixed(2) };
+  if (!player.mode) s.where = { seed: WORLD.seed, x: +player.x.toFixed(2), z: +player.z.toFixed(2) }; // (not on a face or in the air: you wake where you last stood)
 });
 
 // ── Apply the time-of-day palette to the scene ──

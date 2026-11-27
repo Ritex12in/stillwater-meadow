@@ -1,7 +1,7 @@
 // Dev tool: picture sheets of the player's moves (characters/moves.js), for judging the animation:
 // each move is played in the game as it is and its frames set side by side, seen from the side.
 //   node tools/move-sheet.mjs [name ...]     (dev server running; sheets go to e:/Games/_assets/previews/move-<name>.png)
-//   names: jump runjump heavy roll climb slide glide
+//   names: jump runjump heavy roll climb slide glide top
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
 const want = process.argv.slice(2);
@@ -103,6 +103,31 @@ if (run('climb') || run('slide') || run('glide')) {
     await p.waitForTimeout(1500); await p.keyboard.down('KeyD'); await p.waitForTimeout(1100); await p.keyboard.up('KeyD'); await p.keyboard.down('KeyW'); await p.waitForTimeout(1100); await p.keyboard.up('KeyW'); await p.keyboard.down('KeyS');
     const png = await j; await p.keyboard.up('KeyS'); save('glide', png);
     console.log('after glide:', JSON.stringify(await p.evaluate(() => ({ mode: window.__meadow.moves.mode, y: window.__meadow.player.y }))));
+  }
+}
+if (run('top')) { // a short face, climbed right over its top
+  const f = await p.evaluate(() => {
+    const m = window.__meadow, G = m.geo, H = m.home;
+    for (let r = 250; r < 3200; r += 30) for (let a = 0; a < 6.28; a += 0.1) {
+      const x = H.x + Math.cos(a) * r, z = H.z + Math.sin(a) * r;
+      if (!G.walkable(x, z) || G.height(x, z) < 2) continue;
+      for (let q = 0; q < 6.28; q += 0.4) {
+        const dx = Math.cos(q), dz = Math.sin(q);
+        if (G.walkable(x + dx * 1, z + dz * 1) || !G.walkable(x - dx * 1.5, z - dz * 1.5)) continue;
+        let d = 1; while (d < 9 && !G.walkable(x + dx * d, z + dz * d) && G.height(x + dx * d, z + dz * d) > 0.5) d += 0.5;
+        if (d < 3 || d >= 9) continue;
+        if (G.height(x + dx * d, z + dz * d) - G.height(x, z) > 3 && G.walkable(x + dx * (d + 1), z + dz * (d + 1)) && G.walkable(x + dx * (d + 2), z + dz * (d + 2))) return { x, z, dx, dz };
+      }
+    }
+    return null;
+  });
+  console.log('step', JSON.stringify(f));
+  if (f) {
+    await toFace(f, 0);
+    await p.keyboard.down('KeyW');
+    await p.waitForFunction(() => window.__meadow.moves.mode === 'top', null, { timeout: 30000 }).catch(() => console.log('never reached the top'));
+    save('top', await film('top', { title: 'Over the top: forearms on the edge, a heave, a knee onto the ledge, up, dusting the hands', every: 0.09, n: 12, dist: 4.5, angle: Math.PI * 0.3, pitch: 0.35, settle: 1 }));
+    await p.keyboard.up('KeyW');
   }
 }
 await b.close();

@@ -138,3 +138,73 @@ test('climbing, sliding and gliding: push into a steep face to take hold and cli
   expect(['cairn', 'windmill', 'circle', 'castle', 'waystone']).toContain(spot.kind);
   noErrors(errors);
 });
+
+/** A short steep face near home: a spot at its foot, the way up it, and level ground at its top (3 to 9 m of face). */
+const findStep = (page) => page.evaluate(() => {
+  const m = window.__meadow, G = m.geo, H = m.home;
+  for (let r = 250; r < 3200; r += 30) for (let a = 0; a < 6.28; a += 0.1) {
+    const x = H.x + Math.cos(a) * r, z = H.z + Math.sin(a) * r;
+    if (!G.walkable(x, z) || G.height(x, z) < 2) continue;
+    for (let q = 0; q < 6.28; q += 0.4) {
+      const dx = Math.cos(q), dz = Math.sin(q);
+      if (G.walkable(x + dx * 1, z + dz * 1) || !G.walkable(x - dx * 1.5, z - dz * 1.5)) continue;
+      let d = 1; while (d < 9 && !G.walkable(x + dx * d, z + dz * d) && G.height(x + dx * d, z + dz * d) > 0.5) d += 0.5;
+      if (d < 3 || d >= 9) continue;
+      const rise = G.height(x + dx * d, z + dz * d) - G.height(x, z);
+      if (rise > 3 && G.walkable(x + dx * (d + 1), z + dz * (d + 1)) && G.walkable(x + dx * (d + 2), z + dz * (d + 2))) return { x, z, dx, dz, d, rise };
+    }
+  }
+  return null;
+});
+
+test('over the top, and finding the glider: a climb ends in a heave onto the level above; without the glider a long fall tells you where it lies and tracks it; you take it there, and then it opens', async ({ page }) => {
+  const errors = await open(page, 'weather=clear');
+  await step(page, 1);
+  const f = await findStep(page);
+  expect(f, 'a short steep face within 3 km of home').toBeTruthy();
+  await page.evaluate((f) => { const m = window.__meadow; m.travelTo(f.x, f.z, f.x + f.dx * 5, f.z + f.dz * 5); }, f);
+  await step(page, 0.5);
+  const y0 = (await moves(page)).y;
+  await page.keyboard.down('KeyW');
+  const up = await page.evaluate(() => { const m = window.__meadow, seen = new Set(); let n = 0; while (n++ < 3000) { m.tick(1 / 60); seen.add(String(m.moves.mode)); if (seen.has('top') && !m.moves.mode) break; } return { seen: [...seen], n, pose: m.moves.pose.top }; });
+  await page.keyboard.up('KeyW');
+  expect(up.seen, 'took hold, climbed, heaved over the top').toEqual(expect.arrayContaining(['climb', 'top']));
+  const at = await moves(page);
+  expect(at.mode).toBeNull();
+  expect(at.act).toBe('free');
+  expect(at.y - y0, 'up on the level above').toBeGreaterThan(2);
+  expect(await page.evaluate(() => { const m = window.__meadow; return m.geo.walkable(m.player.x, m.player.z); })).toBe(true);
+  expect(up.pose, 'the pose is over').toBe(-1);
+
+  // no glider yet: Space in the air does nothing; a long fall says where it lies, and tracks it
+  const g = await page.evaluate(() => window.__meadow.glider);
+  expect(g.has).toBe(false);
+  expect(g.spot, 'it lies somewhere').toBeTruthy();
+  expect(await page.evaluate((s) => window.__meadow.geo.walkable(s.x, s.z), g.spot), 'where you can stand').toBe(true);
+  await page.evaluate(() => { const m = window.__meadow; m.travelTo(m.spawn.x + 14, m.spawn.z + 14); });
+  await step(page, 0.3);
+  await page.evaluate(() => window.__meadow.dropFrom(22));
+  await T(page, 30);
+  expect(await page.evaluate(() => window.__meadow.jump()), 'nothing to open').toBe(false);
+  await page.evaluate(() => { const m = window.__meadow; let n = 0; while ((m.moves.mode || m.moves.rolling) && n++ < 900) m.tick(1 / 60); });
+  const tr = await page.evaluate(() => window.__meadow.waypoints.track);
+  expect(tr && tr.id, 'tracked').toBe('glider');
+  expect(await page.locator('#toast').textContent()).toContain('glider');
+  // go to it and take it
+  await T(page, 90);
+  await page.evaluate((s) => { window.__meadow.travelTo(s.x + 1.2, s.z, s.x, s.z); }, g.spot);
+  await step(page, 1.2);
+  expect(await page.evaluate(() => window.__meadow.glider.shown), 'it lies there to be seen').toBe(true);
+  expect((await actions(page)).map((a) => a.id)).toContain('glider-take');
+  await page.keyboard.press('KeyE');
+  await step(page, 0.3);
+  const got = await page.evaluate(() => ({ has: window.__meadow.glider.has, track: window.__meadow.waypoints.track, kept: !!window.__meadow.store.glider }));
+  expect(got).toEqual({ has: true, track: null, kept: true });
+  expect((await actions(page)).map((a) => a.id)).not.toContain('glider-take');
+  // and now it opens
+  await page.evaluate(() => window.__meadow.dropFrom(15));
+  await T(page, 12);
+  expect(await page.evaluate(() => window.__meadow.jump())).toBe(true);
+  expect((await moves(page)).mode).toBe('glide');
+  noErrors(errors);
+});

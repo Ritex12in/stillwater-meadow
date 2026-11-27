@@ -20,6 +20,7 @@ const to = (o, ax, v, w) => { o.rotation[ax] = lerp(o.rotation[ax], v, w); };
  */
 export function poseMoves(k, m, t) {
   const L = k.legs, K = k.knees, A = k.arms, E = k.elbows, B = k.body, C = k.chest, H = k.head;
+  B.position.z = 0;
 
   // ── the crouch before a jump: hips down, knees deep, chest forward, arms swung back ──
   if (m.crouch > 0.001) {
@@ -71,9 +72,12 @@ export function poseMoves(k, m, t) {
   // ── a roll out of a long fall: tucked, over one shoulder, up onto a knee ──
   if (m.roll >= 0) {
     const p = m.roll, tuck = sstep(0, 0.12, p) * (1 - sstep(0.7, 1, p)), spin = sstep(0.05, 0.75, p), knee = sstep(0.7, 0.82, p) * (1 - sstep(0.88, 1, p));
-    B.rotation.x += spin * Math.PI * 2;
+    // (the hips turn about the feet, so the ball is carried round its own middle instead: up and back as it goes over)
+    const th = spin * Math.PI * 2, mid = 0.72 * tuck;
+    B.rotation.x += th;
+    B.position.y += mid * (1 - Math.cos(th)); B.position.z = -mid * Math.sin(th);
     B.rotation.z += Math.sin(spin * Math.PI) * 0.35; // (over the right shoulder)
-    B.position.y -= 0.42 * tuck + 0.26 * knee;
+    B.position.y -= 0.3 * tuck + 0.26 * knee;
     for (const i of [0, 1]) { to(L[i], 'x', -1.95, tuck); to(K[i], 'x', 2.25, tuck); to(A[i], 'x', -1.3, tuck); to(A[i], 'z', (i ? -1 : 1) * 0.35, tuck); to(E[i], 'x', -1.9, tuck); }
     to(C, 'x', 0.45, tuck); to(H, 'x', 0.6, tuck);
     // up on one knee, a hand on it

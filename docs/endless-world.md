@@ -815,6 +815,90 @@ are the country's in summer whatever the season; rivers are drawn, trails and br
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
 
+## The cherry blossom valley: the owner's picture, analysed (2026-11-28; nothing built yet)
+
+The owner: "time to work on the biome examples I gave; pick one and start analysing". Picked: "Enchanted
+Cherry Blossom Valley" (in the owner's Downloads), the plan's first biome, since the game already has
+blossom trees, pagodas, a shrine with stone lanterns, and deer. Measured from the picture itself (its
+colours counted by hue, 320 pixels wide) and set against the game's blossom grove as it is today
+(`e:/Games/_assets/previews/grove-now.png`, `grove-pagoda-now.png`: seed 1, spring, 6.12 pm).
+
+### The colours, counted
+
+| | The picture | The game's grove today |
+|---|---|---|
+| Pink and magenta | 34% | 2 to 6% |
+| Red, orange, warm brown | 29% | 24 to 42% (sunset sky and bark) |
+| Violet | 12% | 2 to 3% |
+| Blue | 12% | 0% |
+| Gold | 7% | 3 to 10% |
+| Green | **1%** | **34 to 65%** |
+| Bright pixels (over 80% bright) | 34% | 3 to 7% |
+| Brightness, mean | 0.62 | 0.36 to 0.42 |
+| Saturation, mean | 0.38 | 0.41 to 0.47 |
+
+The picture is not more saturated than the game: it is far lighter, and its hues are different ones.
+Almost nothing in it is green. Its grass reads as moss in shadow (`#473a3d`) under a carpet of petals.
+
+Colours picked from it: blossom in light `#dc93aa`, in the distance `#c594b0`, in shadow `#773749`;
+sky `#f1b5d8` to `#fbcad0` by the sun; snow on the peak `#ccb0d4` (lilac, not white); far mountains
+`#8780b8`; cliff rock `#6b655b`; falling water `#7a8bb3` (blue-violet, not white); mist `#ac9cb3`;
+path `#c59a65`; near rock `#9e7585` (pink light on grey); stream `#646474`; trunk `#603b3d`; moss on
+the trunk `#735914`; lantern glow `#b6763d`; deer `#9d5a3b`; bridge `#a2837d`.
+
+### How it is put together
+
+- **Three depths.** Near: one huge old cherry as a frame (its trunk fills the left sixth, its boughs
+  the whole top third), blossoms and a mossy boulder at the bottom edge. Middle: a stream with low
+  falls, an arched bridge, a deer, a stone path, lanterns. Far: cliffs with tall waterfalls, pagodas
+  on top of them, one snow peak, the sun low behind it.
+- **The eye's way in:** the path from the bottom left corner and the stream from the bottom right
+  both lead to the bridge, a third of the way up; above it the falls; above them the pagodas.
+- **Height in steps:** stream, then meadow, then a cliff of perhaps 25 to 40 m with the falls, then a
+  plateau with the buildings, then the peak. Every step has blossom trees on it.
+- **Light:** a low sun behind the scene, so things are rimmed with pink and their near sides are in
+  soft shadow; warm points of light (windows, lanterns) against the cool violet distance.
+- **Air:** mist at the foot of every fall and between the depths, taking the far things toward
+  lilac; petals in the air and lying on everything (path, rocks, water).
+
+### What is in it
+
+| Thing | In the picture | In the game today |
+|---|---|---|
+| Blossom trees | Many sizes: one giant, mid trees with broad flat crowns on dark twisting trunks, small far ones; all pink | Blossom trees exist; today they read pale lilac-grey, not pink, and are all of a size |
+| Petals | In the air, and lying thick on path, rocks, grass and water | Falling petals at the home shrine's cherry only; none lie on the ground |
+| Ground | Moss and short grass, nearly hidden; a worn stone path; mossy boulders | Plain green grass (65% of the picture is green) |
+| Water | A stream with low stepped falls and rocks in it; tall cliff falls, several side by side | Rivers and falls exist (redrawn 2026-11-28) but are ramps, not cliffs; none placed in the groves |
+| Cliffs and a plateau | The heart of it | None in the groves: they lie on ordinary rolling ground |
+| Pagodas | Several, on the cliff tops, windows lit | One to a grove at most, on level ground, windows lit at dusk |
+| Bridge | Arched, wooden, railed, over the stream | Footbridges exist where trails cross rivers (flat) |
+| Stone lanterns | Along the path and by the water, lit | At the shrine only |
+| Deer | Spotted, grazing by the path | Deer exist (by country), not spotted |
+| A snow peak | One cone on the horizon, lilac | Mountains exist; none placed for a view |
+| Sky | Pink to lavender, soft clouds, a low sun | The sky's own sunset colours (orange); nothing by biome |
+
+### What stands between the game and the picture, largest first
+
+1. **The hues.** The grove's blossom is the wrong colour and its ground is green. Pink blossom,
+   petal-covered ground and a sky, fog and light tinted for the place where you stand would move the
+   picture's numbers most, and none of it moves the land.
+2. **The lightness.** Mist, a pale sky and a bright ground: the game's scene is half as bright.
+3. **The land's shape.** Cliffs, a plateau, falls dropping off it, a stream below: this needs the
+   land changed (the plan's "hearts"), and the cliffs the waterfalls were waiting for.
+4. **The things:** a giant cherry, stepped stream falls, an arched bridge, lanterns along a path,
+   several pagodas on the heights, spotted deer.
+5. **The composition** is a painter's; in a game the player's eye is wherever they stand. What can be
+   done is to lay the heart out so that the way in (the trail) gives that view: path and stream
+   converging on the bridge, the falls and pagodas above it, the peak behind.
+
+### A way to build it (ours; nothing agreed)
+
+Colour first, since it is the largest gap and changes no land: (a) the grove's own look where you
+stand (blossom pink, petals on the ground, sky, fog and light), judged by pictures; then (b) the
+things that need no cliff (lanterns along trails in a grove, the giant cherry, spotted deer, an
+arched bridge); then (c) the heart itself, which changes the land (a cliffed plateau with falls and a
+stream, the pagodas set on it), with the other changes to the land.
+
 ## How the pines are grown from code (2026-11-28; made and measured; the owner keeps the kit's)
 
 **The owner's verdict, on seeing the comparison: "external assets are good".** The downloaded pines, and

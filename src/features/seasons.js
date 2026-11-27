@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { clamp, damp, rnd, mulberry32, hash } from '../core/math.js';
 import { query } from '../core/env.js';
-import { glowTex } from '../core/materials.js';
+import { glowTex, neonU } from '../core/materials.js';
 import { hooks, seasonState as st, world } from '../core/state.js';
 import { coldAt, coldBase, northness, ASPECT, HOME, lakeChill, height, groveAt, biomesAt, yearAt, yearOf, latitudeAt, beltOf, wetSeasonAt } from '../core/shape.js';
 import { yearPhase, seasonValue, isCooling, phaseName, dayOfPhase, chillNow, snowFrom, iceFrom, flowersOut, leavesAt, SEASON_PHASE, ICE_LAG, seasonU, yearHereU, seasonHere, phaseHere } from '../core/year.js';
@@ -210,7 +210,7 @@ export function initSeasons() {
     const want = kind === 'autumn' ? 1 : kind === 'spring' ? 0.6 : 0;
     particleAmt = damp(particleAmt, want * (1 - wx.rain * 0.7), 0.6, dt);
     falling.update(dt, t, camera.position, particleAmt, 0.75, 0.4 + wx.wind * 2, 0);
-    if (falling.obj.visible) falling.u.uOpacity.value = Math.min(1, particleAmt * 1.3) * (0.35 + 0.65 * Math.max(cur.day, 0.2));
+    if (falling.obj.visible) falling.u.uOpacity.value = Math.min(1, particleAmt * 1.3) * Math.max(0.35 + 0.65 * Math.max(cur.day, 0.2), fallingKind === 'spring' ? 0.4 + 0.6 * neonU.value : 0); // (petals in the air glow by night with the trees)
   });
 
   // rain or snow, by how cold it is where you stand

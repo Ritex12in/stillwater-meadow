@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { lerp } from '../core/math.js';
 
-import { std, col, weatherize, addWind, bothSides, instancedVariants, lodSet, slotSet, cutoutDepth, treeWarp, softEdges, neonAtNight } from '../core/materials.js';
+import { std, col, weatherize, addWind, bothSides, instancedVariants, lodSet, slotSet, cutoutDepth, treeWarp, softEdges, neonAtNight, blossomGlow } from '../core/materials.js';
 import { kit, fit } from '../core/assets.js';
 import { variantAt } from './detail.js';
 import { world } from '../core/state.js';
@@ -164,7 +164,7 @@ export function kitTrees(lists, lod) {
   const twisted = [1, 2, 3, 4, 5].map((i) => fit(pieces('TwistedTree_' + i), 6.6, 0.15));
   const tl = twisted.map((m) => first(m, /Leaves/)), tb = twisted.map((m) => first(m, /Bark/));
   lodSetOf(tb, tb.map((b) => farBark(b, 3)), warpedBark(tex('bark_twisted')), 'rounds', blossomKind, Object.assign({}, L, { depthMat: barkDepth() }));
-  const blossom = lodSetOf(tl, tl.map((l) => farLeaves(l, FAR_KEEP)), treeWarp(crownStd(tex('leaves_bush'))), 'roundItems', blossomKind, Object.assign({}, L, { depthMat: leafDepth(tex('leaves_bush')) }));
+  const blossom = lodSetOf(tl, tl.map((l) => farLeaves(l, FAR_KEEP)), blossomGlow(treeWarp(crownStd(tex('leaves_bush')))), 'roundItems', blossomKind, Object.assign({}, L, { depthMat: leafDepth(tex('leaves_bush')) }));
   const crowns = [common, blossom];
   if (meadow) {
     // maples (broad, spreading), birches (tall, white-barked) and light, airy common trees

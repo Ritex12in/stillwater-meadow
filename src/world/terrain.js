@@ -360,7 +360,7 @@ function groundDetail(mat, textured) {
       vLook = look;
       vGrove = grove.x; vSheer = grove.y;
       ${textured ? 'vSplat = splat;' : ''}`);
-    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nvarying vec2 vYear;\nvarying vec4 vLook;\nvarying float vGrove;\nvarying float vSheer;\nuniform vec3 uFalls[3];\nuniform vec3 uCam;\nuniform float uFreshSnow;\nuniform float uNightGlow;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
+    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nvarying vec2 vYear;\nvarying vec4 vLook;\nvarying float vGrove;\nvarying float vSheer;\nuniform vec3 uFalls[3];\nuniform vec3 uCam;\nuniform float uFreshSnow;\nuniform float uNightGlow;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\nfloat gPetal = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
       // (wrapped first: far from the middle of the world the numbers get too big for sin() to scatter)
       float gHash(vec2 p) { return fract(sin(dot(mod(p, 1024.0), vec2(127.1, 311.7))) * 43758.5453); }
       float gNoise(vec2 p) {
@@ -463,6 +463,7 @@ function groundDetail(mat, textured) {
           float petals = mix(lies, (0.22 + 0.62 * drift) * 0.42, away);
           vec3 pink = mix(vec3(0.98, 0.6, 0.75), vec3(1.0, 0.86, 0.92), h2);
           diffuseColor.rgb = mix(diffuseColor.rgb, pink, gv * petals * 0.92);
+          gPetal = gv * petals; // (they glow by night: below)
         }
         // a sheer face (the cliff of a grove's heart): bare stone in level beds, weathered, darker in its seams
         // (the ground's rock picture is mossy and is laid flat, so it smears down a cliff: this is drawn by height instead)
@@ -494,6 +495,7 @@ function groundDetail(mat, textured) {
     sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       {
         // (a heart's falls glow by night: their light on the rock beside them and the ground about the pool)
+        totalEmissiveRadiance += vec3(0.95, 0.42, 0.68) * gPetal * uNightGlow * 0.5; // (the petals lying in a grove glow by night, as its trees do)
         float fallGlow = 0.0;
         for (int i = 0; i < 3; i++) { float fd = length(vGround.xz - uFalls[i].xy); fallGlow += uFalls[i].z * (1.0 - smoothstep(1.5, 24.0, fd)) * (1.0 - smoothstep(1.5, 24.0, fd)); }
         totalEmissiveRadiance += vec3(0.05, 0.13, 0.27) * min(fallGlow, 1.6) * uNightGlow;

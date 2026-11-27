@@ -517,6 +517,26 @@ export function softEdges(mat) {
   return mat;
 }
 
+/**
+ * Blossom that glows by night (the owner: "make cherry blossom trees and leaves glow at night"): a crown
+ * lights up in its own pink, soft, not white-hot as the neon flowers are, so a grove at night is a
+ * field of lanterns. Before the haze, so far trees still melt into the night. Apply after addWind and treeWarp.
+ */
+export function blossomGlow(mat, k = 1) {
+  const prev = mat.onBeforeCompile, baseKey = mat.customProgramCacheKey();
+  mat.onBeforeCompile = (sh, r) => {
+    prev.call(mat, sh, r);
+    sh.uniforms.uNeon = neonU;
+    sh.fragmentShader = 'uniform float uNeon;\n' + sh.fragmentShader.replace('#include <fog_fragment>', `if (uNeon > 0.001) {
+        vec3 bc = diffuseColor.rgb; float bm = max(max(bc.r, bc.g), bc.b);
+        vec3 hue = mix(bc / max(bm, 1e-3), vec3(1.0, 0.58, 0.82), 0.4);
+        gl_FragColor.rgb = max(gl_FragColor.rgb, hue * (0.58 + 0.3 * min(bm, 1.0)) * uNeon * ${(1.0 * k).toFixed(3)});
+      }
+      #include <fog_fragment>`);
+  };
+  mat.customProgramCacheKey = () => baseKey + '|blossomglow' + k;
+  return mat;
+}
 /** How strongly the flowers glow (0 by day, 1 deep in the night); set each frame from the time of day. */
 export const neonU = { value: 0 };
 /**

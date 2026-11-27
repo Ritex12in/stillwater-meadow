@@ -89,6 +89,7 @@ export function renderPrompts(list) {
   lastKey = key;
   shown = list;
   if (coarsePointer) { renderPad(list); return; }
+  list = list.filter((x) => !(x.quiet && x.quiet())); // (a key everyone knows, Space to jump, is not prompted for; on a touch screen it is a button)
   primaryEl = primaryEl || $('promptPrimary');
   moreEl = moreEl || $('promptMore');
   extraEl = extraEl || $('promptExtra');

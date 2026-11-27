@@ -12,6 +12,7 @@ const RULES = {
   dialog: { from: ['free', 'pet', 'sit', 'fish'], locks: true },
   photo:  { from: ['free', 'sit', 'pet', 'fish', 'lie', 'dance'], locks: true },
   dance:  { from: ['free'], locks: true },
+  aloft:  { from: ['free'] }, // off the ground: jumping, falling, climbing, sliding, gliding (characters/moves.js)
 };
 
 const listeners = new Set();

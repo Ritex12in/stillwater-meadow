@@ -26,6 +26,7 @@ import { chooseShrineSite, buildShrine, shrineNear } from './world/shrine.js';
 import { buildClouds, buildFireflies, buildButterflies, buildPollen, buildBirds, birds, birdMat, updateAmbientLife, tintClouds, ffMat, fireflies, butterflies, pollen, pollenMat } from './world/ambient.js';
 import { buildEffects, updateEffects } from './world/effects.js';
 import { player, hero, buildPlayer, updatePlayer } from './characters/player.js';
+import { resetMoves, movesView, pressJump, dropFrom, MOVES } from './characters/moves.js';
 import { animals, buildAnimals, updateAnimal, separateAnimals, shakeDogs } from './characters/animals.js';
 import { registerPetting, updatePetting } from './characters/petting.js';
 import { buildBoat, updateBoat } from './characters/boat.js';
@@ -52,6 +53,7 @@ import { initFoundPlaces, foundView } from './features/places.js';
 import { initMap, mapView } from './ui/map.js';
 import { initWaypoints, waypointsView, travelToPoint, track } from './features/waypoints.js';
 import { initHarbours, harboursView, sail } from './features/harbours.js';
+import { initGlider, gliderView } from './features/glider.js';
 import { initCamp } from './features/camp.js';
 import { initLandmarks, landmarksView, landmarkBlocks, landmarkSeats } from './world/landmarks.js';
 import { initSignposts, signsNear, signBlocks } from './world/signposts.js';
@@ -157,6 +159,7 @@ initWorldPanel();
 /** Go to a spot at once (the Places list): the ground and what grows there are made ready first. */
 function travelTo(x, z, faceX, faceZ) {
   if (!walkable(x, z)) { const to = landNear(x, z); if (faceX === undefined && (to.x !== x || to.z !== z)) { faceX = x; faceZ = z; } x = to.x; z = to.z; } // (out at sea, say: the nearest shore, facing it)
+  resetMoves();
   player.x = x; player.z = z; player.slide = null; player.y = groundAt(x, z);
   if (faceX !== undefined) { player.rot = Math.atan2(faceX - x, faceZ - z); camState.yaw = Math.atan2(x - faceX, z - faceZ); }
   updateAnchor(0, true); // (if this is another settled lake, its jetty, fire and bench are here when you arrive)
@@ -207,7 +210,7 @@ onQualityChange((o) => {
 window.addEventListener('resize', resize);
 
 // ── Features, each isolated so one failing can't take down the rest ──
-const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initMap: () => initMap((x, z) => travelTo(x, z)), initWaypoints: () => initWaypoints(travelTo), initHarbours, initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initIceDance, initDanceCam, initDanceMusic, initFoley };
+const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initMap: () => initMap((x, z) => travelTo(x, z)), initWaypoints: () => initWaypoints(travelTo), initHarbours, initGlider, initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initIceDance, initDanceCam, initDanceMusic, initFoley };
 for (const [name, init] of Object.entries(features)) {
   try {
     const r = init();
@@ -393,6 +396,8 @@ window.__meadow = {
   /** Waystones (features/waypoints.js): those awake, the points you can travel to, those asleep about you; and a way to travel to a point. */
   get waypoints() { return waypointsView(); }, travelToPoint, track,
   /** Harbours (features/harbours.js): those about you, those visited, the passages from the nearest; and a way to sail one. */
+  /** Jumping, climbing, sliding, gliding (characters/moves.js): how it stands, and Space. */
+  get moves() { return movesView(); }, get glider() { return gliderView(); }, jump: pressJump, dropFrom, MOVES,
   get harbours() { return harboursView(); }, sail: (id) => { const h = harbourById(id); return !!h && sail(h); },
   /** The year: hold it at a phase (0 midwinter .. 0.5 midsummer; null lets it run), and how it is now. */
   year: { hold: holdPhase, get state() { return Object.assign({}, seasonState, { mapWeather: undefined }); } },

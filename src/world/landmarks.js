@@ -136,6 +136,9 @@ export function updateLandmarks(x, z) {
 /** The floating island whose updraft is near (x, z), or the one you stand on: its floor. */
 const islandFloor = (near) => { for (const vs of made.skyisle || []) if (vs) for (const c of vs.copies) if (c.site && c.floor && (!near || Math.hypot(c.floor.base.x - near.x, c.floor.base.z - near.z) < 3)) return c.floor; return null; };
 
+/** The floating islands standing just now: their tops (`x`, `z`, `y`, `r`) and the updraft below (`base`). */
+export const islandTops = () => { const out = []; for (const vs of made.skyisle || []) if (vs) for (const c of vs.copies) if (c.site && c.floor) out.push(c.floor); return out; };
+
 export function initLandmarks() {
   let lookIn = 0;
   // the updraft: step into the ring of light and it lifts you onto the island; from the island's middle, glide back down

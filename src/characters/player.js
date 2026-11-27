@@ -6,6 +6,8 @@ import { timeU, windU } from '../core/materials.js';
 import { seats, pushOut, hooks } from '../core/state.js';
 import { makeKid, KIDS, moveAttachments } from './kid.js';
 import { poseKid, STRIDE_RATE } from './kidpose.js';
+import { poseMoves } from './movepose.js';
+import { updateMoves, initMoves, mv } from './moves.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
 import { camState, moveInput } from '../systems/input.js';
@@ -27,6 +29,7 @@ export function buildPlayer() {
   hero = makeKid(KIDS.boy);
   scene.add(hero.root);
   registerSeatActions();
+  initMoves(player);
 }
 /** Change your clothes: another rig takes over, carrying anything held or worn. */
 export function setHeroRig(k) {
@@ -111,6 +114,9 @@ export function updatePlayer(dt, petting) {
   if (player.petting && petting(dt, input.mag)) { poseHero(dt); return; }
   player.petAmt = damp(player.petAmt, 0, 6, dt);
 
+  // off the ground (jumping, falling, climbing, sliding, gliding: characters/moves.js), or about to be
+  if (updateMoves(player, dt, { dx, dz, mag, speed, ix: locked ? 0 : input.ix, iz: locked ? 0 : input.iz })) { poseHero(dt); return; }
+
   // Standing somewhere you can't (the ice just thawed under you): head for the nearest shore.
   const canStand = walkable(player.x, player.z);
   if (canStand) wasOnIce = onIce(player.x, player.z);
@@ -190,10 +196,11 @@ export function poseHero(dt) {
   player.idleT = player.move < 0.15 && activity.free ? player.idleT + dt : 0;
   player.t = timeU.value;
   poseKid(hero, player, dt);
+  poseMoves(hero, mv, player.t);
   // the face: content by default, beaming while petting
   hero.face.set(player.petAmt > 0.5 ? 'happy' : player.lieAmt > 0.5 ? 'sleepy' : 'calm');
   for (const h of hooks.pose) h(dt);
-  hero.root.position.set(player.x, player.y, player.z);
+  hero.root.position.set(player.x + mv.ox, player.y + mv.oy, player.z + mv.oz);
   hero.root.rotation.y = player.rot;
   hero.root.updateMatrixWorld(true);
   hero.face.update(dt, timeU.value);

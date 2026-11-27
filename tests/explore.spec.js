@@ -138,7 +138,7 @@ test('the characters: you and your friend are the sculpted children; there is no
   const errors = await open(page, 'weather=clear&season=summer', '#12');
   await page.waitForFunction(() => window.__meadow.characters().friendShown, null, { timeout: 60000 });
   expect((await page.evaluate(() => window.__meadow.characters())).heroShown).toBe(true);
-  await page.locator('[data-panel="settingsPanel"]').click();
+  await page.locator('[data-panel="settingsPanel"]').evaluate((el) => el.click()); // (clicked in the page: the software renderer's frames here take many seconds, and a real click waits on them)
   expect(await page.locator('#charYou').count(), 'no character list in Settings').toBe(0);
   noErrors(errors);
 });

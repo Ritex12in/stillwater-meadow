@@ -815,6 +815,51 @@ are the country's in summer whatever the season; rivers are drawn, trails and br
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
 
+## How jumping, climbing, sliding and gliding work (built 2026-11-28)
+
+The owner: "we need more actions for the player: he can't climb, jump, jump from a cliff, glide;
+every action needs detailed animation." Asked for the picks: no stamina for climbing, a cloth wing
+for a glider, the glider found (not given), no swimming yet.
+
+`characters/moves.js` (what you do), `characters/movepose.js` (how it looks),
+`features/glider.js` (the wing, the dust, where the glider lies), `tests/moves.spec.js`,
+`tools/move-sheet.mjs` (picture sheets of every move, played in the game as it is).
+
+- **The land has no sheer walls.** It is one surface: a "cliff" is ground steeper than 51 degrees
+  (`MAX_SLOPE`). Measured over home's continent, three seeds: 12 to 15% of the land, nearly all of
+  it between 51 and 70 degrees, in faces mostly 60 to 150 m high. So climbing is going up ground too
+  steep to walk, and a jump from a cliff meets the face again within a second or so; long free
+  falls do not happen until the land has real cliffs (the plan's waterfalls). The landings by
+  height are built and tested by lifting the player.
+- **A mode on the player** (`player.mode`: 'air', 'climb', 'slide', 'glide', 'top'), handled before
+  walking. `walkable` and everyone else's rules are untouched. While it is set the activity is
+  'aloft', so nothing else can be begun; travelling clears it. All of it runs from `dt`.
+- **Jump** (Space; a button on a touch screen, no prompt on a desktop). A crouch of 0.09 s, then up
+  at 6.2 m/s under a gravity of 18: 1.0 m high, 0.68 s. A running jump carries your speed.
+- **Landing** by how far you fell: soft (under 2.2 m), heavy (to 6 m: a hand to the ground, 0.4 s
+  down), a roll (beyond: 0.95 s, carried forward). Nothing hurts. In water you splash and are put
+  back on the shore (a few strokes if it is within 14 m, else at once).
+- **Climb.** Push for 0.22 s into steep ground that rises before you. W up and S down along the
+  fall line at 1.25 m/s of face, A and D sideways, Space jumps off. The body lies along the face
+  (more upright the steeper it is) and is drawn a third of a metre out from it. At the top, a heave
+  over the edge (0.85 s). No stamina.
+- **Slide.** Push over the edge of steep ground that drops before you, or land on it without
+  pushing into it: you slide down the fall line at up to 7.5 m/s, A and D steer, Space jumps clear,
+  pushing back into the face takes hold of it. At the foot you run it off.
+- **Glide.** With the glider, Space in the air with 2 m of room below: 7 m/s forward, sinking 1.5
+  (1 in 4.7); A and D turn (1.5 rad/s, banking), W dives (11.5 and 4.6), S flares (4.6 and 1.0),
+  Space folds it. The ring of light under floating islands lifts you at 8 m/s past their top, and you
+  can land on one. Trees and walls stop you only within 5 m of the ground.
+- **The glider** is found by a high place on home's continent: the summit cairn nearest home,
+  failing that a windmill, a stone circle, a castle, the nearest waystone (looked for a little at a
+  time). The first long fall without it tells you where and tracks it. Taken with E, it is yours in
+  every world (`store.glider`), rolled on the backpack. `?glider=1` gives it at once.
+- **The poses** are laid over the walking pose by amount, as sitting is. The rig has no ankles or
+  wrists, so toes do not point and heels do not lift.
+- **Not built:** the windmilling step off an edge (you slide instead, there being no drop to step
+  into); ice walls and waterfalls that cannot be climbed; the camera drawing back in a long fall;
+  swimming. Your friend and the dogs do not follow you up a face or through the air.
+
 ## How travelling works (waystones, 2026-11-27)
 
 The owner asked for teleport points and said "go with your picks". The picks (ours: the owner may

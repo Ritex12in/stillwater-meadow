@@ -14,7 +14,7 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const UP = V(0, 1, 0);
 
 // ───────────── geometry ─────────────
-class Mesh {
+export class Mesh {
   constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.i = []; }
   vert(p, n, u, v, c) {
     this.p.push(p.x, p.y, p.z); this.n.push(n.x, n.y, n.z); this.uv.push(u, v); this.c.push(c, c, c);
@@ -40,7 +40,7 @@ function perp(d, a, out = V()) {
 }
 
 /** A tapering tube along `pts`; u goes round (`wrap` times), v runs along at `vPerM` per metre. */
-function tube(m, pts, radii, sides, shade, wrap, vPerM) {
+export function tube(m, pts, radii, sides, shade, wrap, vPerM) {
   const n = pts.length, T = V(), N = V(0.31, 0.2, 0.93), B = V(), dir = V(), pos = V();
   const base = m.p.length / 3;
   let along = 0;
@@ -163,7 +163,7 @@ function crown(r, P, sites) {
 
 // ───────────── painted textures ─────────────
 /** A canvas painted by `draw`, turned into a texture whose empty texels carry leaf grey (no dark mip fringes). */
-function leafAtlas(size, draw, bleed = [196, 196, 196], toGrey = false) {
+export function leafAtlas(size, draw, bleed = [196, 196, 196], toGrey = false) {
   const cv = document.createElement('canvas'); cv.width = cv.height = size;
   const x = cv.getContext('2d', { willReadFrequently: true });
   draw(x, size);
@@ -175,7 +175,7 @@ function leafAtlas(size, draw, bleed = [196, 196, 196], toGrey = false) {
   t.anisotropy = 4; t.flipY = false; t.needsUpdate = true;
   return t;
 }
-function barkTexture(w, h, draw) {
+export function barkTexture(w, h, draw) {
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
   draw(cv.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(cv);
@@ -251,7 +251,7 @@ function cluster(x, ox, oy, S, r, o) {
 }
 
 /** Furrowed bark: vertical ridges of varying darkness over a base colour, and a few cross cracks. */
-function furrowed(base, dark, seed) {
+export function furrowed(base, dark, seed) {
   return (x, w, h) => {
     const r = mulberry32(seed);
     x.fillStyle = base; x.fillRect(0, 0, w, h);

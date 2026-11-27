@@ -14,7 +14,7 @@ it changes.
 | Filming an old version (`tools/shorts/version.mjs`): checks out a commit outside the repo, serves it, opens it | built and tried (step 2) |
 | The tall frame (`tools/shorts/frame-test.mjs`): 1080 x 1920, the interface hidden, safe areas, a caption in the game's font | a test still made (step 3); not yet looked at on a phone |
 | The maker (`tools/shorts/make.mjs`): voice, timing, each shot filmed from its own version, captions, edit | built; made short 001 |
-| Shorts | 001 made (27 s), not yet watched by the owner, not posted |
+| Shorts | 001 (the character, 27 s), 002 (a bug: through the floor, 24 s) and 003 (one valley to a world, 26 s) made; none yet watched by the owner; none posted |
 
 ## The order of work
 

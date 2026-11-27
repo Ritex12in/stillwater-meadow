@@ -20,7 +20,7 @@ One thing, shown as it was in each real version of the game.
 | A2 | The pets | Cats and dogs before and after they were redrawn in the children's style. | yes | idea |
 | A3 | The waterfall | A flat cyan ribbon with white stripes; then white water, mist and rocks. | no | idea |
 | A4 | The mountains | A painted ridge on the horizon; then peaks you can walk to. | yes | idea |
-| A5 | One valley to a whole world | A single hand-placed meadow; then land without an edge; then continents and harbours. | partly | idea |
+| A5 | One valley to a whole world | A single hand-placed meadow; then land without an edge; then continents and harbours. | partly | review ([003](briefs/003-one-valley.md)) |
 | A6 | The whole journey | One view of the home lake at every milestone, first commit to today, cut to the music. | partly | idea |
 
 ## Series B: The bug that...
@@ -31,7 +31,7 @@ Something broken, shown broken; one line on why; the fix.
 |---|---|---|---|---|
 | B1 | One endless continent | Continents from plain noise all joined into one landmass, until each got its own square of sea. | no | idea |
 | B2 | The sea with an edge | The ocean stopped at a straight pale line a kilometre out. | no | idea |
-| B3 | The roll that went underground | A forward roll that turned about the feet and took the boy through the floor. | no | idea |
+| B3 | The roll that went underground | A forward roll that turned about the feet and took the boy through the floor. | no | review ([002](briefs/002-through-the-floor.md)) |
 | B4 | Snow that followed you | Fast travel to the tropics, and the snow came too. | no | idea |
 | B5 | Boulders far too big | The first rocks by the waterfalls. | no | idea |
 

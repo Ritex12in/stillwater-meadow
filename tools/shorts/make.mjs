@@ -61,7 +61,7 @@ console.log(`${NAME}: ${total.toFixed(1)} s, ${lines.length} lines, ${shots.leng
 for (const s of shots) console.log(`  shot ${String(s.n).padStart(2)}  ${s.from.toFixed(2).padStart(6)} s  ${s.dur.toFixed(2)} s  ${s.commit.padEnd(8)} line ${s.line}`);
 
 // ── 3. the film ──
-const RUNTIME = async (src) => {
+const RUNTIME = async ([src, rate]) => {
   try { const url = performance.getEntriesByType('resource').map((e) => e.name).find((x) => x.includes('/src/systems/quality.js')); if (url) { const Q = await import(url); if (Q.setQuality) Q.setQuality('ultra'); } } catch (e) { /* an old version without it */ }
   const css = document.createElement('style');
   css.textContent = 'body > *:not(canvas):not(#world) { display: none !important; } html, body { background: #000 !important; }';
@@ -71,7 +71,7 @@ const RUNTIME = async (src) => {
   performance.now = () => vt;
   window.requestAnimationFrame = (cb) => { q.push(cb); return q.length; };
   const fn = src ? (0, eval)('(' + src + ')') : null, c = { m: window.__meadow };
-  window.__short = { c, step(t, u) { if (fn) { try { fn(c, t, u); } catch (e) { c.err = String(e); } } for (let k = 0; k < 2; k++) { vt += 1000 / 60; const cbs = q; q = []; cbs.forEach((cb) => cb(vt)); } } };
+  window.__short = { c, step(t, u) { if (fn) { try { fn(c, t, u); } catch (e) { c.err = String(e); } } for (let k = 0; k < 2; k++) { vt += 1000 / 60 * (rate || 1); const cbs = q; q = []; cbs.forEach((cb) => cb(vt)); } } }; // (`rate` under 1: slow motion)
   return true;
 };
 const browser = await chromium.launch({ channel: 'chrome', args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
@@ -80,20 +80,21 @@ for (const s of shots) {
   const dir = `${OUT}/frames/s${String(s.n).padStart(2, '0')}`;
   if (!stills && reuse && !only && existsSync(dir) && readdirSync(dir).length === s.frames) continue;
   const t0 = Date.now(), v = await openVersion(browser, s.commit, { width: FRAME.width, height: FRAME.height, query: s.query || '', hash: s.hash || '#15', wait: 7000 });
-  await v.page.evaluate(RUNTIME, s.frame || null);
+  await v.page.evaluate(RUNTIME, [s.frame || null, s.rate || 1]);
   const step = (tt, n = 1) => v.page.evaluate(([tt, dur, n]) => { for (let i = 0; i < n; i++) window.__short.step(tt, Math.min(1, tt / dur)); return window.__short.c.err || null; }, [tt, s.dur, n]);
   await step(0, 120); // (settle: the camera comes round, the land and the models arrive)
   await v.page.waitForTimeout(1500);
   await step(0, 60);
   if (stills) {
-    await step(s.dur / 2, 1);
+    const mid = Math.round(s.frames * (s.still === undefined ? 0.5 : s.still)); for (let f = 0; f <= mid; f++) await step(f / FPS * (s.rate || 1)); // (played up to the still, so what moves has moved)
     mkdirSync(OUT + '/stills', { recursive: true });
     await v.page.screenshot({ path: `${OUT}/stills/s${String(s.n).padStart(2, '0')}-${v.sha}.jpg`, type: 'jpeg', quality: 85 });
   } else {
     if (existsSync(dir)) rmSync(dir, { recursive: true });
     mkdirSync(dir, { recursive: true });
     let err = null;
-    for (let f = 0; f < s.frames; f++) { err = (await step(f / FPS)) || err; await v.page.screenshot({ path: `${dir}/${String(f).padStart(5, '0')}.jpg`, type: 'jpeg', quality: 93 }); }
+    for (let f = 0; f < s.frames; f++) { err = (await step(f / FPS * (s.rate || 1))) || err; // (a shot's `t` is the game's time: slower than the film's in slow motion)
+      await v.page.screenshot({ path: `${dir}/${String(f).padStart(5, '0')}.jpg`, type: 'jpeg', quality: 93 }); }
     if (err) console.log('   shot ' + s.n + ' frame function failed: ' + err);
   }
   console.log(`  shot ${s.n} (${v.sha}, ${v.date}): ${stills ? 'still' : s.frames + ' frames'} in ${Math.round((Date.now() - t0) / 1000)} s${v.problems.length ? ' · page problems: ' + v.problems[0].slice(0, 90) : ''}`);

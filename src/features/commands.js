@@ -17,6 +17,9 @@
 //   speed <x>                 how fast you walk and run, times x
 //   tick rate <x> | tick freeze | tick unfreeze | tick step [n]     how fast the game runs: faster or
 //                             slower than real time, stopped, or stepped on by sixtieths of a second
+//   report [what is wrong]    saves a picture of the view and a file of how everything stands (the seed,
+//                             where you are, the time, the weather, what you carry, what is drawn, the
+//                             machine, the errors seen) to your downloads, to hand over with a complaint
 //   seed [text]               this world's seed; or go to another world
 import { registerCommand, commandList } from '../ui/console.js';
 import { timeCtl, setManual, goLive, formatHour } from '../systems/time.js';
@@ -35,10 +38,13 @@ import { gliderView } from './glider.js';
 import { hereText } from '../ui/world-panel.js';
 
 const far = (m) => (m < 60 ? 'here' : m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
+let lastReport = null;
+/** For tests: the last report made ({ name, info, picture: whether a picture was taken }). */
+export const lastReportView = () => lastReport;
 const SITES = ['waystone', 'pagoda', 'castle', 'ruin', 'hut', 'windmill', 'circle', 'cairn', 'spring', 'icecastle', 'grotto', 'volcano', 'beachhut', 'ship', 'skyisle'];
 
-/** `go(x, z, faceX, faceZ)` takes you to a spot; `visitLake(id)` to a lake's shore. */
-export function initCommands({ go, visitLake }) {
+/** `go(x, z, faceX, faceZ)` takes you to a spot; `visitLake(id)` to a lake's shore; `report()` gives the view and how things stand. */
+export function initCommands({ go, visitLake, report }) {
   registerCommand('help', 'the commands', () => commandList().map((c) => `${c.name.padEnd(8)} ${c.help}`));
 
   registerCommand('time', 'time 14 | 14:30 | +2 | -1 | live', (a) => {
@@ -175,6 +181,20 @@ export function initCommands({ go, visitLake }) {
     if (v === 'unfreeze' || v === 'run') { clock.frozen = false; clock.steps = 0; return now(); }
     if (v === 'step') { const n = a[1] === undefined ? 1 : num(a[1], 1, 6000); if (n === null) return 'tick step [n]: 1 to 6000 sixtieths of a second'; clock.frozen = true; clock.steps += Math.floor(n); return `Stepping on ${Math.floor(n)} ${Math.floor(n) === 1 ? 'sixtieth' : 'sixtieths'} of a second (${(Math.floor(n) / 60).toFixed(2)} s), then frozen.`; }
     return 'tick | tick rate <x> | tick freeze | tick unfreeze | tick step [n]';
+  });
+
+  // a report to hand over when something is wrong: the view as a picture, and how everything stands
+  registerCommand('report', 'report [what is wrong]: saves a picture of the view and a file of how things stand, to your downloads', (a, raw) => {
+    const r = report(), d = new Date(), two = (n) => String(n).padStart(2, '0');
+    const name = `stillwater-report-${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}-${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`;
+    r.info.note = raw || '';
+    lastReport = { name, info: r.info, picture: typeof r.picture === 'string' && r.picture.startsWith('data:image/png') };
+    const save = (href, file) => { const el = document.createElement('a'); el.href = href; el.download = file; document.body.appendChild(el); el.click(); el.remove(); };
+    const text = URL.createObjectURL(new Blob([JSON.stringify(r.info, null, 2)], { type: 'application/json' }));
+    save(text, name + '.json');
+    setTimeout(() => URL.revokeObjectURL(text), 10000);
+    if (lastReport.picture) setTimeout(() => save(r.picture, name + '.png'), 300); // (a moment apart: a browser may hold back two downloads at once)
+    return [`Saved to your downloads: ${name}.json${lastReport.picture ? ' and ' + name + '.png' : ' (the picture could not be taken)'}.`, 'If the browser asks whether this site may download several files, allow it.'];
   });
 
   registerCommand('seed', 'seed | seed <text>: this world, or go to another', (a, raw) => {

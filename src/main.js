@@ -4,9 +4,9 @@ import { updateAtmosphere } from './core/atmosphere.js'; // patches the fog shad
 import * as THREE from 'three';
 import { clamp, smooth, rng } from './core/math.js';
 import { reduceMotion, debug, query } from './core/env.js';
-import { scene, camera, createRenderer } from './core/render.js';
+import { scene, camera, canvas, createRenderer } from './core/render.js';
 import { timeU, updateDetail, neonU } from './core/materials.js';
-import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, moistAt, snowCold, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME, landNear, riverNear, harbourById } from './core/shape.js';
+import { lakeT, lakePoint, walkable, dockAt, dockDir, onDock, FIRE_SPOT, SPAWN, WORLD, height, rawHeight, heightAt, shrineSitesNear, coldAt, moistAt, snowCold, dryOf, lushOf, snowOf, groveAt, lakesNear, groundAt, kitOf, KIT, BENCH_SPOT, HOME, landNear, riverNear, harbourById, slopeAt, continentAt, latitudeAt, beltOf, seaAt } from './core/shape.js';
 import { hooks, seasonState, seats, world, obstacles } from './core/state.js';
 import { clock } from './core/clock.js';
 import { buildSky, sky, skyU } from './world/sky.js';
@@ -44,11 +44,11 @@ import { updateWilds, settleWilds, wildStats, growSquare, growRocks, growSmall, 
 import { buildBiomeThings } from './world/biomethings.js';
 import { biomesAt, biomeAt } from './core/biome.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
-import { store, onSave, flush, saveSoon, landChanged } from './systems/save.js';
+import { store, onSave, flush, saveSoon, landChanged, worldSeedText } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
-import { initWorldPanel } from './ui/world-panel.js';
+import { initWorldPanel, hereText } from './ui/world-panel.js';
 import { nearestCountries } from './ui/countries.js';
-import { initConsole, runCommand } from './ui/console.js';
+import { initConsole, runCommand, problems, typed } from './ui/console.js';
 import { initCommands } from './features/commands.js';
 import { initBackpack, backpackView } from './ui/backpack.js';
 import { initFoundPlaces, foundView } from './features/places.js';
@@ -188,7 +188,7 @@ function visitLake(id) {
   return false;
 }
 initConsole();
-initCommands({ go: travelTo, visitLake });
+initCommands({ go: travelTo, visitLake, report: makeReport });
 initScreen();
 const resizers = [];
 const resize = () => {
@@ -339,6 +339,38 @@ export function tick(dt) {
 }
 function renderNow() {
   renderFrame(quality.opts.effects);
+}
+
+/**
+ * A report of how things stand, for the `report` command (features/commands.js): the view as it is
+ * drawn just now (a PNG, as a data URL; the game's own picture, without the interface over it) and
+ * everything there is to say about where you are and what the game is doing.
+ */
+function makeReport() {
+  const m = window.__meadow, x = player.x, z = player.z, gl = renderer.getContext();
+  let gpu = '';
+  try { const ext = gl.getExtension('WEBGL_debug_renderer_info'); gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch (e) { gpu = 'unknown'; }
+  const part = (fn) => { try { return fn(); } catch (e) { return 'failed: ' + e.message; } };
+  renderNow(); // (drawn afresh, so the picture can be read back at once)
+  const picture = part(() => canvas.toDataURL('image/png'));
+  const info = {
+    made: new Date().toISOString(), address: location.href, seed: WORLD.seed, seedText: worldSeedText,
+    you: part(() => ({ x: +x.toFixed(2), z: +z.toFixed(2), y: +player.y.toFixed(2), facing: +player.rot.toFixed(3), ground: +groundAt(x, z).toFixed(2), slope: +slopeAt(x, z).toFixed(2), walkable: walkable(x, z), fromHome: Math.round(Math.hypot(x - HOME.x, z - HOME.z)), activity: activity.current, mode: player.mode || null, seat: player.seat ? player.seat.name : null, onFloor: !!player.floor, skating: !!player.skating, moving: +player.move.toFixed(2) })),
+    moves: part(() => { const v = movesView(); return { mode: v.mode, vy: +v.vy.toFixed(2), speed: +v.speed.toFixed(2), landing: v.landing, rolling: v.rolling }; }),
+    camera: part(() => ({ yaw: +camState.yaw.toFixed(3), pitch: +camState.pitch.toFixed(3), dist: +camState.dist.toFixed(2), x: +camera.position.x.toFixed(1), y: +camera.position.y.toFixed(1), z: +camera.position.z.toFixed(1), far: camera.far })),
+    time: part(() => ({ hour: +wrap24(timeCtl.hour).toFixed(2), shown: formatHour(timeCtl.hour), live: timeCtl.live, period: periodName(timeCtl.hour) })),
+    weather: part(() => ({ type: wx.type, auto: wx.auto, wind: +wx.wind.toFixed(2), wet: +wx.wet.toFixed(2) })),
+    season: part(() => Object.assign({}, seasonState, { mapWeather: undefined })),
+    here: part(() => hereText()),
+    place: part(() => { const c = continentAt(x, z), L = latitudeAt(x, z), lake = lakesNear(x, z, 600)[0]; return { continent: c ? c.name : null, belt: beltOf(L), latitude: +L.toFixed(3), sea: +seaAt(x, z).toFixed(3), climate: m.climate(x, z), biomes: m.biomes(x, z), biome: m.biomeAt(x, z), river: !!riverNear(x, z), nearestLake: lake ? { name: lake.name, far: Math.round(Math.hypot(lake.x - x, lake.z - z)), frozen: !!lake.frozen } : null }; }),
+    about: part(() => ({ landmarks: landmarksView().map((l) => ({ kind: l.kind, name: l.name, far: Math.round(Math.hypot(l.x - x, l.z - z)) })), harbours: harboursView().near.slice(0, 3).map((h) => ({ name: h.name, far: Math.round(Math.hypot(h.x - x, h.z - z)), known: h.known })), actions: evaluateActions().map((a) => a.id) })),
+    carried: part(() => ({ pack: pack.packView().filter(Boolean).map((it) => `${it.type}${it.key !== null && it.key !== undefined ? ':' + it.key : ''} x${it.n}${it.held ? ' (held)' : ''}`), glider: gliderView().has })),
+    travel: part(() => { const w = waypointsView(); return { awake: w.awake.length, tracking: w.track, harboursKnown: harboursView().known.length, placesFound: foundView().length, mapCells: mapView().cells, mapKm2: +(mapView().cells * 32 * 32 / 1e6).toFixed(2) }; }),
+    drawing: part(() => ({ fps: Math.round(quality.fps), quality: quality.level, setting: quality.setting, options: quality.opts, scale: quality.scale, pixelRatio: quality.dpr, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, ground: groundStats(), wilds: wildStats(), objects: m.objects() })),
+    debug: { tickRate: clock.rate, frozen: clock.frozen, walkSpeed: clock.walk, landNumber: store.gen, typed: typed.slice(-20), problems: problems.slice() },
+    machine: { screen: `${window.innerWidth}x${window.innerHeight}`, devicePixelRatio: window.devicePixelRatio, canvas: `${canvas.width}x${canvas.height}`, gpu, browser: navigator.userAgent, touch: matchMedia('(pointer: coarse)').matches, language: navigator.language },
+  };
+  return { picture, info };
 }
 
 let last = performance.now();

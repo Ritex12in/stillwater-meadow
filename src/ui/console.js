@@ -6,6 +6,14 @@
 import { bindKey } from '../systems/actions.js';
 
 const commands = new Map();
+/** The last errors the page has seen (for the `report` command): [{ at (ms since the page opened), text }]. */
+export const problems = [];
+const note = (text) => { problems.push({ at: Math.round(performance.now()), text: String(text).slice(0, 600) }); if (problems.length > 20) problems.shift(); };
+window.addEventListener('error', (e) => note((e.message || 'error') + (e.filename ? ` (${e.filename.replace(/^.*\//, '')}:${e.lineno})` : '')));
+window.addEventListener('unhandledrejection', (e) => note('unhandled: ' + (e.reason && e.reason.stack ? e.reason.stack : e.reason)));
+{ const was = console.error; console.error = (...a) => { note(a.map((x) => (x && x.stack) || x).join(' ')); was.apply(console, a); }; }
+/** What has been typed this visit (for the `report` command). */
+export const typed = [];
 /** Add a command: `run(args, raw)` gets the words after its name and returns what to say (a string, or lines). */
 export function registerCommand(name, help, run) { commands.set(name, { name, help, run }); }
 /** The commands there are: [{ name, help }]. */
@@ -44,7 +52,7 @@ export function initConsole() {
     e.preventDefault();
     const line = input.value.trim();
     if (!line) { show(false); return; }
-    history.push(line); at = history.length;
+    history.push(line); at = history.length; typed.push(line);
     say('/' + line.replace(/^\//, ''), true);
     const res = runCommand(line);
     if (res) say(res);

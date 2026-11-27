@@ -835,6 +835,12 @@ build a loading screen for fast travel".
   harbours made known within 3 km; `wake all` on the continent you are on; `wake <km>`), `speed <x>` (how fast you walk and run), `tick rate <x>`,
   `tick freeze`, `tick unfreeze` and `tick step [n]` (how fast the game runs: against real time, stopped, or
   stepped on by sixtieths of a second; `core/clock.js`, not saved), `seed`.
+- **`report [what is wrong]`** saves two files to the browser's downloads, `stillwater-report-<date>-<time>.png`
+  (the view as drawn, without the interface over it) and `.json` (the note, the address and seed, where
+  you are and what you are doing, the camera, the time, the weather, the season, the country and what
+  stands about, what you carry, how far you have travelled, what is being drawn and how fast, the debug
+  settings and the last commands typed, the machine and browser, and the errors the page has seen):
+  for the owner to hand over when something is wrong.
   Tests run them through `window.__meadow.command('season winter')`. The address's `?season=`,
   `?weather=` and `#hour` work as before.
 - **The travelling screen** (`features/waypoints.js`; `#travel`). Travelling from the map, and a

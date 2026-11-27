@@ -16,7 +16,7 @@ One thing, shown as it was in each real version of the game.
 
 | # | Short | The story in a line | Live on the site? | Status |
 |---|---|---|---|---|
-| A1 | The character | A simple figure; rebuilt from the owner's own drawings; the hair redone six times, then given physics. | yes | brief ([001](briefs/001-the-character.md)) |
+| A1 | The character | A simple figure; rebuilt from the owner's own drawings; the hair redone six times, then given physics. | yes | review ([001](briefs/001-the-character.md)) |
 | A2 | The pets | Cats and dogs before and after they were redrawn in the children's style. | yes | idea |
 | A3 | The waterfall | A flat cyan ribbon with white stripes; then white water, mist and rocks. | no | idea |
 | A4 | The mountains | A painted ridge on the horizon; then peaks you can walk to. | yes | idea |

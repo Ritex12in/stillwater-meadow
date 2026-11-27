@@ -13,8 +13,8 @@ it changes.
 | Picture sheets of the moves (`tools/move-sheet.mjs`) | exist |
 | Filming an old version (`tools/shorts/version.mjs`): checks out a commit outside the repo, serves it, opens it | built and tried (step 2) |
 | The tall frame (`tools/shorts/frame-test.mjs`): 1080 x 1920, the interface hidden, safe areas, a caption in the game's font | a test still made (step 3); not yet looked at on a phone |
-| Captions timed to a script, voice, the one command per short | not built |
-| Any short | none made; one brief drafted ([001](briefs/001-the-character.md)), not approved |
+| The maker (`tools/shorts/make.mjs`): voice, timing, each shot filmed from its own version, captions, edit | built; made short 001 |
+| Shorts | 001 made (27 s), not yet watched by the owner, not posted |
 
 ## The order of work
 
@@ -27,10 +27,10 @@ agreed, and no short is filmed before its brief is approved
 | 1 | **The owner reads this folder** and answers the open questions below. | Decisions; proposed ADRs become accepted or are replaced. | — |
 | 2 ✔ | **Can the past be filmed?** *Done 2026-11-28: yes, all three run (see below).* Try three old versions (the baseline `620f25a`, the first children `c9b7c6f`, the day of the hair `d10efd5`): check out, install, run, take one still each with the same camera. | Three stills side by side, and a note in HISTORY.md of which versions run. Proves or breaks [ADR 0006](adr/0006-the-past-is-filmed-from-the-real-versions.md). | step 1 |
 | 3 ◐ | **A vertical frame.** *A test still is made (`e:\Games\_assets\shorts\frame-test.png`); the owner has still to look at it on their phone.* The film tool renders 1080 x 1920; cameras framed for a tall picture; the safe areas drawn as guides on a test still. | One test still with guides, checked on the owner's phone. | step 1 |
-| 4 | **Captions.** Burned in from a script's lines and timings; the game's display font; inside the safe areas. | A 5-second test clip. | step 3 |
-| 5 | **Voice.** The script's lines spoken by the AI voice (`edge-tts`), with the time of each sentence, for the captions and cuts to follow. *Tried by hand 2026-11-28; not yet a tool.* | The test clip with a voice. | step 4, question 1 |
-| 6 | **One command per short.** A brief's shot list as data; `node tools/shorts/make.mjs 001` films, edits and writes the video and its text file. | The command, run on a throwaway test. | steps 2 to 5 |
-| 7 | **Short 001**, once its brief is approved. | The first short, for the owner's review. | step 6, the brief approved |
+| 4 ✔ | **Captions.** *Done 2026-11-28, in `tools/shorts/make.mjs`: the spoken words a few at a time, timed from the voice's own word times.* Burned in from a script's lines and timings; the game's display font; inside the safe areas. | A 5-second test clip. | step 3 |
+| 5 ✔ | **Voice.** *Done 2026-11-28: `tools/shorts/voice.py`.* The script's lines spoken by the AI voice (`edge-tts`), with the time of each sentence, for the captions and cuts to follow. *Tried by hand 2026-11-28; not yet a tool.* | The test clip with a voice. | step 4, question 1 |
+| 6 ✔ | **One command per short.** *Done 2026-11-28: `node tools/shorts/make.mjs 001` (a shot list in `tools/shorts/shorts/`; `STILLS=1` for one still a shot, `REUSE=1` to keep what is already filmed).* A brief's shot list as data; `node tools/shorts/make.mjs 001` films, edits and writes the video and its text file. | The command, run on a throwaway test. | steps 2 to 5 |
+| 7 ◐ | **Short 001**, once its brief is approved. *Filmed and edited 2026-11-28; waits for the owner to watch it.* | The first short, for the owner's review. | step 6, the brief approved |
 | 8 | **Post, log, learn.** | A row in [LOG.md](LOG.md); after a week, what to change. | step 7 |
 
 Steps 2 and 3 do not depend on each other and can be done in either order.

@@ -44,11 +44,18 @@ const tail = Math.max(lastShot.tail || 0, endSay ? spoken(endSay) + 0.9 : 0), en
 const shots = [];
 let at = 0;
 lines.forEach((l, i) => {
-  const sum = l.shots.reduce((a, s) => a + (s.weight || 1), 0), lead = i === 0 ? l.from : 0;
-  l.shots.forEach((s, k) => {
-    const dur = (l.dur + lead) * (s.weight || 1) / sum + (s === lastShot ? tail : 0);
-    shots.push({ ...s, n: shots.length + 1, from: at, dur, frames: Math.round(dur * FPS), line: i + 1 }); at += dur;
+  // a line's shots share its time by weight; or a shot begins on a word of the line (`cue`: the word as written)
+  const sum = l.shots.reduce((a, s) => a + (s.weight || 1), 0), lead = i === 0 ? l.from : 0, start = at, words = l.text.split(/\s+/);
+  const begins = l.shots.map((s, k) => {
+    if (k === 0) return start;
+    if (s.cue) { const w = words.indexOf(s.cue); if (w < 0 || !l.v.words[w]) throw new Error(`line ${i + 1}: no word "${s.cue}" to cut on`); return l.from + l.v.words[w].at - 0.1; }
+    return start + (l.dur + lead) * l.shots.slice(0, k).reduce((a, q) => a + (q.weight || 1), 0) / sum;
   });
+  l.shots.forEach((s, k) => {
+    const end = k < l.shots.length - 1 ? begins[k + 1] : start + l.dur + lead, dur = end - begins[k] + (s === lastShot ? tail : 0);
+    shots.push({ ...s, n: shots.length + 1, from: begins[k], dur, frames: Math.round(dur * FPS), line: i + 1 });
+  });
+  at = start + l.dur + lead + (l.shots.includes(lastShot) ? tail : 0);
 });
 console.log(`${NAME}: ${total.toFixed(1)} s, ${lines.length} lines, ${shots.length} shots, voice ${spec.voice}`);
 for (const s of shots) console.log(`  shot ${String(s.n).padStart(2)}  ${s.from.toFixed(2).padStart(6)} s  ${s.dur.toFixed(2)} s  ${s.commit.padEnd(8)} line ${s.line}`);
@@ -102,7 +109,8 @@ lines.forEach((l) => {
     const word = l.text.split(/\s+/)[k] || w.text; // (the script's own spelling and punctuation)
     if (!cur) { cur = { text: word, from: l.from + w.at - 0.06 }; caps.push(cur); } else cur.text += ' ' + word;
     cur.to = l.from + w.at + w.dur + 0.12;
-    if (/[.!?,:]$/.test(word) || cur.text.split(' ').length >= 4 || cur.text.length > 22) cur = null;
+    const left = l.v.words.length - 1 - k, ends = /[.!?,:]$/.test(word), nextEnds = left >= 1 && /[.!?,:]$/.test(l.text.split(/\s+/)[k + 1] || '');
+    if (ends || ((cur.text.split(' ').length >= 4 || cur.text.length > 22) && !nextEnds)) cur = null; // (a few words at a time; never one word left on its own at a sentence's end)
   });
 });
 caps.forEach((c, i) => { const next = caps[i + 1]; if (next && next.from - c.to < 0.5) c.to = next.from; c.to = Math.min(c.to, endFrom - 0.05); });
@@ -122,7 +130,7 @@ await browser.close();
 // ── 5. the edit ──
 // the shots, cut one after another
 const vin = shots.flatMap((s) => ['-framerate', String(FPS), '-i', `${OUT}/frames/s${String(s.n).padStart(2, '0')}/%05d.jpg`]);
-ff([...vin, '-filter_complex', shots.map((_, i) => `[${i}:v]`).join('') + `concat=n=${shots.length}:v=1:a=0,format=yuv420p[v]`, '-map', '[v]', '-c:v', 'libx264', '-preset', 'medium', '-crf', '14', '-r', String(FPS), `${OUT}/picture.mp4`]);
+ff([...vin, '-filter_complex', shots.map((_, i) => `[${i}:v]`).join('') + `concat=n=${shots.length}:v=1:a=0,scale=in_range=full:out_range=limited,format=yuv420p[v]`, '-map', '[v]', '-color_range', 'tv', '-c:v', 'libx264', '-preset', 'medium', '-crf', '14', '-r', String(FPS), `${OUT}/picture.mp4`]);
 // the captions over them; the voice over the game's own music
 const over = caps.concat(endCard ? [{ file: endCard, from: endFrom, to: total + 1, fade: true }] : []);
 let chain = '', last = '[0:v]';
@@ -135,7 +143,7 @@ if (hasMusic) chain += `[${a0 + vl.length}:a]atrim=start=3:duration=${total.toFi
 chain += vl.map((_, i) => `[a${i}]`).join('') + (hasMusic ? '[m]' : '') + `amix=inputs=${vl.length + (hasMusic ? 1 : 0)}:normalize=0:duration=longest,loudnorm=I=-15:TP=-1.5:LRA=11,aresample=48000[a]`;
 const out = `${OUT}/${NAME}.mp4`;
 ff(['-i', `${OUT}/picture.mp4`, ...over.flatMap((c) => (c.fade ? ['-loop', '1', '-t', (total + 1).toFixed(2), '-i', c.file] : ['-i', c.file])), ...vl.flatMap((l) => ['-i', l.file]), ...(hasMusic ? ['-i', music] : []),
-  '-filter_complex', chain, '-map', '[v]', '-map', '[a]', '-t', total.toFixed(2), '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', out]);
+  '-filter_complex', chain, '-map', '[v]', '-map', '[a]', '-t', total.toFixed(2), '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-maxrate', '10M', '-bufsize', '20M', '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-r', String(FPS), '-c:a', 'aac', '-b:a', '192k', '-ac', '2', '-movflags', '+faststart', out]);
 ff(['-ss', '0.8', '-i', out, '-frames:v', '1', '-q:v', '2', `${OUT}/${NAME}-poster.jpg`]);
 // a strip of frames, one every two seconds, to look the whole thing over at a glance
 ff(['-i', out, '-vf', `fps=1/2,scale=216:384,tile=${Math.ceil(total / 2)}x1`, '-frames:v', '1', '-q:v', '3', `${OUT}/${NAME}-strip.jpg`]);

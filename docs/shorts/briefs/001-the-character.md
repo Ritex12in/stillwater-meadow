@@ -1,6 +1,6 @@
 # 001. The character
 
-- **Status:** draft again: the script was rewritten on 2026-11-28 at the owner's word and waits for their yes; stills taken (`e:\Games\_assets\shorts\001-the-character\stills\`), not filmed
+- **Status:** review: the rewritten script was approved by the owner on 2026-11-28 ("yes, film it"); filmed and edited the same day; waits for the owner to watch it
 - **Idea:** A1 in [IDEAS.md](../IDEAS.md)
 - **Length:** 27 seconds
 - **Shows only what is live on the site?** yes
@@ -67,7 +67,7 @@ The game's day music, low under the voice; the night take is not needed.
 
 ## Needed from the owner
 
-A yes to the rewritten script, or changes. Then it is filmed.
+To watch `e:\Games\_assets\shorts\001-the-character\001-the-character.mp4` and say yes, or what to change. Then to post it (the title, description and tags are in `001-the-character.txt` beside it).
 
 ## Notes
 
@@ -80,3 +80,5 @@ A yes to the rewritten script, or changes. Then it is filmed.
 - 2026-11-28: the owner asked for the script itself to be rewritten. The first script defined him by what he is not ("no 3D model", "no modelling software"); this one tells how he changed, day by day, and adds the second day's sculpted child and what he can do now. The earlier script is in the file's history.
 - 2026-11-28: stills of all twelve shots taken. The six versions of 22 November now show the game's own boy. The glide shot (line 6) frames him as a speck against the sky and must be reframed before filming.
 - The title's "The title says" note above is about the earlier title and no longer applies.
+- 2026-11-28: filmed and edited (`node tools/shorts/make.mjs 001`): 27.1 s, 1080 x 1920, 27 MB, 12 shots from 9 versions of the game, 24 captions, the AI voice over the game's day music. The six versions of line 4 cut in on the words they show (Round, oval, Bigger, Spikes, With). Claude has looked at it only as stills (a strip of one frame every two seconds, and single frames): the motion, the voice and the mix have not been heard or seen by anyone yet.
+- Day one (`620f25a`) cannot be driven by script, so it is framed as that version opens: from behind, further off than the rest.

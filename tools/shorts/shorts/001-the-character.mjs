@@ -3,7 +3,7 @@
 // options (`query`, `hash`: the hour), a share of its line's time (`weight`), and `frame(c, t, u)`, run
 // in that version's page every frame (`c.m` is its `window.__meadow`, if it has one; `t` seconds into
 // the shot, `u` 0..1 through it). The functions may use only what they are given. A line's `pad` is
-// time held after it is said (s).
+// time held after it is said (s). A shot's `cue` is the word of its line it cuts in on (as written).
 //
 // The camera is the game's own, following the boy: `yaw` is set from the way he faces (0 looks at his
 // face, pi at his back), so every version is framed alike.
@@ -21,12 +21,12 @@ export default {
     { text: 'Day one.', shots: [{ commit: '620f25a', query: '', hash: '#15' }], pad: 0.9 },
     { text: 'Day two, he was sculpted, in code.', shots: [{ commit: 'c9b7c6f', query: 'weather=clear&season=summer', hash: '#15', frame: close(2.6, 0.55, 0.08) }] },
     { text: 'Then I drew him on paper, and we rebuilt him to match. Round head. No, oval. Bigger hair. Spikes. With a curve.', shots: [
-      { commit: 'e469097', query: OWN, hash: '#15', frame: close(), weight: 2.2 },
-      { commit: '20fcba4', query: OWN, hash: '#15', frame: close() },
-      { commit: '9d2b54f', query: OWN, hash: '#15', frame: close() },
-      { commit: '36e98f0', query: OWN, hash: '#15', frame: close() },
-      { commit: 'da8f185', query: OWN, hash: '#15', frame: close() },
-      { commit: 'd9e1567', query: OWN, hash: '#15', frame: close() },
+      { commit: 'e469097', query: OWN, hash: '#15', frame: close() },
+      { commit: '20fcba4', query: OWN, hash: '#15', frame: close(), cue: 'Round' },
+      { commit: '9d2b54f', query: OWN, hash: '#15', frame: close(), cue: 'oval.' },
+      { commit: '36e98f0', query: OWN, hash: '#15', frame: close(), cue: 'Bigger' },
+      { commit: 'da8f185', query: OWN, hash: '#15', frame: close(), cue: 'Spikes.' },
+      { commit: 'd9e1567', query: OWN, hash: '#15', frame: close(), cue: 'With' },
     ] },
     { text: 'Then his hair learned to move.', shots: [{ commit: NOW, query: Q, hash: '#15', frame: `(c, t, u) => { const m = c.m; m.camState.yaw = m.player.rot + 0.75; m.camState.dist = 3.3; m.camState.pitch = 0.1; if (!c.jumped && t > 0.3) { c.jumped = 1; m.jump(); } }` }] },
     { text: 'Now he jumps, and he glides.', shots: [{ commit: NOW, query: Q + '&glider=1', hash: '#15', frame: `(c, t, u) => { const m = c.m; m.camState.yaw = m.player.rot + 3.14 - 0.8; m.camState.dist = 4.6; m.camState.pitch = 0.1; if (!c.go && t > 0.02) { c.go = 1; m.dropFrom(13, 5); } if (c.go === 1 && t > 0.25) { c.go = 2; m.jump(); } }` }], pad: 0.5 },

@@ -1,8 +1,8 @@
 # 001. The character
 
-- **Status:** approved (the owner, 2026-11-28: "go with your picks"), then changed the same day at the owner's word (see Notes); stills taken, not yet filmed
+- **Status:** draft again: the script was rewritten on 2026-11-28 at the owner's word and waits for their yes; stills taken (`e:\Games\_assets\shorts\001-the-character\stills\`), not filmed
 - **Idea:** A1 in [IDEAS.md](../IDEAS.md)
-- **Length:** about 27 seconds
+- **Length:** 27 seconds
 - **Shows only what is live on the site?** yes
 - **Approved by the owner on:** 2026-11-28
 
@@ -18,35 +18,35 @@ collision (`d10efd5`). About 25 commits in a day, and no modelling program opene
 
 ## The hook
 
-Today's boy, close, his hair moving in the wind. "This character has no 3D model."
+Today's boy, close, his hair moving. "Fifteen days ago, this boy was made of boxes."
 
 ## The script
 
-| # | Time | Line (voice and caption) | On screen | Filmed from |
-|---|---|---|---|---|
-| 1 | 0–2 s | This character has no 3D model. | Today's boy, close up, hair moving. | today |
-| 2 | 2–6 s | Every strand of his hair is code. And I didn't write it. An AI did. | A slow turn round him. | today |
-| 3 | 6–9 s | Day one, he looked like this. | Hard cut: the first figure, same pose, same camera. | `5dcb32b` |
-| 4 | 9–17 s | So I drew what I wanted, and described it. Round head. No, oval. Bigger hair. Spikes. With a curve. | The real versions, one per phrase, same pose and camera. | `e469097`, `20fcba4`, `9d2b54f`, `36e98f0`, `da8f185`, `d9e1567` (each asked for the game's own figure) |
-| 5 | 17–19 s | Then his hair got physics. | He jumps and lands; the hair bounces. | today |
-| 6 | 19–24 s | No modelling software. I described him. An AI coded him. | Wide: him by the lake at sunset. | today |
-| 7 | 24–27 s | Stillwater Meadow. Free, in your browser. | End card. | — |
+Rewritten 2026-11-28 at the owner's word: the story of how he changed, told for itself (see Notes).
 
-Words: 69. Length: about 27 s (set by the voice).
+| # | Line (voice and caption) | On screen | Filmed from |
+|---|---|---|---|
+| 1 | Fifteen days ago, this boy was made of boxes. | Today's boy, close up, a slow quarter turn. | today |
+| 2 | Day one. | The first version: a figure of boxes by the lake, his dog beside him. | `620f25a` (13 Nov) |
+| 3 | Day two, he was sculpted, in code. | The first sculpted child, close, same framing as today's. | `c9b7c6f` (14 Nov) |
+| 4 | Then I drew him on paper, and we rebuilt him to match. Round head. No, oval. Bigger hair. Spikes. With a curve. | Six real versions of him, one per phrase, same pose and camera. | `e469097`, `20fcba4`, `9d2b54f`, `36e98f0`, `da8f185`, `d9e1567` (22 Nov) |
+| 5 | Then his hair learned to move. | He jumps and lands; the hair bounces. | today |
+| 6 | Now he jumps, and he glides. | He drops from a height and the glider opens. | today |
+| 7 | I describe him. An AI writes the code. | Wide: him by the lake at dusk. | today |
+| 8 | Stillwater Meadow. Free, in your browser. | End card over the same shot. | today |
+
+Words: 62. Length: 27 s (set by the voice: en-US-Andrew).
 
 ## Claims check
 
 | Line | Claim | Allowed? |
 |---|---|---|
-| 1 | The character has no 3D model. | Yes: the characters are built in code (`src/characters/kid.js`). |
-| 2 | Every strand of his hair is code; an AI wrote it, not the owner. | Yes. |
-| 3 | He looked like this on day one. | Yes if filmed from `5dcb32b`, which is 13 November, the first day in the history. |
-| 4 | The owner drew what they wanted and described it. | Yes: the owner's character sheets (docs/endless-world.md records the work done from them). |
-| 5 | The hair has physics. | Yes: `d10efd5`. |
-| 6 | No modelling software was used for him. | Yes for the character. It does not say the whole game is code, which would not be true. |
-
-An earlier draft said "Fifteen days. No modelling software. All code." **"All code" was cut**: it
-reads as a claim about the whole game ([CLAIMS.md](../CLAIMS.md)).
+| 1 | Fifteen days ago he was a figure of boxes. | Yes: `620f25a` is 13 November and the figure in it is built of boxes; the short is dated 28 November. The number must be changed if the short is posted much later ("In two weeks" would age better). |
+| 2, 3 | Day one; day two he was sculpted in code. | Yes: `620f25a` is the first day in the history, `c9b7c6f` the second (14 November), and the children are built in code (`src/characters/kid.js`). |
+| 4 | The owner drew him and he was rebuilt to match, in those steps. | Yes: the commits of 22 November, made from the owner's character sheets. "We" is the owner and the AI. |
+| 5 | His hair moves. | Yes: hair with springs and collision, `d10efd5`. |
+| 6 | He jumps and glides. | Yes, and live on the site. |
+| 7 | The owner describes; an AI writes the code. | Yes. |
 
 ## Shots
 
@@ -60,14 +60,14 @@ The game's day music, low under the voice; the night take is not needed.
 
 ## To post
 
-- **Title:** I can't draw 3D. So I described him to an AI.
-- **Description:** The boy in my game has no 3D model. I drew him on paper, described him, and an AI wrote the code: his face, his clothes, every spike of his hair. Made with AI (Claude); the voice is AI too. Play free in your browser: link in bio.
+- **Title:** 15 days of one character, from boxes to this
+- **Description:** Day one he was a few boxes. I drew him on paper, described what I wanted, and an AI wrote the code, try after try: his face, his clothes, every spike of his hair. Every frame here is the game as it was that day. Made with AI (Claude); the voice is AI too. Play free in your browser: link in bio.
 - **Tags:** #indiegame #gamedev #devlog #madewithai #proceduralgeneration #cozygames #threejs
 - **End card:** Stillwater Meadow · free in your browser
 
 ## Needed from the owner
 
-Nothing more before filming. The finished short is theirs to watch and say yes or no to.
+A yes to the rewritten script, or changes. Then it is filmed.
 
 ## Notes
 
@@ -77,3 +77,6 @@ Nothing more before filming. The finished short is theirs to watch and say yes o
 - 2026-11-28: the owner said "go with your picks": the voice is en-US-Andrew; line 5 shows the jump; the character sheets are not shown (the files are not with the project).
 - 2026-11-28: the owner, on seeing the stills: the characters that were tried from outside are out of context and are not to be mentioned. The line about them and its two shots are gone ([ADR 0011](../adr/0011-only-the-games-own-characters-are-in-the-story.md)).
 - 2026-11-28: the stills showed that the versions of 22 November draw the game's own figure only with `hero=classic` in the address; the shot list asks for it.
+- 2026-11-28: the owner asked for the script itself to be rewritten. The first script defined him by what he is not ("no 3D model", "no modelling software"); this one tells how he changed, day by day, and adds the second day's sculpted child and what he can do now. The earlier script is in the file's history.
+- 2026-11-28: stills of all twelve shots taken. The six versions of 22 November now show the game's own boy. The glide shot (line 6) frames him as a speck against the sky and must be reframed before filming.
+- The title's "The title says" note above is about the earlier title and no longer applies.

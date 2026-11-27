@@ -38,7 +38,7 @@ const spoken = (l) => { const w = l.words[l.words.length - 1]; return w.at + w.d
 
 // ── 2. the timing ──
 let t = 0.25;
-const lines = spec.lines.map((l, i) => { const v = voice[i], from = t, dur = spoken(v) + GAP; t += dur; return { ...l, v, from, dur }; });
+const lines = spec.lines.map((l, i) => { const v = voice[i], from = t, dur = spoken(v) + GAP + (l.pad || 0); t += dur; return { ...l, v, from, dur }; });
 const endSay = spec.end && spec.end.say ? voice[voice.length - 1] : null, lastShot = lines[lines.length - 1].shots[lines[lines.length - 1].shots.length - 1];
 const tail = Math.max(lastShot.tail || 0, endSay ? spoken(endSay) + 0.9 : 0), endFrom = t + 0.15, total = t + tail;
 const shots = [];

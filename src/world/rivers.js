@@ -78,10 +78,14 @@ const FRAG = GRADE_GLSL + HAZE_GLSL + UNIFORMS + NOISE + `
     float foamCalm = clamp(fleck * (0.16 + 0.5 * vFall.y) + lace * 0.3 + pool * 0.85, 0.0, 1.0);
     // a fall's face: white water in ropes running down, the river's own colour showing in veins between
     float along = vFlow.x - uTime * 6.5;
-    float rope = vn(vec2(across * 3.2, along * 0.22)) * 0.5 + vn(vec2(across * 7.5 + 4.0, along * 0.5)) * 0.3 + vn(vec2(across * 15.0 - 2.0, along * 1.1)) * 0.2;
+    // (the finest ropes only from near by: from further off, or drawn at a low resolution, they are narrower than a pixel and turn to hard stripes)
+    float fine = 1.0 - smoothstep(12.0, 32.0, length(cameraPosition - vWP));
+    float rope = vn(vec2(across * 3.2, along * 0.22)) * (0.5 + 0.12 * (1.0 - fine)) + vn(vec2(across * 7.5 + 4.0, along * 0.5)) * (0.3 + 0.08 * (1.0 - fine)) + vn(vec2(across * 15.0 - 2.0, along * 1.1)) * 0.2 * fine;
+    // (white water by night: it catches the moon, so it is never darker than the rock behind it, and is a little blue)
+    float lit = max(uLight, 0.66), night = 1.0 - smoothstep(0.42, 0.8, uLight);
     float white = smoothstep(0.26 + 0.14 * uHeart.a, 0.6 + 0.12 * uHeart.a, rope); // (at a heart more of the water's own colour shows between the ropes)
     vec3 vein = mix(mix(shallow * vec3(0.84, 1.0, 1.0) + deep * 0.2, vec3(0.9, 0.95, 0.97), 0.45), uHeart.rgb, uHeart.a * 0.85);
-    vec3 fallC = mix(vein, vec3(0.95, 0.97, 0.98), white) * uLight; // (pale veins, not bright ones)
+    vec3 fallC = mix(vein, vec3(0.95, 0.97, 0.98), white) * lit * mix(vec3(1.0), vec3(0.84, 0.92, 1.12), night); // (pale veins, not bright ones)
     c = mix(c, vec3(0.94, 0.96, 0.97) * uLight, foamCalm * (1.0 - vFall.x));
     c = mix(c, fallC, vFall.x);
     // frozen: pale ice
@@ -102,7 +106,8 @@ const SHEET_FRAG = GRADE_GLSL + HAZE_GLSL + UNIFORMS + NOISE + `
     float across = vFlow.y * vW * 0.5, along = vFlow.x - uTime * 9.5;
     float clump = vn(vec2(across * 2.2 + 9.0, along * 0.16)) * 0.6 + vn(vec2(across * 5.5, along * 0.34 + 2.0)) * 0.4;
     float a = smoothstep(0.5, 0.74, clump) * (1.0 - smoothstep(0.45, 1.0, abs(vFlow.y))) * smoothstep(0.0, 0.18, vFall.y) * (1.0 - smoothstep(0.82, 1.0, vFall.y)); // (thin at the lip and at the foot)
-    vec3 c = mix(vec3(0.97, 0.98, 0.99), uHeart.rgb * 1.3, uHeart.a * 0.3) * uLight;
+    float night = 1.0 - smoothstep(0.42, 0.8, uLight);
+    vec3 c = mix(vec3(0.97, 0.98, 0.99), uHeart.rgb * 1.3, uHeart.a * 0.3) * max(uLight, 0.7) * mix(vec3(1.0), vec3(0.84, 0.92, 1.12), night); // (moonlit by night)
     float dist = length(cameraPosition - vWP);
     c = mix(c, meadowHaze(fogColor, fogGlow, vWP - cameraPosition, fogSun), smoothstep(fogNear, fogFar, dist));
     gl_FragColor = vec4(meadowGrade(c), a * (0.85 - 0.3 * uHeart.a) * (1.0 - uIce));
@@ -126,7 +131,7 @@ const MIST_FRAG = GRADE_GLSL + HAZE_GLSL + `
   varying float vLife; varying vec3 vWP;
   void main() {
     float a = texture2D(tPuff, gl_PointCoord).a * smoothstep(0.0, 0.15, vLife) * (1.0 - vLife) * (0.7 + 0.5 * uHeart.a) * (1.0 - uIce);
-    vec3 c = mix(vec3(0.96, 0.98, 1.0), vec3(0.84, 0.79, 0.93), uHeart.a) * min(1.0, uLight); // (lilac at a heart)
+    vec3 c = mix(vec3(0.96, 0.98, 1.0), vec3(0.84, 0.79, 0.93), uHeart.a) * clamp(uLight, 0.62, 1.0); // (lilac at a heart; pale in the moonlight, not dark)
     c = mix(c, meadowHaze(fogColor, fogGlow, vWP - cameraPosition, fogSun), smoothstep(fogNear, fogFar, length(cameraPosition - vWP)));
     gl_FragColor = vec4(meadowGrade(c), a);
   }`;

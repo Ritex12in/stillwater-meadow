@@ -16,7 +16,7 @@
 // vertex colours. Either way broad patches of colour vary across the land.
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
-import { smooth, fbm } from '../core/math.js';
+import { smooth, fbm, mulberry32 } from '../core/math.js';
 import { SEASON_GLSL, seasonU } from '../core/year.js';
 import { quality } from '../systems/quality.js';
 import { biomesAt } from '../core/biome.js';
@@ -335,6 +335,40 @@ export function farHaze(sh) {
 }
 
 /**
+ * Petals lying on the ground, as a picture laid over it (the owner: "why can't we just use petals as fake
+ * painted on the ground, like grass"): a square of scattered petals made here in code, which repeats
+ * every way. Drawn small and far off the graphics card uses the picture's smaller copies, so a petal
+ * never flickers on and off, and nothing about it depends on where the camera is.
+ * What it holds, for each point: green, how much of it a petal covers; red, that petal's shade (pale to
+ * deep pink); blue, a number of its own (0..1), by which the shader leaves it out where few have drifted.
+ * Red and blue are stored times the cover, so the smaller copies average them over the petals alone.
+ */
+const PETAL_TILE = 6; // (metres of ground one copy of the picture covers)
+let petalsTex = null;
+function petalTexture() {
+  if (petalsTex) return petalsTex;
+  const S = 1024, c = document.createElement('canvas'), R = mulberry32(0x9E7A15);
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
+  const px = S / PETAL_TILE; // (pixels to a metre)
+  for (let i = 0; i < 4200; i++) {
+    const x = R() * S, y = R() * S, long = (0.042 + 0.028 * R()) * px / 2, wide = long * (0.5 + 0.12 * R()), turn = R() * Math.PI, shade = R(), own = R();
+    g.fillStyle = `rgb(${Math.round(shade * 255)},255,${Math.round(own * 255)})`;
+    // (again across each edge it overhangs, so the picture joins itself)
+    for (const ox of [0, x < 16 ? S : x > S - 16 ? -S : null]) for (const oy of [0, y < 16 ? S : y > S - 16 ? -S : null]) {
+      if (ox === null || oy === null) continue;
+      g.beginPath(); g.ellipse(x + ox, y + oy, long, wide, turn, 0, Math.PI * 2); g.fill();
+    }
+  }
+  petalsTex = new THREE.CanvasTexture(c);
+  petalsTex.wrapS = petalsTex.wrapT = THREE.RepeatWrapping;
+  petalsTex.minFilter = THREE.LinearMipmapLinearFilter; petalsTex.magFilter = THREE.LinearFilter;
+  petalsTex.anisotropy = 8; // (the ground is seen at a low angle: without this the petals blur a few metres off)
+  return petalsTex;
+}
+
+/**
  * Per-pixel variation on top of the vertex colours: broad patches of lighter and darker grass,
  * metre-scale mottling, and a fine grain that fades out with distance (so it doesn't shimmer).
  */
@@ -353,6 +387,7 @@ function groundDetail(mat, textured) {
       });
     }
     sh.uniforms.uNightGlow = neonU;
+    sh.uniforms.tPetals = { value: petalTexture() };
     sh.vertexShader = 'varying vec3 vGround;\nattribute vec3 clime;\nvarying vec3 vClime;\nattribute vec2 yearly;\nvarying vec2 vYear;\nattribute vec4 look;\nvarying vec4 vLook;\nattribute vec2 grove;\nvarying float vGrove;\nvarying float vSheer;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
       vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;
       vClime = clime;
@@ -360,7 +395,7 @@ function groundDetail(mat, textured) {
       vLook = look;
       vGrove = grove.x; vSheer = grove.y;
       ${textured ? 'vSplat = splat;' : ''}`);
-    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nvarying vec2 vYear;\nvarying vec4 vLook;\nvarying float vGrove;\nvarying float vSheer;\nuniform vec3 uFalls[3];\nuniform vec3 uCam;\nuniform float uFreshSnow;\nuniform float uNightGlow;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\nfloat gPetal = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
+    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nvarying vec2 vYear;\nvarying vec4 vLook;\nvarying float vGrove;\nvarying float vSheer;\nuniform vec3 uFalls[3];\nuniform vec3 uCam;\nuniform float uFreshSnow;\nuniform float uNightGlow;\nuniform sampler2D tPetals;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\nfloat gPetal = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
       // (wrapped first: far from the middle of the world the numbers get too big for sin() to scatter)
       float gHash(vec2 p) { return fract(sin(dot(mod(p, 1024.0), vec2(127.1, 311.7))) * 43758.5453); }
       float gNoise(vec2 p) {
@@ -447,28 +482,17 @@ function groundDetail(mat, textured) {
           float gv = smoothstep(0.25, 0.8, vGrove);
           float gl = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
           diffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb, vec3(gl), 0.6) * vec3(0.63, 0.59, 0.57) + vec3(0.045, 0.02, 0.045), gv * 0.8); // (moss in shadow, toward mauve: the picture's ground is 473a3d, not olive)
-          // petals: one to a small square of ground, each at its own spot in it, thick where they have drifted
+          // petals: painted on the ground as the grass is (the picture above, laid twice at two sizes and turns so it is not seen to repeat),
+          // fewer of them where few have drifted. The picture's own smaller copies do the work of distance: no flicker, and nothing here reads the camera.
           float drift = smoothstep(0.3, 0.72, gNoise(vGround.xz * 0.09 + 7.0) * 0.6 + gNoise(vGround.xz * 0.37 + 2.0) * 0.5);
-          float lies = 0.0, h2 = 0.5, sharp = 1.0;
-          for (int layer = 0; layer < 2; layer++) { // (two sizes of square, so they do not sit in rows)
-            vec2 pp = vGround.xz * (layer == 0 ? 4.3 : 7.1) + float(layer) * 13.7, ci = floor(pp), cf = fract(pp) - 0.5;
-            float h1 = fract(sin(dot(ci, vec2(127.1, 311.7))) * 43758.5453), hb = fract(h1 * 57.31), h3 = fract(h1 * 131.7);
-            vec2 d = cf - (vec2(hb, h3) - 0.5) * 0.6; float an = h3 * 6.283;
-            d = vec2(d.x * cos(an) + d.y * sin(an), (d.y * cos(an) - d.x * sin(an)) * 1.9); // (longer than it is wide, lying any way round)
-            float r = 0.17 + 0.12 * hb;
-            // (how much of a square one pixel of the screen covers here: where a petal is smaller than a pixel it would flicker on and off as the camera moves,
-            // so its edge is softened by that much, and past about a third of a square the petals give way to the even cast below)
-            float fw = max(fwidth(pp.x), fwidth(pp.y));
-            float on = step(h1, 0.2 + 0.6 * drift) * smoothstep(r + fw * 0.6, r * 0.6 - fw * 0.6, length(d));
-            sharp = min(sharp, 1.0 - smoothstep(0.1, 0.32, fw));
-            if (on > lies) { lies = on; h2 = hb; }
-          }
-          float away = smoothstep(14.0, 50.0, length(vGround - uCam)); // (far off the petals are too small to draw one by one: a pink cast instead)
-          // (where they are too small for a pixel, as much pink as they cover on the whole, so nothing changes but the flicker; the stronger cast only far off)
-          float petals = mix(mix((0.2 + 0.6 * drift) * 0.17, lies, sharp), (0.22 + 0.62 * drift) * 0.42, away);
-          vec3 pink = mix(vec3(0.98, 0.6, 0.75), vec3(1.0, 0.86, 0.92), mix(0.5, h2, sharp)); // (each its own shade only where each can be seen)
+          float dens = 0.14 + 0.52 * drift;
+          vec4 pa = texture2D(tPetals, vGround.xz / ${PETAL_TILE.toFixed(1)});
+          vec4 pb = texture2D(tPetals, vec2(vGround.x * 0.8 + vGround.z * 0.6, vGround.z * 0.8 - vGround.x * 0.6) / ${(PETAL_TILE * 1.62).toFixed(2)} + 0.37);
+          float va = pa.g * smoothstep(-0.12, 0.12, dens - pa.b / max(pa.g, 1e-3)), vb = pb.g * smoothstep(-0.12, 0.12, dens - pb.b / max(pb.g, 1e-3));
+          float petals = va + vb - va * vb;
+          vec3 pink = mix(vec3(0.98, 0.6, 0.75), vec3(1.0, 0.86, 0.92), clamp((pa.r * va + pb.r * vb) / max(pa.g * va + pb.g * vb, 1e-3), 0.0, 1.0));
           diffuseColor.rgb = mix(diffuseColor.rgb, pink, gv * petals * 0.92);
-          gPetal = gv * petals; // (they glow by night: below)
+          gPetal = gv * petals * (1.0 - smoothstep(0.05, 0.55, vSheer)); // (they glow by night: below; none on a sheer face)
         }
         // a sheer face (the cliff of a grove's heart): bare stone in level beds, weathered, darker in its seams
         // (the ground's rock picture is mossy and is laid flat, so it smears down a cliff: this is drawn by height instead)

@@ -140,7 +140,7 @@ test('the save keeps time, weather and the flowers you picked across a reload', 
   noErrors(errors);
 });
 
-test('at the speed command of 10, running up a hill you stay on the ground, not sunk into it until you stop', async ({ page }) => {
+test('at the speed command of 10, running up a hill and down it you stay on the ground, neither sunk into it nor floating over it', async ({ page }) => {
   // (the owner, 2026-11-28: "while moving with speed of 10, player merge in ground and comes up when stopped")
   const errors = await open(page, 'weather=clear');
   await step(page, 1);
@@ -157,9 +157,16 @@ test('at the speed command of 10, running up a hill you stay on the ground, not 
   await page.evaluate((h) => { const m = window.__meadow; m.travelTo(h.x, h.z, h.tx, h.tz); m.command('speed 10'); }, hill);
   await step(page, 0.5);
   await page.keyboard.down('KeyW');
-  const deep = await page.evaluate(() => { const m = window.__meadow; let d = 0; for (let i = 0; i < 90; i++) { m.tick(1 / 60); d = Math.max(d, m.geo.groundAt ? m.geo.groundAt(m.player.x, m.player.z) - m.player.y : m.geo.height(m.player.x, m.player.z) - m.player.y); } return d; });
+  const deep = await page.evaluate(() => { const m = window.__meadow; let d = 0; for (let i = 0; i < 90; i++) { m.tick(1 / 60); d = Math.max(d, m.geo.height(m.player.x, m.player.z) - m.player.y); } return d; });
+  await page.keyboard.up('KeyW');
+  // and down it again: not floating above the slope (and so not over it, as if walking on air)
+  await page.evaluate((h) => window.__meadow.travelTo(h.tx, h.tz, h.x, h.z), hill);
+  await step(page, 0.5);
+  await page.keyboard.down('KeyW');
+  const high = await page.evaluate(() => { const m = window.__meadow; let d = 0; for (let i = 0; i < 90; i++) { m.tick(1 / 60); if (!m.moves.mode) d = Math.max(d, m.player.y - m.geo.height(m.player.x, m.player.z)); } return d; });
   await page.keyboard.up('KeyW');
   await page.evaluate(() => window.__meadow.command('speed 1'));
   expect(deep, 'never more than a few centimetres below the ground').toBeLessThan(0.1);
+  expect(high, 'running down it, never floating above the ground').toBeLessThan(0.1);
   noErrors(errors);
 });

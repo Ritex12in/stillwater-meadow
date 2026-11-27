@@ -815,7 +815,11 @@ are the country's in summer whatever the season; rivers are drawn, trails and br
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
 
-## How the pines are grown from code (2026-11-28; made and measured, not yet in the game)
+## How the pines are grown from code (2026-11-28; made and measured; the owner keeps the kit's)
+
+**The owner's verdict, on seeing the comparison: "external assets are good".** The downloaded pines, and
+the rest of the downloaded plants, rocks, props and ground textures, stay. The code-grown pines are
+kept in the repo unused, with their tools, in case that changes.
 
 The owner, shown what in the game is not made in code (`tools/kit-sheet.mjs`): "code pine tree and
 compare side by side"; then, of the first try (dark, an even cone, twice the kit's triangles):

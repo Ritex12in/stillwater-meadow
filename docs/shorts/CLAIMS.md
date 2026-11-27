@@ -38,6 +38,10 @@ ot-coded-models.png` and `not-coded-pictures.png`, made by `tools/kit-sheet.mjs`
 
 ## If the owner wants "everything is coded" to be true
 
+**Decided 2026-11-28: they do not.** Shown the downloaded art and a code-grown pine beside the kit's,
+the owner said "external assets are good". The downloaded art stays; the paragraph below is kept for
+the record.
+
 It would need the downloaded plants, rocks, bench and fences replaced by code-made ones: a piece of
 work on the game itself, with its own cost in looks and speed. It is on the list in
 [PLAN.md](PLAN.md) as an open question, not as a task.

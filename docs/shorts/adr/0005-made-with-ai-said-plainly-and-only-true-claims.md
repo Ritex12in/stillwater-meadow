@@ -1,8 +1,8 @@
 # 0005. Made with AI, said plainly; and only true claims
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-11-27
-- **Who decided:** The owner asked for "everything is coded" to be mentioned; Claude found it untrue on 2026-11-27 and proposes this instead. Needs the owner's answer.
+- **Who decided:** The owner asked for "everything is coded" to be mentioned; Claude found it untrue on 2026-11-27 and proposes this instead. Needs the owner's answer. **Answered 2026-11-28:** shown the downloaded art and a code-grown pine beside the kit's, the owner said "external assets are good": the downloaded art stays, so the shorts say what is code and do not say "everything".
 
 ## Context
 

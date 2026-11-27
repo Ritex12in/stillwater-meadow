@@ -39,7 +39,7 @@ Steps 2 and 3 do not depend on each other and can be done in either order.
 |---|---|---|---|
 | 1 | **Whose voice?** | The owner's own, recorded on a phone, one take per line. | A person's voice makes the diary theirs. This PC's built-in voices are not good enough; a voice service would be a new thing to choose and perhaps pay for. |
 | 2 | **Unreleased features:** show them as "coming soon", or wait for the release? | Start with stories that are live (A1, A2, A4, D1, D5); hold the rest. | The public site is at 23 November. Showing gliding or continents now promises what a visitor cannot find. |
-| 3 | **"Everything is coded":** drop the claim, or make it true? | Drop it; say what is code ([CLAIMS.md](CLAIMS.md)). | It is not true today: about 12 MB of downloaded plants, rocks, props and ground textures. Making it true is a project on the game, not on the videos. |
+| 3 | ~~**"Everything is coded":** drop the claim, or make it true?~~ **Answered 2026-11-28: the downloaded art stays ("external assets are good"); the claim is dropped.** | Drop it; say what is code ([CLAIMS.md](CLAIMS.md)). | It is not true today: about 12 MB of downloaded plants, rocks, props and ground textures. Making it true is a project on the game, not on the videos. |
 | 4 | **The owner's character sheets:** may they appear, and where are the files? | Yes, for a second in A1. | They are the turn of the character's story. |
 | 5 | **A name on the end card?** | The game's name and "free in your browser" only. | The owner's choice how they appear. |
 | 6 | **How often?** | Decide after the first three: one a week is a pace the pipeline can keep. | Sets how much of this to automate. |

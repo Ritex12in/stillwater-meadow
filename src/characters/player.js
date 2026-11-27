@@ -177,7 +177,10 @@ export function updatePlayer(dt, petting) {
   }
   if (!(player.slide && player.slide.rescue)) player.move = damp(player.move, mag > 0.05 ? speed : 0, 8, dt);
   const floor = player.slide ? player.slide.minY : -99;
-  player.y = damp(player.y, Math.max(groundAt(player.x, player.z), onIce(player.x, player.z) ? ICE_Y : -99, floor), 14, dt);
+  // (the height follows the ground smoothly, but as fast as you are going: at the `speed` command's 10 a fixed rate fell metres behind
+  // on a slope, so you sank into the hill as you climbed and rose out of it when you stopped. And never below the ground at all.)
+  const gy = Math.max(groundAt(player.x, player.z), onIce(player.x, player.z) ? ICE_Y : -99, floor);
+  player.y = Math.max(damp(player.y, gy, 14 * Math.max(1, player.move / 5.4), dt), gy - 0.03);
   poseHero(dt);
 }
 

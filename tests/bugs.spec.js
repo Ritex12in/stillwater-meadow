@@ -139,3 +139,27 @@ test('the save keeps time, weather and the flowers you picked across a reload', 
   expect(s.bouquet, 'the picked flowers are still in the backpack').toBe(2);
   noErrors(errors);
 });
+
+test('at the speed command of 10, running up a hill you stay on the ground, not sunk into it until you stop', async ({ page }) => {
+  // (the owner, 2026-11-28: "while moving with speed of 10, player merge in ground and comes up when stopped")
+  const errors = await open(page, 'weather=clear');
+  await step(page, 1);
+  const hill = await page.evaluate(() => {
+    const m = window.__meadow, G = m.geo, H = m.home;
+    for (let r = 200; r < 2500; r += 30) for (let a = 0; a < 6.28; a += 0.2) {
+      const x = H.x + Math.cos(a) * r, z = H.z + Math.sin(a) * r;
+      if (!G.walkable(x, z)) continue;
+      for (let q = 0; q < 6.28; q += 0.4) { const dx = Math.cos(q), dz = Math.sin(q); let ok = G.height(x + dx * 60, z + dz * 60) > G.height(x, z) + 9; for (let d = 2; ok && d <= 60; d += 2) ok = G.walkable(x + dx * d, z + dz * d) && G.height(x + dx * d, z + dz * d) >= G.height(x + dx * (d - 2), z + dz * (d - 2)) - 0.05; if (ok) return { x, z, tx: x + dx * 60, tz: z + dz * 60 }; }
+    }
+    return null;
+  });
+  expect(hill, 'a long walkable slope near home').not.toBeNull();
+  await page.evaluate((h) => { const m = window.__meadow; m.travelTo(h.x, h.z, h.tx, h.tz); m.command('speed 10'); }, hill);
+  await step(page, 0.5);
+  await page.keyboard.down('KeyW');
+  const deep = await page.evaluate(() => { const m = window.__meadow; let d = 0; for (let i = 0; i < 90; i++) { m.tick(1 / 60); d = Math.max(d, m.geo.groundAt ? m.geo.groundAt(m.player.x, m.player.z) - m.player.y : m.geo.height(m.player.x, m.player.z) - m.player.y); } return d; });
+  await page.keyboard.up('KeyW');
+  await page.evaluate(() => window.__meadow.command('speed 1'));
+  expect(deep, 'never more than a few centimetres below the ground').toBeLessThan(0.1);
+  noErrors(errors);
+});

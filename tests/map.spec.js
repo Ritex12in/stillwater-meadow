@@ -96,10 +96,9 @@ test('waystones: one to a stretch of country, on the map from the start; track o
   expect(land.home, 'none by the home lake').toBeGreaterThan(600);
   expect(land.dry, 'each on dry ground, clear of lakes and rivers').toBe(true);
   // in play the lists that take you anywhere are gone; to begin with you can travel home, and nowhere else
-  await page.locator('[data-panel="worldPanel"]').click();
+  await page.locator('[data-panel="worldPanel"]').evaluate((el) => el.click()); // (clicked in the page: the software renderer's frames can take many seconds, and a real click waits on them)
   await expect(page.locator('#hereNow')).toBeVisible();
-  await expect(page.locator('#placesBox')).toBeHidden();
-  await expect(page.locator('#countriesBox')).toBeHidden();
+  expect(await page.locator('#places, #countries, #timeSlider, #weather, #season').count(), 'no lists that take you anywhere, no pickers: those are commands').toBe(0);
   await page.keyboard.press('Escape');
   const w0 = await page.evaluate(() => window.__meadow.waypoints);
   expect(w0.awake).toEqual([]);

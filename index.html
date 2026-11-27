@@ -47,7 +47,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5V6l10-2v11.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="2.5" fill="currentColor"/><circle cx="16.5" cy="15.5" r="2.5" fill="currentColor"/></svg>
       <span id="musicLabel">Music off</span>
     </button>
-    <button class="tool glass" type="button" data-panel="worldPanel" aria-expanded="false" title="Time, weather and season">
+    <button class="tool glass" type="button" data-panel="worldPanel" aria-expanded="false" title="How it is here, and this world">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       <span>World</span>
     </button>
@@ -62,40 +62,8 @@
     </button>
   </nav>
 
-  <section class="popover" id="worldPanel" data-exclusive="1" hidden aria-label="Time, weather and season">
+  <section class="popover" id="worldPanel" data-exclusive="1" hidden aria-label="How it is here, and this world">
     <p class="here" id="hereNow" aria-live="polite"></p>
-    <div>
-      <h3>Time of day</h3>
-      <div class="time">
-        <button type="button" class="live" id="liveBtn" aria-pressed="true" title="Follow your computer's clock"><i></i>Live</button>
-        <div class="track">
-          <input id="timeSlider" type="range" min="0" max="1439" step="1" value="0" aria-label="Time of day">
-          <div class="ticks" aria-hidden="true"><span>12 am</span><span>6 am</span><span>12 pm</span><span>6 pm</span><span>12 am</span></div>
-        </div>
-        <output id="timeOut" for="timeSlider">--:--</output>
-      </div>
-    </div>
-    <div>
-      <h3>Weather <kbd>Q</kbd></h3>
-      <div class="chips" id="weather" role="group" aria-label="Weather">
-        <button type="button" data-wx="auto" class="auto" aria-pressed="true" title="Weather changes on its own">Auto</button>
-        <button type="button" data-wx="clear" aria-pressed="false" title="Clear" aria-label="Clear"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
-        <button type="button" data-wx="rain" aria-pressed="false" title="Rain" aria-label="Rain"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14.5h9.5a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.7 1.4A3 3 0 0 0 7 14.5z"/><path d="M8.5 17.5l-1 2.5M12.5 17.5l-1 2.5M16.5 17.5l-1 2.5"/></svg></button>
-        <button type="button" data-wx="storm" aria-pressed="false" title="Thunderstorm" aria-label="Thunderstorm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14.5h9.5a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.7 1.4A3 3 0 0 0 7 14.5z"/><path d="M12.8 15.5l-2.3 3.5h3l-2.3 3.5"/></svg></button>
-        <button type="button" data-wx="fog" aria-pressed="false" title="Fog" aria-label="Fog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M6 12h14M4 16h12M8 20h10"/></svg></button>
-        <button type="button" data-wx="snow" aria-pressed="false" title="Snow" aria-label="Snow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5L12 6l2.5-1.5M9.5 19.5L12 18l2.5 1.5"/></svg></button>
-      </div>
-    </div>
-    <div>
-      <h3>Season <kbd>N</kbd></h3>
-      <div class="chips" id="season" role="group" aria-label="Season">
-        <button type="button" data-season="auto" class="auto" aria-pressed="true" title="Follow the calendar">Auto</button>
-        <button type="button" data-season="spring" aria-pressed="false">Spring</button>
-        <button type="button" data-season="summer" aria-pressed="false">Summer</button>
-        <button type="button" data-season="autumn" aria-pressed="false">Autumn</button>
-        <button type="button" data-season="winter" aria-pressed="false">Winter</button>
-      </div>
-    </div>
     <div>
       <h3>This world</h3>
       <div class="world-seed">
@@ -108,15 +76,6 @@
         <button type="submit" class="btn">Go</button>
       </form>
       <p class="note" id="seedNote" hidden></p>
-    </div>
-    <div id="placesBox">
-      <h3>Places nearby</h3>
-      <div class="places" id="places" role="group" aria-label="Places nearby: choose one to go there"></div>
-    </div>
-    <div id="countriesBox">
-      <h3>Kinds of country</h3>
-      <p class="note" id="countriesNote" hidden>Looking about…</p>
-      <div class="places countries" id="countries" role="group" aria-label="Kinds of country: choose one to go to the nearest"></div>
     </div>
   </section>
 
@@ -177,8 +136,7 @@
       <dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Wave, cheer, sit on the grass, dance</dd>
       <dt><kbd>Z</kbd></dt><dd>Lie down and watch the stars</dd>
       <dt><kbd>P</kbd></dt><dd>Photo mode: <kbd>1</kbd>–<kbd>5</kbd> filters, <kbd>V</kbd> focus blur, <kbd>Enter</kbd> saves, <kbd>Space</kbd>/<kbd>C</kbd> up and down</dd>
-      <dt><kbd>Q</kbd> <kbd>N</kbd></dt><dd>Change the weather · change the season</dd>
-      <dt><kbd>[</kbd> <kbd>]</kbd> <kbd>L</kbd></dt><dd>Shift the time · back to live time</dd>
+      <dt><kbd>Space</kbd></dt><dd>Jump · on a steep face, jump off · in the air, open or fold the glider</dd>
       <dt><kbd>U</kbd> <kbd>H</kbd></dt><dd>Music on or off · this panel</dd>
       <dt><kbd>Esc</kbd></dt><dd>Close any open panel</dd>
     </dl>
@@ -221,6 +179,23 @@
     <p class="harbour-note">The skipper sails to the harbours facing this one across the sea.</p>
     <ul class="passages" id="harbourList"></ul>
   </section>
+
+  <!-- The command line (ui/console.js): a debugging tool, opened with the / key -->
+  <div class="cmd glass" id="cmd" hidden>
+    <div class="cmd-out" id="cmdOut" aria-live="polite"></div>
+    <form id="cmdForm" autocomplete="off"><span aria-hidden="true">/</span><input id="cmdInput" type="text" maxlength="120" spellcheck="false" autocomplete="off" aria-label="Command"></form>
+  </div>
+
+  <!-- Travelling (features/waypoints.js): shown while you are carried to a place and its land is made ready -->
+  <div class="travel" id="travel" hidden aria-live="polite">
+    <div class="travel-in">
+      <svg class="travel-rose" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.5"/><circle cx="50" cy="50" r="36" fill="none" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2 5" opacity="0.6"/><path d="M50 10 L56 50 L50 90 L44 50 Z" fill="currentColor" opacity="0.9"/><path d="M10 50 L50 44 L90 50 L50 56 Z" fill="currentColor" opacity="0.45"/><circle cx="50" cy="50" r="3" fill="#12181c"/></svg>
+      <p class="travel-how" id="travelHow">Travelling to</p>
+      <h2 id="travelName"></h2>
+      <p class="travel-sub" id="travelSub"></p>
+      <div class="travel-bar"><i id="travelBar"></i></div>
+    </div>
+  </div>
 
   <div class="dialog" id="nameDialog" hidden>
     <form id="nameForm">

@@ -336,3 +336,27 @@ body.cinematic > *:not(#world):not(.letterbox):not(.toast):not(#toast):not(scrip
 .passages b { font: 600 15px var(--font-ui); }
 .passages span { grid-row: 2; color: var(--ink-soft); font: 500 12px var(--font-ui); }
 .passages .btn { grid-row: 1 / 3; grid-column: 2; }
+
+/* the command line (ui/console.js): a debugging tool */
+.cmd { position: fixed; left: 16px; bottom: 16px; width: min(560px, calc(100vw - 32px)); padding: 10px 12px; border-radius: 12px; background: rgba(12, 18, 22, 0.86); border: 1px solid var(--line); z-index: 60; font: 500 13px/1.45 ui-monospace, Consolas, monospace; color: #f7f4ec; }
+.cmd-out { max-height: 46vh; overflow: auto; }
+.cmd-out p { margin: 0; white-space: pre-wrap; }
+.cmd-out p.mine { color: #9fe9ff; }
+.cmd form { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.cmd form span { color: #9fe9ff; }
+.cmd input { flex: 1; background: none; border: 0; outline: 0; color: inherit; font: inherit; }
+
+/* travelling: the screen while you are carried to a place (features/waypoints.js) */
+.travel { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; color: #f7f4ec; opacity: 0; transition: opacity 0.35s ease; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 38%, #27424f 0%, #16242c 55%, #0c1418 100%); }
+.travel.on { opacity: 1; pointer-events: auto; }
+.travel-in { display: grid; justify-items: center; gap: 6px; padding: 24px; text-align: center; transform: translateY(8px); transition: transform 0.6s ease; }
+.travel.on .travel-in { transform: none; }
+.travel-rose { width: 92px; height: 92px; color: #ffd27a; margin-bottom: 14px; animation: travel-turn 2.6s ease-in-out infinite alternate; }
+@keyframes travel-turn { from { transform: rotate(-28deg); } to { transform: rotate(28deg); } }
+.travel-how { margin: 0; font: 700 11px var(--font-ui); letter-spacing: 0.22em; text-transform: uppercase; color: rgba(247, 244, 236, 0.65); }
+.travel h2 { margin: 0; font: italic 600 clamp(30px, 5vw, 46px)/1.1 var(--font-display); }
+.travel-sub { margin: 0; min-height: 1.3em; font: 500 14px var(--font-ui); color: rgba(247, 244, 236, 0.75); }
+.travel-bar { width: min(260px, 60vw); height: 3px; margin-top: 18px; border-radius: 2px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+.travel-bar i { display: block; height: 100%; width: 0; background: #ffd27a; border-radius: 2px; transition: width 0.25s ease; }
+@media (prefers-reduced-motion: reduce) { .travel-rose { animation: none; } .travel, .travel-in { transition: none; } }

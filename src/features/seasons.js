@@ -117,6 +117,11 @@ function readHere(x, z) {
   st.homeWinter = chillNow(lakeChill(HOME), st.season) > 0.47;
 }
 
+/** The ways the year can be held: 'auto' (it turns on its own) or a season. */
+export const SEASON_MODES = ORDER;
+export const seasonMode = () => mode;
+/** Hold the year at a season, or let it turn ('auto'): the `season` command (features/commands.js). */
+export const setSeasonMode = (m) => { if (ORDER.includes(m)) setMode(m); };
 function setMode(m) {
   mode = m;
   held = null;
@@ -138,7 +143,6 @@ export function initSeasons() {
   falling = makeFalling({ count: 500, box: [48, 14, 48], speed: [0.5, 1.0], size: 0.16, map: glowTex, sway: 0.8, colors: ['#ffffff'] });
 
   buttons().forEach((b) => b.addEventListener('click', () => setMode(b.dataset.season)));
-  bindKey('KeyN', () => setMode(ORDER[(ORDER.indexOf(mode) + 1) % ORDER.length]));
   syncUi();
 
   // as the meadow opens: everything as the season has it here, at once

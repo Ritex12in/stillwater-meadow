@@ -815,6 +815,32 @@ are the country's in summer whatever the season; rivers are drawn, trails and br
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
 
+## How debugging by command works, and the travelling screen (built 2026-11-28)
+
+The owner: "time to remove the world debug option and introduce a command debug option"; and "also
+build a loading screen for fast travel".
+
+- **The World popover** keeps what is the player's: the line saying how it is where you stand, and
+  this world's seed (copy a link, a new world, go to a seed). Its pickers for the time, the weather
+  and the season are gone, with their keys (Q, N, [, ], L), and so are its lists of places and kinds
+  of country that took you anywhere (`?freetravel=1` now only lets the map and the journal take you
+  to any place).
+- **The command line** (`ui/console.js`; the commands in `features/commands.js`). The `/` key
+  opens it; Enter runs a line, Up and Down bring back earlier ones, Escape closes it. It is not
+  prompted for nor listed in the controls, but anyone who presses `/` has it (our pick: say if it
+  should need `?debug`). `help` lists the commands: `time`, `weather`, `season`, `pos`, `tp`,
+  `goto` (the nearest of a kind of country or thing; alone, it lists them with how far each is),
+  `lakes` and `lake <n>`, `give glider`, `take glider`, `wake` (the waystones within 3 km), `seed`.
+  Tests run them through `window.__meadow.command('season winter')`. The address's `?season=`,
+  `?weather=` and `#hour` work as before.
+- **The travelling screen** (`features/waypoints.js`; `#travel`). Travelling from the map, and a
+  harbour's passage, bring up a screen over the whole view: a compass rose swinging, "Travelling
+  to" (or "Sailing to"), the place's name, a line under it (Waystone, Home, across the sea and the
+  continent's name), and a bar that fills as the ground there is built. It stays at least 1.1 s and
+  goes when the ground's queue is empty, or after 5 s whatever is left. Measured on the owner's
+  machine's Chrome: 3.6 s for a sail across the sea (1.5 s of that is the sail's own wait), 1.2 s
+  back home. It replaces the plain fade.
+
 ## How jumping, climbing, sliding and gliding work (built 2026-11-28)
 
 The owner: "we need more actions for the player: he can't climb, jump, jump from a cliff, glide;

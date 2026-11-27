@@ -98,8 +98,7 @@ test('the lake does not freeze around the boat during a tour', async ({ page }) 
   await teleport(page, bp.x, bp.z);
   await press(page, 'KeyE', 4);
   expect(await page.evaluate(() => window.__meadow.ferry.state)).toBe('touring');
-  await page.locator('[data-panel="worldPanel"]').click();
-  await page.locator('[data-season="winter"]').click();
+  expect(await page.evaluate(() => window.__meadow.command('season winter'))).toBe('The season is winter.'); // (the season is set by command: ui/console.js)
   await step(page, 40);
   const s = await page.evaluate(() => ({ ice: window.__meadow.seasonState.ice, ferry: window.__meadow.ferry.state }));
   if (s.ferry === 'touring') expect(s.ice).toBeLessThanOrEqual(0.21);

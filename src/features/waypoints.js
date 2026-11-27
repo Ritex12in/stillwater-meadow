@@ -2,7 +2,8 @@
 // about every kilometre and a half of country: core/shape.js SITE_KINDS.waystone, world/buildings.js)
 // is asleep until you walk up to it and wake it (E); from then on you can travel to it from the
 // map, from anywhere. The home lake and your own camp are points from the start. Which stones are
-// awake is kept per world (`store.waypoints`). Travelling fades the view out and in, with a chime.
+// awake is kept per world (`store.waypoints`). Travelling brings up a screen saying where you are going,
+// which stays while the land there is made ready; a chime as you arrive.
 //
 // Tracking: any waystone chosen on the map can be tracked, awake or not. A marker then
 // hangs over it in the world, with its name and how far it is; when it is out of view the marker
@@ -67,13 +68,52 @@ function chime(base = 392) {
   });
 }
 
-let goTo = null, busy = false;
-/** Travel to a point (from `travelPoints`): the view fades out, you are there, it fades in. (`p.say`: what is said on arriving; `p.ms`: how long the view stays dark.) */
+let goTo = null, busy = false, landLeft = () => 0, shownAt = 0, screenUp = false;
+const HOLD_MS = 1100, GIVE_UP_MS = 5000;
+const KIND_SAYS = { home: 'Home', camp: 'Your camp', waystone: 'Waystone', harbour: 'Harbour' };
+/**
+ * The travelling screen: over the whole view while you are carried to a place and its land is made
+ * ready, with where you are going and a bar that fills as the ground there is built. It stays at
+ * least HOLD_MS (so it can be read, and never flickers), and goes when the land is ready (or after
+ * GIVE_UP_MS, whatever is still to come).
+ */
+function showScreen(p) {
+  const el = document.getElementById('travel');
+  if (!el) return false;
+  document.getElementById('travelHow').textContent = p.how || 'Travelling to';
+  document.getElementById('travelName').textContent = p.name;
+  document.getElementById('travelSub').textContent = p.sub || KIND_SAYS[p.kind] || '';
+  document.getElementById('travelBar').style.width = '0%';
+  el.hidden = false; void el.offsetWidth; el.classList.add('on');
+  shownAt = performance.now(); screenUp = true;
+  return true;
+}
+function hideScreenWhenReady() {
+  const el = document.getElementById('travel'), bar = document.getElementById('travelBar');
+  let most = 0;
+  const look = () => {
+    const left = landLeft(), t = performance.now() - shownAt;
+    most = Math.max(most, left, 1);
+    bar.style.width = Math.round(Math.max(Math.min(1, t / HOLD_MS) * 0.35, 1 - left / most) * 100) + '%';
+    if ((left > 0 || t < HOLD_MS) && t < GIVE_UP_MS) { setTimeout(look, 80); return; }
+    bar.style.width = '100%';
+    el.classList.remove('on'); screenUp = false;
+    setTimeout(() => { if (!screenUp) el.hidden = true; }, 400);
+  };
+  look();
+}
+/** Is the travelling screen up? */
+export const travelling = () => busy || screenUp;
+/**
+ * Travel to a point (from `travelPoints`): the travelling screen comes up, you are carried there, and
+ * it goes when the land is ready. (`p.say`: what is said on arriving; `p.ms`: how long before you are
+ * carried; `p.how`, `p.sub`: the screen's lines, "Sailing to" and the like.)
+ */
 export function travelToPoint(p) {
   if (!p || busy || !goTo) return false;
   if (!activity.free) { toast('Finish what you are doing first.', 2.5); return false; }
   busy = true;
-  const fade = document.getElementById('fade');
+  const screen = showScreen(p);
   const arrive = () => {
     try {
       togglePanel('mapPanel', false);
@@ -81,22 +121,21 @@ export function travelToPoint(p) {
       chime(523);
       toast(p.say || (p.kind === 'home' ? `${p.name} · home` : p.name), p.say ? 5 : 3);
     } finally { // (whatever happens, the view comes back)
-      if (fade) fade.classList.remove('on');
       busy = false;
+      if (screen) hideScreenWhenReady();
     }
   };
-  if (reduceMotion || !fade) { arrive(); return true; }
-  fade.classList.add('on');
   setTimeout(arrive, p.ms || FADE_MS);
   return true;
 }
 
 /** For tests: the stones awake, and those asleep about you. */
-export const waypointsView = () => ({ track: tracked() && Object.assign({}, tracked()), awake: woken().map((w) => Object.assign({}, w)), points: travelPoints(), asleep: asleepNear(player.x, player.z, 2500), busy });
+export const waypointsView = () => ({ screen: screenUp, track: tracked() && Object.assign({}, tracked()), awake: woken().map((w) => Object.assign({}, w)), points: travelPoints(), asleep: asleepNear(player.x, player.z, 2500), busy });
 
-/** `go(x, z, faceX, faceZ)` takes you to a spot, facing another. */
-export function initWaypoints(go) {
+/** `go(x, z, faceX, faceZ)` takes you to a spot, facing another; `left()` says how much of the land about you is still to be built. */
+export function initWaypoints(go, left) {
   goTo = go;
+  if (left) landLeft = left;
   setWaystoneAwake(isAwake);
   const near = () => sitesNear(player.x, player.z, 40, 'waystone').find((s) => Math.hypot(s.x - player.x, s.z - player.z) < WAKE_REACH) || null;
   let here = null, hx = NaN, hz = NaN; // (looked for again only once you have moved a little)

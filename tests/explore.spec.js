@@ -231,22 +231,23 @@ test('a fox by country at the lake you are at (red, white in the snow), slipping
   noErrors(errors);
 });
 
-test('kinds of country: the World popover lists every biome with the nearest one, and Go takes you there', async ({ page }) => {
-  const errors = await open(page, 'weather=clear&season=summer&freetravel=1', '#12'); // (freetravel: the lists that take you anywhere at once, which play does without)
-  await page.locator('[data-panel="worldPanel"]').evaluate((el) => el.click()); // (clicked from the page: with this popover open the software renderer draws a frame every several seconds, and a click that waits for the page to settle times out)
-  const desert = page.locator('#countries button[data-country="desert"]');
-  await expect(desert).toContainText(/Golden desert · [\d.]+ (m|km)/, { timeout: 15000 });
-  expect(await page.locator('#countries button').count(), 'every kind is listed').toBe(16);
-  await expect(page.locator('#countries button[data-country="meadow"]')).toContainText('here');
-  await desert.evaluate((el) => el.click());
-  await expect(desert).toContainText('here', { timeout: 15000 });
+test('kinds of country: the goto command lists every biome with the nearest one, and takes you there', async ({ page }) => {
+  const errors = await open(page, 'weather=clear&season=summer', '#12');
+  const cmd = (c) => page.evaluate((c) => window.__meadow.command(c), c);
+  const list = (await cmd('goto')).split('\n');
+  expect(list.length, 'every kind is listed, and a line of the other things to go to').toBe(17);
+  expect(list.find((l) => l.startsWith('desert'))).toMatch(/Golden desert · [\d.]+ (m|km)/);
+  expect(list.find((l) => l.startsWith('meadow'))).toContain('here');
+  expect(await cmd('goto desert')).toBe('Golden desert.');
   const at = await page.evaluate(() => { const m = window.__meadow; return { desert: m.biomes(m.player.x, m.player.z).desert, dry: m.geo.walkable(m.player.x, m.player.z) }; });
   expect(at.desert, 'standing in the desert').toBeGreaterThan(0.5);
   expect(at.dry).toBe(true);
+  expect((await cmd('goto')).split('\n').find((l) => l.startsWith('desert'))).toContain('here');
   // the wonders too: to the foot of the volcano, on ground you can stand on
-  await page.locator('#countries button[data-country="volcano"]').evaluate((el) => el.click());
-  await expect(page.locator('#countries button[data-country="volcano"]')).toContainText(/The volcano · [\d.]+ m/, { timeout: 15000 });
+  expect(await cmd('goto volcano')).toBe('The volcano.');
+  expect((await cmd('goto')).split('\n').find((l) => l.startsWith('volcano'))).toMatch(/The volcano · [\d.]+ m/);
   expect(await page.evaluate(() => { const m = window.__meadow; return m.geo.walkable(m.player.x, m.player.z); })).toBe(true);
+  expect(await cmd('goto nowhere')).toContain('Nothing of that kind');
   // the same world, the same answers
   const again = await page.evaluate(() => { const m = window.__meadow, h = m.home; return JSON.stringify(m.countries(h.x, h.z)) === JSON.stringify(m.countries(h.x, h.z)); });
   expect(again).toBe(true);

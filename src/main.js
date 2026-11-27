@@ -46,8 +46,10 @@ import { biomesAt, biomeAt } from './core/biome.js';
 import { initPost, resizePost, renderFrame, post } from './systems/post.js';
 import { store, onSave, flush, saveSoon, landChanged } from './systems/save.js';
 import { initHud, updateHud, renderPrompts, setClockLabel, togglePanel, reportProblem, showFatal, toast } from './ui/hud.js';
-import { initWorldPanel, initPlaces } from './ui/world-panel.js';
-import { initCountries, nearestCountries } from './ui/countries.js';
+import { initWorldPanel } from './ui/world-panel.js';
+import { nearestCountries } from './ui/countries.js';
+import { initConsole, runCommand } from './ui/console.js';
+import { initCommands } from './features/commands.js';
 import { initBackpack, backpackView } from './ui/backpack.js';
 import { initFoundPlaces, foundView } from './features/places.js';
 import { initMap, mapView } from './ui/map.js';
@@ -185,8 +187,8 @@ function visitLake(id) {
   }
   return false;
 }
-initPlaces({ list: () => lakesAbout(1500).slice(0, 7), go: visitLake });
-initCountries({ where: () => player, go: travelTo });
+initConsole();
+initCommands({ go: travelTo, visitLake });
 initScreen();
 const resizers = [];
 const resize = () => {
@@ -210,7 +212,7 @@ onQualityChange((o) => {
 window.addEventListener('resize', resize);
 
 // ── Features, each isolated so one failing can't take down the rest ──
-const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initMap: () => initMap((x, z) => travelTo(x, z)), initWaypoints: () => initWaypoints(travelTo), initHarbours, initGlider, initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initIceDance, initDanceCam, initDanceMusic, initFoley };
+const features = { initCloudSea, initSignposts, initFoundPlaces: () => initFoundPlaces((x, z) => travelTo(x, z)), initMap: () => initMap((x, z) => travelTo(x, z)), initWaypoints: () => initWaypoints(travelTo, () => groundStats().queued), initHarbours, initGlider, initCamp, initLandmarks, initPetVoices, initDucks, initWildlife, initSeasons, initRod, initFlowers, initFishing, initCampfire, initStargaze, initPhoto: () => initPhoto(renderNow), initMusic, initPets, initNames, initEmotes, initFriend, initIceDance, initDanceCam, initDanceMusic, initFoley };
 for (const [name, init] of Object.entries(features)) {
   try {
     const r = init();
@@ -224,10 +226,6 @@ updateLifeLake(0, player.x, player.z, true); // (and the ducks, the heron and th
 
 // ── Hotkeys ──
 bindKey('KeyH', () => togglePanel('controls'));
-bindKey('KeyQ', cycleWeather);
-bindKey('KeyL', goLive);
-bindKey('BracketLeft', () => setManual(timeCtl.target - 0.5));
-bindKey('BracketRight', () => setManual(timeCtl.target + 0.5));
 onRainStopped(shakeDogs);
 
 // ── Persist the time and weather choice ──
@@ -397,6 +395,8 @@ window.__meadow = {
   get waypoints() { return waypointsView(); }, travelToPoint, track,
   /** Harbours (features/harbours.js): those about you, those visited, the passages from the nearest; and a way to sail one. */
   /** Jumping, climbing, sliding, gliding (characters/moves.js): how it stands, and Space. */
+  /** Run a debug command as typed (ui/console.js). */
+  command: runCommand,
   get moves() { return movesView(); }, get glider() { return gliderView(); }, jump: pressJump, dropFrom, MOVES,
   get harbours() { return harboursView(); }, sail: (id) => { const h = harbourById(id); return !!h && sail(h); },
   /** The year: hold it at a phase (0 midwinter .. 0.5 midsummer; null lets it run), and how it is now. */

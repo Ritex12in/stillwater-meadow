@@ -4,7 +4,6 @@
 // building sites, found by their own rule.
 import { height, walkable, cliffsAt, sitesNear, moistAt, coldAt, snowCold, snowOf, dryOf, lushOf, groveAt, VOLCANO } from '../core/shape.js';
 import { biomesAt } from '../core/biome.js';
-import { freeTravel } from '../core/env.js';
 
 /** How far the search reaches (m), and how finely (m between looks). */
 export const SEARCH_REACH = 6000;
@@ -65,55 +64,4 @@ export function nearestCountries(x, z, reach = SEARCH_REACH) {
     take(k, s.x + ux * k.off, s.z + uz * k.off, d, s.x, s.z);
   }
   return KINDS.map((k) => Object.assign({ id: k.id, name: k.name }, found.get(k.id) || { far: null }));
-}
-
-const $ = (id) => document.getElementById(id);
-const distance = (m) => (m < 60 ? 'here' : m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
-
-/**
- * The list in the World popover: searched afresh each time the popover opens (or after you go
- * somewhere from it). `where()` gives your spot ({ x, z }); `go(x, z, faceX, faceZ)` takes you to one.
- */
-export function initCountries({ where, go }) {
-  const box = $('countries'), panel = $('worldPanel'), note = $('countriesNote');
-  if (!box || !panel) return { list: () => [] };
-  let last = [], from = null;
-  const rows = KINDS.map((k) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.dataset.country = k.id;
-    b.addEventListener('click', () => {
-      const c = last.find((q) => q.id === k.id);
-      if (!c || c.far === null) return;
-      go(c.x, c.z, c.faceX, c.faceZ);
-      search();
-    });
-    box.appendChild(b);
-    return b;
-  });
-  const draw = () => {
-    rows.forEach((b, i) => {
-      const c = last[i];
-      const text = !c ? KINDS[i].name : c.far === null ? `${c.name} · none within ${SEARCH_REACH / 1000} km` : `${c.name} · ${distance(c.far)}`;
-      if (b.textContent !== text) b.textContent = text;
-      b.disabled = !c || c.far === null;
-      b.title = c && c.far !== null ? `Go to the nearest ${c.name.toLowerCase()}` : '';
-    });
-  };
-  // (searched a moment after opening, so the popover shows first; again only if you have moved)
-  let pending = 0;
-  const search = () => {
-    clearTimeout(pending);
-    if (note) note.hidden = false;
-    pending = setTimeout(() => {
-      const p = where();
-      if (!from || Math.hypot(p.x - from.x, p.z - from.z) > 30) { from = { x: p.x, z: p.z }; last = nearestCountries(p.x, p.z); }
-      if (note) note.hidden = true;
-      draw();
-    }, 40);
-  };
-  draw();
-  // (the list is hidden in play, so there is no need to look)
-  new MutationObserver(() => { if (!panel.hidden && freeTravel) search(); }).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
-  return { list: () => last, search };
 }

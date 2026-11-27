@@ -32,7 +32,7 @@ const atHarbour = () => { const h = harboursNear(player.x, player.z, 40, true)[0
 /** Sail from a harbour to another (one of its passages). */
 export function sail(to) {
   if (!to) return false;
-  const ok = travelToPoint({ id: to.id, kind: 'harbour', name: to.name, x: to.x, z: to.z, ax: to.ax, az: to.az, say: `You sail across the sea to ${to.name}, on ${to.cont.name}.`, ms: SAIL_MS });
+  const ok = travelToPoint({ id: to.id, kind: 'harbour', name: to.name, x: to.x, z: to.z, ax: to.ax, az: to.az, say: `You sail across the sea to ${to.name}, on ${to.cont.name}.`, ms: SAIL_MS, how: 'Sailing to', sub: `across the sea · ${to.cont.name}` });
   if (ok) learn(to); // (only if you do set sail)
   return ok;
 }

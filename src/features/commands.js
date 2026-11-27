@@ -41,7 +41,7 @@ const far = (m) => (m < 60 ? 'here' : m < 1000 ? `${Math.round(m / 10) * 10} m` 
 let lastReport = null;
 /** For tests: the last report made ({ name, info, picture: whether a picture was taken }). */
 export const lastReportView = () => lastReport;
-const SITES = ['waystone', 'pagoda', 'castle', 'ruin', 'hut', 'windmill', 'circle', 'cairn', 'spring', 'icecastle', 'grotto', 'volcano', 'beachhut', 'ship', 'skyisle'];
+const SITES = ['heart', 'waystone', 'pagoda', 'castle', 'ruin', 'hut', 'windmill', 'circle', 'cairn', 'spring', 'icecastle', 'grotto', 'volcano', 'beachhut', 'ship', 'skyisle'];
 
 /** `go(x, z, faceX, faceZ)` takes you to a spot; `visitLake(id)` to a lake's shore; `report()` gives the view and how things stand. */
 export function initCommands({ go, visitLake, report }) {

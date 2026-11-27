@@ -10,7 +10,7 @@ import { sitesNear, harboursNear, VOLCANO } from '../core/shape.js';
 import { hooks, obstacles } from '../core/state.js';
 import { cur } from '../systems/time.js';
 import * as THREE from 'three';
-import { harbour, waystone, pagoda, castle, ruinArch, colonnade, stiltHut, windmill, stoneCircle, cairn, hotSpring, crystalGrotto, volcanoTop, skyIsles, ship, buildingMats } from './buildings.js';
+import { heartPlace, harbour, waystone, pagoda, castle, ruinArch, colonnade, stiltHut, windmill, stoneCircle, cairn, hotSpring, crystalGrotto, volcanoTop, skyIsles, ship, buildingMats } from './buildings.js';
 import { player } from '../characters/player.js';
 import { activity } from '../systems/activity.js';
 import { registerAction } from '../systems/actions.js';
@@ -37,9 +37,10 @@ const KINDS = {
   skyisle: { view: 1400, pool: 1, make: [0, 1].map((v) => () => skyIsles(v)) },
   waystone: { view: 520, pool: 2, make: [0, 1, 2].map((v) => () => waystone(v)) },
   harbour: { view: 900, pool: 3, make: [0, 1, 2].map((v) => () => harbour(v)) },
+  heart: { view: 1300, pool: 1, make: [0, 1].map((v) => () => heartPlace(v)) },
 };
 /** The names the places are found by (world/landmarks.js placeName). */
-const KIND_NAMES = { harbour: 'Harbour', beachhut: 'Beach hut', ship: 'Ship', skyisle: 'Floating islands', pagoda: 'Pagoda', castle: 'Castle', ruin: 'Ruins', hut: 'Stilt hut', windmill: 'Windmill', circle: 'Stone circle', cairn: 'Summit cairn', spring: 'Hot spring', icecastle: 'Ice castle', grotto: 'Crystal grotto', volcano: 'Volcano', waystone: 'Waystone' };
+const KIND_NAMES = { heart: 'Blossom terrace', harbour: 'Harbour', beachhut: 'Beach hut', ship: 'Ship', skyisle: 'Floating islands', pagoda: 'Pagoda', castle: 'Castle', ruin: 'Ruins', hut: 'Stilt hut', windmill: 'Windmill', circle: 'Stone circle', cairn: 'Summit cairn', spring: 'Hot spring', icecastle: 'Ice castle', grotto: 'Crystal grotto', volcano: 'Volcano', waystone: 'Waystone' };
 const NAME_A = ['Old', 'Grey', 'Silver', 'High', 'Quiet', 'Misty', 'Golden', 'Hollow', 'Wind', 'Star', 'Moss', 'Dawn', 'Ember', 'Frost', 'Willow', 'Raven'];
 const WAY_B = ['fell', 'wick', 'holt', 'combe', 'dale', 'stow', 'rise', 'ford', 'haven', 'moor', 'garth', 'mere'];
 /** A place's name, by rule from its site: "the Misty Stone circle"; a waystone has a name of its own ("Ravenmoor waystone"). */
@@ -51,6 +52,7 @@ function footprint(kind, made) {
   if (kind === 'castle' || kind === 'icecastle') { const S = r - 3; for (let i = 0; i < 24; i++) { const a = (i / 24) * TAU; out.push([Math.cos(a) * S, Math.sin(a) * S, 2]); } out.push([0, -2, 6]); return out; }
   if (kind === 'hut') return [[0, 0, 2.5]];
   if (kind === 'waystone') return [[0, 0, 0.85]];
+  if (kind === 'heart') return [[0, -11, 4.4], [made.small, 5, 3.3]]; // (its two pagodas)
   if (kind === 'harbour') return [[1.9, -1.6, 0.8], [2.8, -1.6, 0.5]]; // (the crates and barrels; the jetty stands over the water)
   const n = kind === 'pagoda' ? 8 : 6;
   for (let i = 0; i < n; i++) { const a = (i / n) * TAU; out.push([Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.35]); }

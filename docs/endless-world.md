@@ -815,7 +815,7 @@ are the country's in summer whatever the season; rivers are drawn, trails and br
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
 
-## The cherry blossom valley: the owner's picture, analysed (2026-11-28; steps 1 and 2 built)
+## The cherry blossom valley: the owner's picture, analysed (2026-11-28; steps 1 to 3 built)
 
 The owner: "time to work on the biome examples I gave; pick one and start analysing". Picked: "Enchanted
 Cherry Blossom Valley" (in the owner's Downloads), the plan's first biome, since the game already has
@@ -948,6 +948,41 @@ coded ones were finished. They can be swapped for downloaded models later. No la
   home in seed 1, so there is no picture of one.
 - **A spotted deer** (`features/wildlife.js`): the deer at a lake that lies in a grove has pale
   flecks along its back and flanks. **Not seen** in a picture either.
+
+### Step 3 built: the heart of a grove (2026-11-27, on "go with step 3, your picks")
+
+**This one moves land**, so `WORLD_GEN` is 4: a world made before it has its map, places, waystones,
+harbours, tracking, camp and lanterns cleared once more (the second clearing after the continents).
+It is on `endless-world` only; it does not go to `main` until the owner says so.
+
+- **The heart** (`core/shape.js`: a new kind of site, `heart`, laid out as the volcano is). Deep in a
+  grove (0.7 or more), on ground 4 to 70 m up, with no sea, snow or lake near and fairly even country
+  round it, the land is raised into a **terrace** 44 to 58 m across and about 24 m above what lies in
+  front of it. The front is a **cliff** (7 to 8 m of rise per metre); round the back it comes down as a
+  slope you walk up (0.3 to 0.56). One to a square of 1100 m, in four squares of five where the land
+  fits. Other places, waystones, shrines and rivers keep off it.
+- **The fall** (`heartRiver`): a stream laid by hand, not by the river-maker: it rises on the terrace,
+  runs to the lip, drops the whole cliff in one fall (20 to 26 m) into a pool at the foot, and runs a
+  few metres on. Rocks at the lip and round the pool; none hung on the face
+  (`world/rivers.js stonesFor`).
+- **The pagodas** (`world/buildings.js heartPlace`, `world/landmarks.js`): a large one and a smaller
+  one beside it on the terrace, with four stone lanterns. Named "Blossom terrace"; on the map with a
+  pagoda mark; a trail leads to it; `goto heart` in the command line takes you to the nearest.
+- **Sheer faces are bare stone** (`world/terrain.js`): the ground's rock picture is a mossy green and
+  is laid flat, so on a cliff it drew as a green smear. A face steeper than about 1.4 m per metre is
+  now drawn in the ground shader as stone in level beds, each its own shade, with dark seams and
+  upright cracks, and carries no moss or petals. **This applies everywhere**, so the steepest mountain
+  faces change too (not looked at in a picture). No boulder is set on such a face (`world/wilds.js`).
+
+Counted with `tools/hearts.mjs` in seeds 1, 7 and 42: one or two hearts within 6 km of home (the
+nearest 1096 m, 3890 m and 870 m off); every top walkable; nothing else standing on any of them.
+Pictures (`tools/heart-view.mjs`, seed 1): `heart-below.png`, `heart-fall.png`, `heart-top.png`.
+
+**Against the owner's picture, still off:** the terrace is a round drum, not a broken, stepped
+crag with trees on its ledges; there is one fall, not several; the pool is small and there is no
+lake or mist at its foot; no far mountains behind. The view from 300 m off is shut in by trees
+(`heart-far.png` shows none of it). **Not measured:** speed on the owner's laptop; how long a square
+of ground takes to build with the heart in it.
 
 ### A way to build it (ours; nothing agreed)
 

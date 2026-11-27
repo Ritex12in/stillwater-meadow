@@ -316,6 +316,24 @@ export function skyIsles(variant = 0) {
 }
 
 /**
+ * What stands on the heart of a blossom grove (core/shape.js: a terrace with a cliff before it): a
+ * tall pagoda toward the back and a lesser one to one side, a stone lantern or two between. Local +z
+ * is the way the cliff faces; the stream crosses the top on the other side from the lesser pagoda.
+ */
+export function heartPlace(variant = 0) {
+  const g = new THREE.Group(), big = pagoda(variant ? 1 : 0), small = pagoda(2), m = buildingMats(), k = new Kit();
+  big.group.position.set(0, 0, -11);
+  small.group.scale.setScalar(0.72); small.group.position.set(variant ? 19 : -19, 0, 5); small.group.rotation.y = variant ? -0.5 : 0.5;
+  // stone lanterns by the way between them and at the cliff's edge
+  for (const [x, z] of [[4.5, 2], [-4.5, 2], [variant ? -9 : 9, 16], [0, 24]]) {
+    k.add(m.stone, cyl(0.34, 0.28, 0.18, 6, x, 0, z)); k.add(m.stone, cyl(0.14, 0.11, 0.8, 6, x, 0.18, z)); k.add(m.stone, cyl(0.17, 0.29, 0.13, 6, x, 0.98, z));
+    k.add(m.glass, box(0.3, 0.3, 0.3, x, 1.12, z), false); k.add(m.stone, cone(0.44, 0.28, 6, x, 1.44, z));
+  }
+  g.add(big.group, small.group, k.build());
+  return { group: g, radius: 26, height: big.height || 16, small: variant ? 19 : -19 };
+}
+
+/**
  * A harbour (features/harbours.js): a plank jetty on posts running out to sea from the shore, a
  * lantern at its end (lit at dusk), a little sailing boat moored alongside with its sail furled, and
  * crates, barrels and a signboard where it meets the land. Local +z runs out to sea; the deck stands

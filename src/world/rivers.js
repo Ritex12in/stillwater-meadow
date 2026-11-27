@@ -158,14 +158,14 @@ function stonesFor(r) {
     const hw = r.w[i] / 2, drop = r.lv[i] - r.lv[i + 1];
     if (r.fall[i]) {
       // a fall: rocks down both sides of its face (slabs beside a tall one), a few about the lip, and boulders round the pool at its foot
-      const tall = drop > TALL, big = tall ? Math.min(1.7, 0.45 + drop * 0.07) : 0.2 + drop * 0.05, rows = Math.max(2, Math.ceil(drop / (tall ? 2.6 : 1.2)));
+      const tall = drop > TALL, big = tall ? Math.min(1.7, 0.45 + drop * 0.07) : 0.2 + drop * 0.05, rows = r.heart ? 0 : Math.max(2, Math.ceil(drop / (tall ? 2.6 : 1.2))); // (a heart's fall pours down a bare rock face: rocks at its lip and round its pool, none hung on the face)
       for (let k = 0; k <= rows; k++) for (const side of [-1, 1]) {
         const t = 0.1 + (k / rows) * 0.9, off = hw * 0.95 + big * (0.6 + roll() * 0.4);
         put(r.x[i] + dx * t + nx * side * off, r.lv[i] - drop * Math.max(0, t - 0.12) / 0.88 + big * (tall ? 0.1 : 0), r.z[i] + dz * t + nz * side * off, big * (0.7 + roll() * 0.6), tall ? 1.15 : 0.8);
-        if (tall && roll() < 0.5) put(r.x[i] + dx * t + nx * side * (off + big * 1.2), r.lv[i] - drop * t + big * 0.2, r.z[i] + dz * t + nz * side * (off + big * 1.2), big * (0.4 + roll() * 0.35), 1.0);
+        if (tall && !r.heart && roll() < 0.5) put(r.x[i] + dx * t + nx * side * (off + big * 1.2), r.lv[i] - drop * t + big * 0.2, r.z[i] + dz * t + nz * side * (off + big * 1.2), big * (0.4 + roll() * 0.35), 1.0);
       }
-      for (const side of [-1, 1]) put(r.x[i] - tx * 0.6 + nx * side * (hw + 0.3), r.lv[i] - 0.05, r.z[i] - tz * 0.6 + nz * side * (hw + 0.3), 0.3 + roll() * 0.3); // (the lip)
-      const foot = tall ? 5 : 3;
+      if (!(i > 0 && r.fall[i - 1])) for (const side of [-1, 1]) put(r.x[i] - tx * 0.6 + nx * side * (hw + 0.3), r.lv[i] - 0.05, r.z[i] - tz * 0.6 + nz * side * (hw + 0.3), 0.3 + roll() * 0.3); // (the lip: where the fall begins)
+      const foot = r.fall[i + 1] ? 0 : tall ? 5 : 3; // (round the pool: where the fall ends)
       for (let k = 0; k < foot; k++) { const a = (roll() - 0.5) * 2.4, d = hw * (0.9 + roll() * 0.9) + (tall ? 0.8 : 0.2); put(r.x[i + 1] + tx * (0.8 + roll() * 2.5) + nx * Math.sin(a) * d * 1.3, r.lv[i + 1] - 0.1, r.z[i + 1] + tz * (0.8 + roll() * 2.5) + nz * Math.sin(a) * d * 1.3, 0.22 + roll() * (tall ? 0.7 : 0.35)); }
     } else {
       // calm and quick water: a stone on the bank now and then; in quick water more of them, some in the stream

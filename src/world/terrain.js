@@ -169,7 +169,8 @@ function* fill(t) {
       if (cs >= 3.6) { grad[0] = dx / (2 * cs); grad[1] = dz / (2 * cs); }
       const base = coldBase(x, z), lie = slopeLook(x, z, h, base, cs >= 3.6 ? grad : null), north = lie.north, scree = lie.scree, felt = feltHeight(x, z, h, north, base);
       // (bare rock on cliffs and high ground; grey scree at the foot of a cliff)
-      const wRock = Math.max(rockAmt(h, slope, felt) * 0.85, scree * 0.8), wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6;
+      // (and a face too steep for anything to grow on, as the cliff of a grove's heart is: bare rock)
+      const sheer = smooth(1.4, 2.4, slope), wRock = Math.max(rockAmt(h, slope, felt) * 0.85, scree * 0.8, sheer * 0.95), wMoss = Math.max(smooth(0.35, 0.8, slope), smooth(14, 40, h)) * 0.6 * (1 - sheer * 0.7);
       // the climate here: snow lies longer on slopes facing north, and not on cliffs; lush country is a deeper green
       const rain = moistAt(x, z), dry = dryOf(rain), chill = coldAt(x, z, h + ASPECT * north, base), cold = snowCold(chill, rain) * (1 - smooth(0.9, 1.5, slope) * 0.55);
       // cold country where little snow lies (it is too dry) is tundra: low olive-brown moss and sedge
@@ -184,7 +185,8 @@ function* fill(t) {
       clm[k * 3] = cold; clm[k * 3 + 1] = dry; clm[k * 3 + 2] = pond;
       { const y = yearAt(x, z); yr[k * 2] = y.A; yr[k * 2 + 1] = y.m; }
       const bw = biomesAt(x, z, h, base, rain);
-      grv[k] = groveAt(x, z) * (1 - Math.max(bw.desert, bw.beach, bw.swamp, bw.volcanic));
+      // (a sheer face is told to the shader in the same number, below nought: bare stone there, no moss or petals)
+      grv[k] = sheer > 0.02 ? -sheer : groveAt(x, z) * (1 - Math.max(bw.desert, bw.beach, bw.swamp, bw.volcanic));
       look[k * 4] = Math.max(bw.desert, bw.beach); look[k * 4 + 1] = bw.swamp; look[k * 4 + 2] = bw.enchanted; look[k * 4 + 3] = bw.volcanic;
       c.multiplyScalar(1 - lushOf(rain) * 0.16);
       if (textured) {
@@ -426,6 +428,18 @@ function groundDetail(mat, textured) {
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.26, 0.31, 0.18) * (0.85 + 0.3 * broad), smoothstep(0.2, 0.8, vLook.y) * 0.75);
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.55, 0.82, 0.86), smoothstep(0.2, 0.8, vLook.z));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.12, 0.13) * (0.85 + 0.3 * mid), smoothstep(0.2, 0.75, vLook.w));
+        }
+        // a sheer face (the cliff of a grove's heart): bare stone in level beds, weathered, darker in its seams
+        // (the ground's rock picture is mossy and is laid flat, so it smears down a cliff: this is drawn by height instead)
+        if (vGrove < -0.02) {
+          float along = vGround.x * 0.8 + vGround.z * 0.6;
+          float lay = vGround.y * 0.3 + gNoise(vGround.xz * 0.05) * 2.2 + gNoise(vGround.xz * 0.31 + 9.0) * 0.45; // (the beds dip and waver)
+          float nb = floor(lay), kb = fract(sin(nb * 91.7) * 43758.5453);                                           // (each bed its own shade)
+          float seam = smoothstep(0.09, 0.0, fract(lay)) * (0.5 + 0.5 * gNoise(vec2(along * 0.4, nb)));           // (a dark seam under each, broken along its length)
+          float joint = smoothstep(0.035, 0.0, abs(fract(along * (0.1 + 0.08 * kb) + kb * 7.0) - 0.5)) * step(0.35, gNoise(vec2(floor(along * (0.1 + 0.08 * kb) + kb * 7.0) * 3.1, nb * 5.3))); // (upright cracks, not through every bed)
+          float grit = gNoise(vec2(along * 1.3, vGround.y * 2.6)) * 0.6 + gNoise(vec2(along * 0.21, vGround.y * 0.5 + 5.0)) * 0.4;
+          vec3 stone = mix(vec3(0.43, 0.41, 0.43), vec3(0.64, 0.6, 0.57), kb * 0.6 + grit * 0.4) * (0.84 + 0.3 * grit) * (1.0 - 0.42 * max(seam, joint * 0.8));
+          diffuseColor.rgb = mix(diffuseColor.rgb, stone, smoothstep(0.05, 0.55, -vGrove));
         }
         // a blossom grove: the ground mossy and dark in the trees' shade, petals lying on it in drifts
         // (after the owner's picture: almost no green, pink over everything)

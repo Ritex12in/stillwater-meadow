@@ -131,6 +131,7 @@ const GLYPH = {
   shrine: { d: 'M2.500 5h11M4 7.500h8M5 5v9M11 5v9', line: true },
   castle: { d: 'M3 14V5h2v2h2V5h2v2h2V5h2v9z' }, icecastle: { d: 'M3 14V5h2v2h2V5h2v2h2V5h2v9z' },
   pagoda: { d: 'M8 2l5 4H3zM8 6l6 4H2zM5 10h6v4H5z' },
+  heart: { d: 'M8 2l5 4H3zM8 6l6 4H2zM5 10h6v4H5z' }, // (the heart of a blossom grove: its pagodas)
   ruin: { d: 'M3 14V8a5 5 0 0 1 10 0v6h-2.500V8a2.500 2.500 0 0 0-5 0v6z' },
   hut: { d: 'M2 8l6-5 6 5h-2v6H4V8z' }, beachhut: { d: 'M2 8l6-5 6 5h-2v6H4V8z' },
   windmill: { d: 'M8 8L3 3M8 8l5-5M8 8l-5 5M8 8l5 5', line: true },

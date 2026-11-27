@@ -114,7 +114,8 @@ export function growRocks(ix, iz) {
   for (let k = 0; k < 16; k++) {
     const x = x0 + R() * S, z = z0 + R() * S, size = R(), a = R(), b = R(), c = R(), turn = R(), tilt = R(), tint = R(), keep = R();
     if (lakeT(x, z) < 1.15 || clearingAt(x, z)) continue;
-    const h = height(x, z), rocky = rockAmt(h, slopeOf(x, z), feltAt(x, z, h));
+    const h = height(x, z), sl = slopeOf(x, z), rocky = rockAmt(h, sl, feltAt(x, z, h));
+    if (sl > 1.6) continue; // (none hung on a sheer face)
     // (more of them on the dry heath and in the cold, where little else stands)
     if (keep > 0.07 + rocky * 0.8 + smooth(30, 70, h) * 0.15 + dryOf(moistAt(x, z)) * 0.16 + snowOf(coldAt(x, z, h)) * 0.08) continue;
     const s = 0.4 + size * size * (1.1 + rocky * 1.3);

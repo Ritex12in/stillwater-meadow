@@ -953,6 +953,38 @@ The pictures are paintings and the game is low-poly on an integrated graphics ch
 Xe): composition, palette and light can be matched, the fine detail cannot, and every texture,
 tree and see-through layer costs frames there, so each piece is measured on the owner's computer.
 
+## How the rivers and falls are drawn (their look redone 2026-11-28; the land untouched)
+
+The first piece of "a world with places in it" that needs no change to the land. Before: a flat
+cyan ribbon with white stripes, lying on a grass slope. Now (`world/rivers.js`):
+
+- **Calm water:** blue-green, deeper in the middle; it thins to nothing at its edges, so the bed
+  shows through and the river has no hard border; ripples drawn out along the current; flecks of
+  foam drifting, more below a fall and along the banks.
+- **A fall's face:** white water in ropes running down, pale veins of the river's colour between;
+  over it a second strip standing a little off the face (the falling sheet: clumps moving faster
+  than the face, bellying out below the lip), so the fall has depth; foam churning in the pool
+  below, further below a tall fall.
+- **Mist:** puffs rising from the foot of each fall, swelling and thinning as they climb; more,
+  bigger and higher below a tall one.
+- **Rocks:** boulders down both sides of every fall (slabs up to about 1.7 m across the radius
+  beside one dropping more than 4 m, so it runs through a rocky chute), a few at its lip and round
+  its pool; stones now and then along the banks and in quick water. One shape, pushed in and out
+  so no two faces match, one instanced mesh a river (a river with 19 falls: 386 stones, one draw).
+  **For the eye only:** the land's height, where you may walk and the river's levels are as they
+  were; you can walk through a rock.
+- Everything is lit by the day as the lakes are (grey at night, not glowing), hazed and graded;
+  a frozen river shows ice, and its falling sheet and mist stop. All of a river's pieces hang from
+  its ribbon and are thrown away with it (geometries and textures held are the same after three
+  far trips as after one).
+- At the 60 frames a second the browser allows, on the owner's computer at 1920 x 1000 on High,
+  the new pieces shown or hidden made no difference at the foot of a tall fall (so no cost seen,
+  and no headroom measured).
+- Still as it was, for the change to the land: rivers are 2.4 to 4.3 m wide from spring to mouth,
+  and a fall is a steep ramp of the ground, not a cliff. Where a river meets a small lake, a pale
+  flat sheet shows in the low ground beside the lake (there before this work; not yet looked into).
+- `window.__meadow.riversView()`: each river drawn, with how many falls and stones.
+
 ## How seasons by latitude work (built 2026-11-28)
 
 Built from the plan below, with the owner's "go with your picks" on the pictures (stripes

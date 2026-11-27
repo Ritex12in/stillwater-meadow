@@ -13,7 +13,7 @@ import { buildSky, sky, skyU } from './world/sky.js';
 import { buildLights, hemi, ambient, sun, placeSun } from './world/lights.js';
 import { buildGround, updateGround, pumpGround, settleGround, groundStats, groundU } from './world/terrain.js';
 import { buildWater, updateWater, waterLakes, waterU, seaShown, seaDrawnAt } from './world/water.js';
-import { updateRivers, riversShown } from './world/rivers.js';
+import { updateRivers, riversShown, resizeRivers, riversView } from './world/rivers.js';
 import { updateCrossings, crossingsShown } from './world/crossings.js';
 import { buildTrees, buildRocks, buildGrass, buildFlowers, buildReedsAndPads, buildUndergrowth, treeSpots, TREE_REACH, MODEL_FAR } from './world/vegetation.js';
 import { loadKit, kit } from './core/assets.js';
@@ -192,6 +192,7 @@ const resize = () => {
   resizePost();
   const h = renderer.domElement.height;
   resizeWeather(h);
+  resizeRivers(h);
   resizers.forEach((fn) => fn(h));
 };
 initPost(renderer, scene, camera);
@@ -412,7 +413,7 @@ window.__meadow = {
   // the trees beyond the valley: what is loaded, a way to bring it up to date, and one square's trees
   /** The shrine sites within `r` metres of you (the shrine stands at `shrine`, one of them). */
   shrines: (r = 1500) => shrineSitesNear(player.x, player.z, r), rawHeight,
-  seaShown, seaDrawnAt, riversShown, crossingsShown,
+  seaShown, seaDrawnAt, riversShown, riversView, crossingsShown,
   wild: () => wildView(),
   characters: () => ({ heroShown: hero.root.visible, friendShown: !!(friend && friend.k && friend.k.root.visible) }),
   countries: (x = player.x, z = player.z) => nearestCountries(x, z),

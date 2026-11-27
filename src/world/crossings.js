@@ -7,6 +7,7 @@ import { std, mergeGeos } from '../core/materials.js';
 
 const REACH = 700;
 const woodMat = std('#8b6a47'), beamMat = std('#6b4f34'), stoneMat = std('#94918a');
+const redMat = std('#b8392b'), capMat = std('#3a2c24'); // (a garden bridge in a blossom grove: vermilion rails and posts, dark caps)
 const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), V = new THREE.Vector3(), SC = new THREE.Vector3();
 /** A box `w` across, `h` high, `d` along, its middle at (x, y, z) in the bridge's own frame, tipped by `pitch` along it. */
 const box = (w, h, d, x, y, z, pitch = 0) => new THREE.BoxGeometry(w, h, d).applyMatrix4(M.compose(V.set(x, y, z), Q.setFromEuler(E.set(pitch, 0, 0)), SC.set(1, 1, 1)));
@@ -28,11 +29,17 @@ function bridgeMesh(b) {
       frame.push(box(0.07, 0.07, len + 0.02, s * (W + 0.02), y(am) + 0.78, am, p));       // rail
     }
   }
-  for (let a = -half + 0.15; a <= half - 0.1; a += (2 * half - 0.3) / Math.max(2, Math.round(half / 0.7))) for (const s of [-1, 1]) frame.push(box(0.09, 0.85, 0.09, s * (W + 0.02), y(a) + 0.38, a)); // posts
+  const caps = [], garden = (b.grove || 0) > 0.5;
+  for (let a = -half + 0.15; a <= half - 0.1; a += (2 * half - 0.3) / Math.max(2, Math.round(half / 0.7))) for (const s of [-1, 1]) {
+    frame.push(box(garden ? 0.12 : 0.09, garden ? 1.0 : 0.85, garden ? 0.12 : 0.09, s * (W + 0.02), y(a) + (garden ? 0.46 : 0.38), a)); // posts
+    if (garden) caps.push(box(0.2, 0.07, 0.2, s * (W + 0.02), y(a) + 0.99, a), box(0.1, 0.1, 0.1, s * (W + 0.02), y(a) + 1.07, a)); // (each under a small dark cap)
+  }
+  if (garden) for (let i = 0; i < parts; i++) { const a0 = -half + (i / parts) * 2 * half, a1 = a0 + (2 * half) / parts, am = (a0 + a1) / 2, len = Math.hypot(a1 - a0, y(a1) - y(a0)), p = -Math.atan2(y(a1) - y(a0), a1 - a0); for (const s of [-1, 1]) frame.push(box(0.05, 0.05, len + 0.02, s * (W + 0.02), y(am) + 0.45, am, p)); } // (and a second, lower rail)
   // and the ends of the beams sunk into each bank
   for (const s of [-1, 1]) for (const e of [-1, 1]) frame.push(box(0.14, 0.5, 0.5, s * (W - 0.15), y(e * half) - 0.35, e * (half - 0.1)));
   const g = new THREE.Group();
-  for (const [geos, mat] of [[deck, woodMat], [frame, beamMat]]) {
+  for (const [geos, mat] of [[deck, woodMat], [frame, garden ? redMat : beamMat], [caps, capMat]]) {
+    if (!geos.length) continue;
     const geo = mergeGeos(geos); geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; g.add(m);
   }

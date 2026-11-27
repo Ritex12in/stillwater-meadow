@@ -815,7 +815,7 @@ are the country's in summer whatever the season; rivers are drawn, trails and br
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
 
-## The cherry blossom valley: the owner's picture, analysed (2026-11-28; step 1, colour and light, built)
+## The cherry blossom valley: the owner's picture, analysed (2026-11-28; steps 1 and 2 built)
 
 The owner: "time to work on the biome examples I gave; pick one and start analysing". Picked: "Enchanted
 Cherry Blossom Valley" (in the owner's Downloads), the plan's first biome, since the game already has
@@ -927,6 +927,27 @@ picture, which is lit as bright as our noon. **Not done in this step:** the gras
 are still green (they stand over the petals); the distant tree cards were not looked at; the pagoda
 stands at a grove's edge, where little of this shows. Speed on the owner's laptop was not measured
 (the ground shader does more in a grove: two small loops a pixel).
+
+### Step 2 built: the things that need no cliff (2026-11-28, on "finish the coded ones now")
+
+The owner asked for better assets to be looked for on the internet first; several packs were found
+but none with a licence that could be checked from here, and nothing could be downloaded, so the
+coded ones were finished. They can be swapped for downloaded models later. No land is moved.
+
+- **Stone lanterns along the trails** (`world/trailside.js`, new): where a trail runs through a
+  grove, a lantern every sixteen metres, one each side by turns, lit at dusk. In seed 1, five to
+  twelve stand within 300 m of most pagodas; the grove goes on for 30 to 150 m along a pagoda's
+  trail. Two instanced meshes, up to 96 lanterns. You can walk through them (they block nothing).
+  Pictures: `grove2-lanterns-day.png`, `-dusk.png` (`tools/grove-view.mjs`).
+- **Great old cherries** (`world/wilds.js`): deep in a grove, about one blossom tree in ten is two
+  and a half to three times the size of the rest (17 to 20 m). It is the same tree model enlarged,
+  not the gnarled, mossy giant of the picture.
+- **A garden bridge** (`core/shape.js` bridgesOf, `world/crossings.js`): where a trail crosses a
+  river in a grove the footbridge arches two and a half times as high and is lacquered vermilion,
+  with a second rail and dark caps on its posts. **Not seen:** no such crossing lies within 5 km of
+  home in seed 1, so there is no picture of one.
+- **A spotted deer** (`features/wildlife.js`): the deer at a lake that lies in a grove has pale
+  flecks along its back and flanks. **Not seen** in a picture either.
 
 ### A way to build it (ours; nothing agreed)
 

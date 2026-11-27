@@ -6,7 +6,7 @@ import { TAU, lerp, damp, smooth, rnd, mulberry32 } from '../core/math.js';
 // (the fox, and the deer away from home, draw from a source of their own, so the rest of the world's
 // random sequence, which the other animals draw from, is as it was without them)
 const own = mulberry32(0x0F0C5), ownRnd = (a = 0, b = 1) => a + (b - a) * own();
-import { lakeAt, lakeT, heightAt, walkable, HOME, lakeIce } from '../core/shape.js';
+import { lakeAt, lakeT, heightAt, walkable, HOME, lakeIce, groveAt } from '../core/shape.js';
 import { std, enableShadows, glowTex } from '../core/materials.js';
 import { hooks, seasonState, world } from '../core/state.js';
 import { clock } from '../core/clock.js';
@@ -154,15 +154,21 @@ export function initWildlife() {
       g.add(p); return p;
     });
     g.add(body, belly, tail, neck);
+    // a spotted coat (in a blossom grove: after the owner's picture): pale flecks along the back and flanks
+    const spots = new THREE.Group(), fleck = new THREE.BoxGeometry(0.012, 0.05, 0.05);
+    for (let i = 0; i < 22; i++) { const s = i % 2 ? 1 : -1, row = i % 3; const f = new THREE.Mesh(fleck, light); f.position.set(s * 0.213, 1.12 - row * 0.1 + ((i * 7) % 5) * 0.012, -0.44 + (i / 22) * 0.88 + ((i * 3) % 4) * 0.02); spots.add(f); }
+    for (let i = 0; i < 7; i++) { const f = new THREE.Mesh(fleck, light); f.rotation.z = Math.PI / 2; f.position.set(((i * 5) % 3 - 1) * 0.1, 1.178, -0.4 + i * 0.13); spots.add(f); }
+    spots.visible = false; g.add(spots);
     enableShadows(g);
     scene.add(g);
-    return { g, neck, legs, state: 'graze', x: 0, z: 0, heading: 0, t: 0, away: 0, phase: 0, look: 0 };
+    return { g, neck, legs, spots, state: 'graze', x: 0, z: 0, heading: 0, t: 0, away: 0, phase: 0, look: 0 };
   })();
   const placeDeer = (r = rnd) => {
     if (!deerSpots.length) { deer.g.visible = false; return; }
     let best = deerSpots[0], bd = -1;
     for (const s of deerSpots) { const d = Math.hypot(s.x - player.x, s.z - player.z); if (d > bd && r() < 0.7) { bd = d; best = s; } }
     deer.x = best.x; deer.z = best.z; deer.heading = r() * TAU; deer.state = 'graze'; deer.g.visible = true;
+    deer.spots.visible = groveAt(best.x, best.z) > 0.4;
   };
   placeDeer();
   const placeDeerAt = (L) => { findDeerSpots(L); placeDeer(L === HOME ? rnd : ownRnd); };
@@ -215,7 +221,7 @@ export function initWildlife() {
     }
   };
   placeFox(lifeLake);
-  wildView = () => ({ fox: { kind: fox.kind, shown: fox.g.visible, state: fox.state, x: fox.x, z: fox.z }, deer: { shown: deer.g.visible, spots: deerSpots.length } });
+  wildView = () => ({ fox: { kind: fox.kind, shown: fox.g.visible, state: fox.state, x: fox.x, z: fox.z }, deer: { shown: deer.g.visible, spots: deerSpots.length, spotted: deer.spots.visible } });
   hooks.lake.push((L) => { placeFox(L); placeDeerAt(L); });
 
   hooks.frame.push((dt, t) => {

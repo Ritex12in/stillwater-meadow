@@ -1275,6 +1275,15 @@ export function trailAt(x, z) {
   if (best > 0 && lakeAt(x, z).t(x, z) < 1.35) return 0; // (not through a lake, nor its shore)
   return best;
 }
+/** The trails that pass within about `r` metres of a spot (each: `id`, `len`, and its ends `a`, `b`). */
+export function trailsNear(x, z, r) {
+  const segs = new Map();
+  if (!sitesReady) return [];
+  for (let cz = Math.floor((z - r) / TRAIL_CELL); cz <= Math.floor((z + r) / TRAIL_CELL); cz++) for (let cx = Math.floor((x - r) / TRAIL_CELL); cx <= Math.floor((x + r) / TRAIL_CELL); cx++) for (const s of trailsOfCell(cx, cz)) segs.set(s.id, s);
+  return [...segs.values()];
+}
+/** The point `t` (0..1) of the way along a trail, as it wanders. */
+export const trailPoint = (s, t) => { const w = wander(s, t); return { x: s.a.x + s.ux * s.len * t - s.uz * w, z: s.a.z + s.uz * s.len * t + s.ux * w }; };
 /** For signposts: the trails leaving places near a spot, each with the place at its far end. */
 export function trailEndsNear(x, z, r) {
   const out = [], segs = new Map();
@@ -1555,7 +1564,8 @@ export function bridgesOf(r) {
           const half = w2 / 2 / Math.max(0.35, Math.abs(ux * (-bz) + uz * bx) / Math.hypot(bx, bz)) + 1.8;
           const ya = heightBeforeRivers(x - ux * half, z - uz * half), yb = heightBeforeRivers(x + ux * half, z + uz * half);
           if (out.some((b) => Math.hypot(b.x - x, b.z - z) < 12)) continue;
-          out.push({ x, z, ux, uz, half, ya, yb, lv, arch: 0.3 + 0.04 * half });
+          const grove = smooth(0.35, 0.6, groveAt(x, z)); // (in a blossom grove the bridge is a garden bridge: a high arch, lacquered red; world/crossings.js)
+          out.push({ x, z, ux, uz, half, ya, yb, lv, arch: (0.3 + 0.04 * half) * (1 + 1.5 * grove), grove });
         }
       }
       px = qx; pz = qz;

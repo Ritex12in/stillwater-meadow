@@ -33,7 +33,9 @@ export function hereText() {
   const st = seasonState, p = typeof st.phaseHere === 'number' ? st.phaseHere : 0.5; // (the year where you stand: by latitude)
   const into = ((((p + 0.125) % 1) + 1) % 1) * 4 % 1, part = into < 0.34 ? 'Early' : into < 0.67 ? 'Mid' : 'Late';
   const tropic = st.beltHere === 'tropical', polar = st.beltHere === 'polar', local = phaseName(p);
-  const bits = [polar ? 'Polar ice' : tropic ? st.nameHere : `${part} ${local.toLowerCase()}`, `${st.beltHere} belt`];
+  // (the season a place keeps, by name: features/seasons.js; with a season held for a look, how far into it the year is)
+  const bits = [polar ? 'Polar ice' : tropic || st.fixed ? st.nameHere : `${part} ${local.toLowerCase()}`, `${st.beltHere} belt`];
+  if (st.fixed) { const sky = { rain: 'rain', storm: 'a thunderstorm', fog: 'fog', snow: 'snowing' }[wx.type]; if (sky) bits.push(sky); return 'Here: ' + bits.join(' · '); }
   const sky = { rain: 'rain', storm: 'a thunderstorm', fog: 'fog', snow: 'snowing' }[wx.type];
   if (sky) bits.push(sky);
   if (st.winterHere && local !== 'Winter' && !polar) bits.push('snow lies here');

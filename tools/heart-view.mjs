@@ -6,7 +6,7 @@ const p = await b.newPage({ viewport: { width: 1280, height: 720 } });
 p.on('pageerror', (e) => console.log('ERR', e.message));
 p.on('console', (m) => { if (m.type() === 'error') console.log('CON', m.text().slice(0, 300)); });
 const tag = process.env.TAG || '';
-await p.goto('http://127.0.0.1:8080/?seed=' + (process.env.SEED || 1) + '&weather=clear&season=spring#' + (process.env.HOUR || 16.5));
+await p.goto('http://127.0.0.1:8080/?seed=' + (process.env.SEED || 1) + '&weather=clear' + (process.env.SEASON ? '&season=' + process.env.SEASON : '') + '#' + (process.env.HOUR || 16.5));
 await p.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });
 await p.waitForTimeout(3000);
 await p.addStyleTag({ content: 'body > *:not(canvas):not(#world) { display: none !important; }' });

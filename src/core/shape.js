@@ -645,7 +645,7 @@ const year = { A: 1, m: 0 };
 export function yearAt(x, z) {
   const d = z - (HOME.z - HOME_SOUTH), south = smooth(-300, 300, modLand(d) - HALF), odd = ((Math.floor(d / LAND) % 2) + 2) % 2;
   year.A = smooth(0.2, 0.55, latitudeAt(x, z)); // (in full by home's latitude; little enough in the subtropics that no snow lies there in a mild winter)
-  year.m = odd ? 1 - south : south;
+  year.m = 0; // (there is no other half-year any more: nothing turns, so no place is half a year apart. It was `odd ? 1 - south : south`.)
   return year;
 }
 /** A thing's own year, worked out once and kept on it (`it.x`, `it.z`). */

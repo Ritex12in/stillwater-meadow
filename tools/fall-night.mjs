@@ -1,12 +1,12 @@
 // Dev tool: the falls of the grove's heart nearest home at a given hour and graphics level (needs `npm run dev`).
 // To e:/Games/_assets/previews/fall-<level>-<hour>-<view>.png.   LEVEL=low HOUR=23 SEED=1 node tools/fall-night.mjs
 import { chromium } from 'playwright';
-const level = process.env.LEVEL || 'low', hour = process.env.HOUR || 23, season = process.env.SEASON || 'spring';
+const level = process.env.LEVEL || 'low', hour = process.env.HOUR || 23, season = process.env.SEASON || 'place';
 const b = await chromium.launch({ channel: 'chrome', args: ['--enable-gpu', '--use-angle=d3d11', '--ignore-gpu-blocklist'] });
 const p = await b.newPage({ viewport: { width: 1280, height: 720 } });
 p.on('pageerror', (e) => console.log('ERR', e.message));
 p.on('console', (m) => { if (m.type() === 'error') console.log('CON', m.text().slice(0, 300)); });
-await p.goto('http://127.0.0.1:8080/?seed=' + (process.env.SEED || 1) + '&weather=clear&season=' + season + '#' + hour);
+await p.goto('http://127.0.0.1:8080/?seed=' + (process.env.SEED || 1) + '&weather=clear' + (process.env.SEASON ? '&season=' + season : '') + '#' + hour);
 await p.waitForFunction(() => window.__meadow && window.__meadow.player, null, { timeout: 150000 });
 await p.waitForTimeout(3000);
 await p.addStyleTag({ content: 'body > *:not(canvas):not(#world) { display: none !important; }' });

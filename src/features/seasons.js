@@ -1,3 +1,10 @@
+// THE YEAR DOES NOT TURN (the owner, 2026-11-28: "remove the season concept, season will be fixed for
+// places"). The year is held at midsummer for good, so every place shows what its own land makes it: cold
+// country and the high peaks lie under snow with their lakes frozen (winter, always), a blossom grove is
+// in blossom (spring, always), everywhere else is in summer leaf. The calendar and the save no longer
+// reach it. The engine below is kept, and a season can still be held for a look or a test (`?season=`,
+// the `season` command, `holdPhase`): that is a debug tool, it is not saved.
+//
 // Seasons, place by place. The time of year (core/year.js) is the same everywhere; what it does
 // depends on where you are: a cold upland is white while the valley below is in autumn colour, and
 // a warm coast stays green all winter. This module keeps the year moving (or held at a picked
@@ -31,6 +38,7 @@ const P = {
 /** How much snow cover (on trees, rocks and things) a full snow where you stand gives. */
 const COVER = 0.72;
 
+const FIXED_PHASE = 0.5; // (midsummer: a place's own chill, and nothing added)
 let mode = 'auto', held = null, particleAmt = 0, ready = false, falling = null, fallingKind = '';
 
 // Every round tree has a crown colour for each state of its leaves (`pal`) and the colour it is
@@ -83,7 +91,8 @@ function syncUi() {
 
 /** Move the year on (or hold it at the picked season), and write it where everything reads it. */
 function turnYear() {
-  const p = held !== null ? held : mode === 'auto' ? yearPhase() : SEASON_PHASE[mode];
+  const p = held !== null ? held : mode === 'auto' ? FIXED_PHASE : SEASON_PHASE[mode];
+  st.fixed = held === null && mode === 'auto'; // (as the places have it: nothing held for a look)
   st.phase = p;
   st.season = seasonValue(p);
   st.lagged = seasonValue(p - ICE_LAG);
@@ -104,6 +113,8 @@ function readHere(x, z) {
   st.phaseHere = phaseHere(st.phase, y);
   st.beltHere = beltOf(latitudeAt(x, z));
   st.nameHere = st.beltHere === 'polar' ? '' : st.beltHere === 'tropical' ? (wetSeasonAt(x, z, st.season) > 0.5 ? 'Wet season' : 'Dry season') : phaseName(st.phaseHere);
+  // (the season a place keeps: winter where the snow lies, spring in a blossom grove, summer elsewhere)
+  if (st.fixed && st.beltHere !== 'polar') st.nameHere = now > 0.47 ? 'Winter' : groveAt(x, z) > 0.5 ? 'Spring' : st.beltHere === 'tropical' ? st.nameHere : 'Summer';
   // (in and out at different chills, so clothes and music do not flicker along a snow line)
   winterHere = winterHere ? now > 0.42 : now > 0.5;
   st.winterHere = winterHere;
@@ -126,18 +137,16 @@ export const setSeasonMode = (m) => { if (ORDER.includes(m)) setMode(m); };
 function setMode(m) {
   mode = m;
   held = null;
-  store.season = m;
-  saveSoon();
-  turnYear();
+  turnYear(); // (not kept in the save: a held season is for a look)
   recolourIn = 0; hereIn = 0; // (straight away: the trees, and how it is here)
-  toast(m === 'auto' ? `The year turns on its own: ${phaseName(st.phase).toLowerCase()} now.` : `${phaseName(st.phase)} comes to the land.`);
+  toast(m === 'auto' ? 'Each place keeps its own season.' : `${phaseName(st.phase)} is held everywhere, for a look.`);
   syncUi();
 }
 
 let recolourIn = 0, hereIn = 0, blend = 1;
 export function initSeasons() {
   const q = query.get('season');
-  mode = ORDER.includes(q) ? q : ORDER.includes(store.season) ? store.season : 'auto';
+  mode = ORDER.includes(q) ? q : 'auto'; // (the save's old choice of season is not read: an old save that held winter does not bring it back)
   turnYear();
   ready = true;
   world.tintTree = tintTree;

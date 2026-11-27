@@ -68,7 +68,7 @@ export function initCommands({ go, visitLake, report }) {
 
   registerCommand('season', SEASON_MODES.join(' | '), (a) => {
     const v = (a[0] || '').toLowerCase();
-    if (!v) return `The season is ${seasonMode() === 'auto' ? 'turning on its own' : 'held at ' + seasonMode()}. ${hereText()}`;
+    if (!v) return `${seasonMode() === 'auto' ? 'Each place keeps its own season (auto)' : 'Held everywhere at ' + seasonMode() + ', for a look (season auto to let go)'}. ${hereText()}`;
     if (!SEASON_MODES.includes(v)) return 'season ' + SEASON_MODES.join(' | ');
     setSeasonMode(v);
     return v === 'auto' ? 'The year turns on its own.' : `The season is ${v}.`;

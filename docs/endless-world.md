@@ -312,6 +312,8 @@ or dropped once a pack is chosen.
 
 ## Plan: seasons and weather by place (decided 2026-11-22, built the same night)
 
+> **Overturned 2026-11-28.** The owner: "remove the season concept, season will be fixed for places". The year no longer turns: see "The year does not turn" below. What follows is kept as the record of how it was and of the engine, which is still in the code and can be held at a season for a look.
+
 **What is wrong today.** One season for the whole world, from the calendar or picked: in winter every
 lake freezes, snow covers everything and flowers go everywhere; walking never changes the season.
 One weather state follows you everywhere, changing on a timer by a table of what follows what, the
@@ -597,6 +599,8 @@ budgets checked on the owner's machine. The scope is many milestones; each lands
   sea arches, a sky city on the floating islands, cave interiors. See the milestone table.
 
 ## How seasons and weather work (built 2026-11-22)
+
+> **Overturned 2026-11-28.** The owner: "remove the season concept, season will be fixed for places". The year no longer turns: see "The year does not turn" below. What follows is kept as the record of how it was and of the engine, which is still in the code and can be held at a season for a look.
 
 - **The year** (`core/year.js`): a phase, 0 midwinter, 0.5 midsummer, the same for every player at
   the same real moment (UTC), one year every 8 real days. A picked season holds the phase at its
@@ -1119,6 +1123,48 @@ arched bridge); then (c) the heart itself, which changes the land (a cliffed pla
 stream, the pagodas set on it), with the other changes to the land; then (d), added by us after (c)
 was built: the way in, the heart laid out so that walking to it gives the picture's view.
 
+## The year does not turn: a season for each place, for good (2026-11-28)
+
+The owner, on seeing the blossom grove bare under snow in the game's winter: "winter cherry blossom
+trees are not looking good, that place is losing its purpose. Remove the season concept, season will
+be fixed for places." And of the grove's falls: "waterfall should not change with season."
+
+**What it is now.** Nothing changes with the date. The year is held at midsummer for good
+(`features/seasons.js`, `FIXED_PHASE`), so each place shows what its own land makes it:
+
+| A place | Its season, always | Why |
+|---|---|---|
+| Cold country, the poles, high peaks | Winter: snow lies, lakes and rivers frozen, trees bare | its own cold (`coldAt`), with nothing added |
+| A blossom grove | Spring: in blossom, petals falling and lying | blossom trees flower in everything but winter, and a grove is mild |
+| Everywhere else | Summer: in leaf, flowers out, water open | |
+| The tropics | Their wet season | the dry one was the other half of the year |
+| The warm subtropics | Parched gold | their summer drought, now for good |
+
+These are **our picks** of what "fixed for places" means; the owner may overturn any.
+
+**What was changed.** The calendar (`yearPhase`) and the save's old choice of season no longer reach
+the year: an old save that held winter does not bring it back. No place is half a year apart any
+more (`core/shape.js yearAt`: `m` is nought everywhere; it was the other side of an equator, which
+held at midsummer would have lain under snow for good). The "Here:" line names the season a place
+keeps. A grove's falls, pool and stream never freeze (`riverIce`). No land moved: `WORLD_GEN` stays 4.
+
+**What is kept.** The whole engine of the year (`core/year.js`), and a way to hold one season
+everywhere **for a look or a test**: `?season=winter` in the address, the `season` command, the
+tests' `holdPhase`. It is a debug tool: it is not saved, and `season auto` lets go.
+
+**What the owner loses** (to be decided, not built):
+- **Autumn** is nowhere: no turned leaves, no falling leaves, no leaf litter. A kind of country that
+  is autumn for good would bring it back.
+- **Winter at home** never comes: the **snowman** and the **skating dance** on the home lake cannot
+  be reached in play (only with the season held). Skating itself still works on the frozen lakes of
+  cold country.
+- The pike's hint ("storms and autumn") names a season that never comes.
+
+Checked (`tools/season-check.mjs`): loaded as a player loads it on two real dates four days apart
+(half a game year), home, a grove's heart and a tropical, subtropical, temperate and polar spot far to
+the south read the same on both: summer at home, no snow and trees in leaf at the heart, snow in the
+cold. A test holds it ("the year does not turn"). The picture tools no longer ask for spring.
+
 ## How the pines are grown from code (2026-11-28; made and measured; the owner keeps the kit's)
 
 **The owner's verdict, on seeing the comparison: "external assets are good".** The downloaded pines, and
@@ -1522,6 +1568,8 @@ cyan ribbon with white stripes, lying on a grass slope. Now (`world/rivers.js`):
 
 ## How seasons by latitude work (built 2026-11-28)
 
+> **Overturned 2026-11-28.** The owner: "remove the season concept, season will be fixed for places". The year no longer turns: see "The year does not turn" below. What follows is kept as the record of how it was and of the engine, which is still in the code and can be held at a season for a look.
+
 Built from the plan below, with the owner's "go with your picks" on the pictures (stripes
 accepted; belt edges wandering about 900 m; the old patches adding half) and on the three
 decisions (old worlds cleared once; the sun one for the whole world).
@@ -1568,6 +1616,8 @@ decisions (old worlds cleared once; the sun one for the whole world).
   land as it then was; now that the rule is the game's, its "as it is" views show the new land.
 
 ## Plan: seasons by latitude (decided 2026-11-27; built 2026-11-28, see above)
+
+> **Overturned 2026-11-28.** The owner: "remove the season concept, season will be fixed for places". The year no longer turns: see "The year does not turn" below. What follows is kept as the record of how it was and of the engine, which is still in the code and can be held at a season for a look.
 
 **Why.** The owner: a player who wants spring in winter has to wait, which is annoying (the World
 panel's season picker is a debugging tool, not for players); and in the real world seasons vary

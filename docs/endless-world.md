@@ -994,9 +994,12 @@ cyan ribbon with white stripes, lying on a grass slope. Now (`world/rivers.js`):
   a frozen river shows ice, and its falling sheet and mist stop. All of a river's pieces hang from
   its ribbon and are thrown away with it (geometries and textures held are the same after three
   far trips as after one).
-- At the 60 frames a second the browser allows, on the owner's computer at 1920 x 1000 on High,
-  the new pieces shown or hidden made no difference at the foot of a tall fall (so no cost seen,
-  and no headroom measured).
+- Cost, on the owner's computer (1920 x 1000, High, the frame rate uncapped, standing in the
+  foot of a tall fall, the new pieces shown then hidden, three times over in one page): 55 / 57,
+  57 / 62, 57 / 60 frames a second, so about 2 to 5 frames there, the worst place. Stills taken
+  with the mist hidden show what it adds (a white haze over the foot); what the falling sheet
+  adds does not show in a still (it is a matter of movement) and is not yet proved worth its
+  cost.
 - Still as it was, for the change to the land: rivers are 2.4 to 4.3 m wide from spring to mouth,
   and a fall is a steep ramp of the ground, not a cliff. Where a river meets a small lake, a pale
   flat sheet shows in the low ground beside the lake (there before this work; not yet looked into).

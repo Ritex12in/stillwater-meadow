@@ -21,7 +21,7 @@ import { SEASON_GLSL, seasonU } from '../core/year.js';
 import { quality } from '../systems/quality.js';
 import { biomesAt } from '../core/biome.js';
 import { wxU, neonU } from '../core/materials.js';
-import { height, lakeAt, setGroundSampler, trailAt, riverNear, riverBank, isleQ, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, yearAt } from '../core/shape.js';
+import { height, lakeAt, setGroundSampler, trailAt, riverNear, riverBank, isleQ, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, yearAt, seaAt } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -178,7 +178,8 @@ function* fill(t) {
       const rv = t.lv >= 2 ? riverNear(x, z) : null, rpond = rv && rv.d < Math.max(rv.w / 2, cs * 0.6); // (from the 4.8 m squares out: finer ones show the cut bed)
       const pond = (t.lv > 0 && h < 0.02) || rpond ? 1 : 0;
       // (a river's just under its own water, which is drawn over it where near enough)
-      if (pond) { pos[k * 3 + 1] = rpond ? Math.max(rv.lv - 0.1, Math.min(h, 0.02)) : 0.02; nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }
+      if (pond) { pos[k * 3 + 1] = rpond ? Math.max(rv.lv - 0.1, Math.min(h, 0.02)) : seaAt(x, z) > 0 ? -0.3 : 0.02; // (the sea's painted bed lies under the sea's own sheet, which is drawn over it as far as it reaches)
+        nrm[k * 3] = 0; nrm[k * 3 + 1] = 1; nrm[k * 3 + 2] = 0; }
       clm[k * 3] = cold; clm[k * 3 + 1] = dry; clm[k * 3 + 2] = pond;
       { const y = yearAt(x, z); yr[k * 2] = y.A; yr[k * 2 + 1] = y.m; }
       const bw = biomesAt(x, z, h, base, rain);

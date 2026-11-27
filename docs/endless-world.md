@@ -109,7 +109,7 @@ Each one leaves the game playable and tested.
 | M | **A map** (asked for by the owner, 2026-11-26): a screen opened with M showing the land you have explored, filling in as you walk, with the places you have found marked. | Explored land is kept per world; nothing unfound is marked (`tests/map.spec.js`). | done (see "How the map works"); its look is for the owner to judge |
 | T | **Teleport points** (asked for by the owner, 2026-11-27; the owner took our picks): waystones, standing stones you wake and then travel to from the map; the lists that took you anywhere at once are gone from play. | Stones are fixed by the seed and change nothing of the land; a woken stone stays woken per world (`tests/map.spec.js`). | done (see "How travelling works"); the stone's look is for the owner to judge |
 | L | **Seasons by latitude** (planned 2026-11-27, not started; see "Plan: seasons by latitude"). The endless world in lands 12 km north to south, each pole, equator, pole; the kind of year a place has follows its latitude, and the two halves of a land are half a year apart. | Pictures agreed by the owner before the build; every kind of country still findable; one full run of the suite; speed checked on the owner's computer. | built 2026-11-28 (see "How seasons by latitude work"); speed on the owner's computer not yet checked |
-| W | **A world worth looking at** (planned 2026-11-28; see "Plan: a world with places in it"). Oceans, continents and islands; regions each with a heart, a composed place like Stillwater Meadow; each biome's own look after the owner's six pictures; rivers that grow and real waterfalls. | Pictures agreed by the owner before each change to the land; all the changes to the land shipped as one. | planned; the waterfall's look begun |
+| W | **A world worth looking at** (planned 2026-11-28; see "Plan: a world with places in it"). Oceans, continents and islands; regions each with a heart, a composed place like Stillwater Meadow; each biome's own look after the owner's six pictures; rivers that grow and real waterfalls. | Pictures agreed by the owner before each change to the land; all the changes to the land shipped as one. | begun: the waterfall's look; continents and islands in the land (no crossing yet) |
 | 9 | **The main story** (planned; premise and telling to be decided with the owner). Long: a dozen chapters or more. Its places are found by rule from the seed. | |
 
 ## Rules for milestone 4
@@ -958,11 +958,47 @@ left, land and sea; right, the regions' hearts, harbours and trails.
   and more varied sizes are the levers); two continents can draw the same name; islands show as
   sand-coloured specks; the land's own shape and the game's sea are not in the picture.
 
+### Continents and islands in the game (built 2026-11-28, on "go with your picks")
+
+The first step of the order above is built: the game's own sea (`core/shape.js` `seaAt`) is now the
+continents' rule, and `tools/world-map.mjs` draws from the game's own functions (`seaAt`,
+`rawHeight`, `continentAt`), so the picture is the land you walk. `WORLD_GEN` is 3: worlds visited
+before have their discoveries cleared once more.
+
+- **The rule.** Squares of `CONTINENT_CELL` (9 km), home's square centred on home and every other
+  row pushed half a square along (so the continents no longer stand in rows and columns); in each,
+  one continent or none (one in seven is open sea): a middle pushed up to a quarter of a square
+  about, a radius of 2 to 3.5 km, a long way and a short way (up to 1.3 to 1) at a seeded angle,
+  and a coast bent by noise. Home's square always has one, radius 3 to 3.5 km, home 800 m off its
+  middle (no longer joined to a neighbour in the three seeds drawn). Islands rise from the shelf
+  within about 1.3 km of a coast, a few more toward an equator.
+- **The land under the sea.** Beyond the coast the land sinks to 26 m under, and now its hills
+  and mountains sink with it (before, a mountain range stood out of the open sea), so only the
+  islands stand out of it. Home is on land for 2 km whatever the seed.
+- **Names.** Each continent has a name from its square (`continentAt(x, z).name`), never the same
+  as another's within two squares. Nothing in the game shows them yet.
+- **Cost.** The full sea is about 8 times the old one's noise (0.6 against 0.08 microseconds a
+  call), and it is read under every height; so it is worked out once on a 32 m grid (blocks of
+  2 km, the oldest dropped past 900) and read between. Measured in one page, 160 000 reads: old
+  12 to 14 ms, new 5 to 12 ms (the first pass, filling the grid, included). The grid moves the
+  coast by up to a few tens of metres against the full rule, everywhere alike.
+- **Seen from afar.** Beyond the finest ground the land paints its low ground as water; for the
+  sea it now lies under the sea's own sheet (3 km round you), so the sea runs to the horizon
+  instead of ending in a straight-edged pale shelf.
+- **What came out** (`worldmap-1-game.png`, `-7-game.png`, `-42-game.png`): 59 to 67% sea; home's
+  continent 43 to 46 km2 (about 7 km across); the others mostly 16 to 58 km2, 5 to 17 hearts each;
+  about 10 km2 of islands in each 30 km square and 150 to 170 scraps of land under 2 km2.
+  In the game: `coast-0.png` to `coast-3.png` (`tools/coast-view.mjs`).
+- **Not yet.** No way to cross the sea: waystones on other continents show on the map and can
+  be tracked but not reached (harbours and passages are next, and must come before this goes to
+  the live site). No pack ice on the sea toward the poles (the sea's sheet never freezes; far off,
+  the painted sea does). The regions' hearts are still only in the picture.
+
 ### Decisions not yet answered by the owner
 
 How much sea; how big a continent; how to cross first; names and completion goals per continent;
 how big a region; which biome first; whether settlements have people in them (the pictures do;
-the game has no villagers).
+the game has no villagers; until the owner says, none).
 
 ### To be straight about
 

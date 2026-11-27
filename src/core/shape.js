@@ -247,7 +247,7 @@ export const EROSION = 1.0;
 const gH = [0, 0, 0], gC = [0, 0, 0];
 function land(x, z, open) {
   const sea = seaAt(x, z), h = landShape(x, z, open);
-  return sea > 0 ? h - sea * SEA_DEPTH : h;
+  return sea > 0 ? h * (1 - sea) - sea * SEA_DEPTH : h; // (the hills too go under the open sea: only the islands stand out of it)
 }
 function landShape(x, z, open) {
   const u = x + SX * 31, v = z + SZ * 31;
@@ -288,20 +288,105 @@ function terrace(h) {
   const S = 16, k = h / S, i = Math.floor(k), f = k - i;
   return (i + smooth(0.72, 0.95, f)) * S;
 }
-// ── The sea ────────────────────────────────────────────────────
-// A continent field, broad as the climate's: where it runs low the land sinks under one sea, its
-// level the lakes' own (0). Lowland goes under first; hills and mountains stand out of it as
-// islands and headlands (the coastal isles). Never within 2 km of home.
-export const SEA_DEPTH = 26;
-let OSX = null;
+// ── The sea, its continents and islands ────────────────────────
+// (docs/endless-world.md, "Plan: a world with places in it".) The world is ruled into squares
+// CONTINENT_CELL metres wide, home's square centred on home and every other row pushed half a square
+// along, so the continents do not stand in rows and columns. A square holds one continent or none: a
+// middle pushed about in its square, a size, a long way and a short way at some angle, and a coast
+// bent by noise. Each is smaller than its square, so there is sea between neighbours (now and then two
+// touch: an isthmus). Home's square always has one, home inland on it. (One plain field of noise will
+// not do: at half land it joins up into one landmass without end.) Islands rise from the shelf near a
+// continent, more toward an equator. The land sinks under the sea, its level the lakes' own (0): low
+// country goes under first, hills stand out as headlands. Never within 2 km of home.
+export const SEA_DEPTH = 26, CONTINENT_CELL = 9000;
+let OSX = null, OSZ = 0;
+const contCells = new Map();
+const CONT_A = ['Raven', 'Silver', 'Ember', 'Willow', 'Frost', 'Amber', 'Heron', 'Thistle', 'Dawn', 'Moss', 'Star', 'Lark', 'Mist', 'Golden', 'Hollow', 'Wind'], CONT_B = ['moor', 'reach', 'mark', 'holm', 'wold', 'shore', 'vale', 'fell', 'land', 'haven'];
+/** A square's continent, or null. (Names never repeat within two squares of each other.) */
+function contCell(cx, cz) {
+  const key = cx * 131071 + cz;
+  let c = contCells.get(key);
+  if (c !== undefined) return c;
+  c = null;
+  const sd = WORLD.seed | 0, row = cz & 1 ? 0.5 : 0;
+  if (cx === 0 && cz === 0) {
+    const a = hash(sd, 311) * TAU;
+    c = { x: HOME.x + Math.cos(a) * 800, z: HOME.z + Math.sin(a) * 800, R: 3000 + hash(sd, 313) * 500, s: 1 + hash(sd, 317) * 0.15 };
+  } else if (hash(cx * 13 + sd, cz * 7 + 5) > 0.14) {
+    c = { x: HOME.x + (cx + row + (hash(cx * 3 + sd, cz * 11) - 0.5) * 0.5) * CONTINENT_CELL, z: HOME.z + (cz + (hash(cz * 5 + sd, cx * 17) - 0.5) * 0.5) * CONTINENT_CELL, R: 2000 + hash(cx + sd * 3, cz * 19) * 1500, s: 1 + hash(cx * 37, cz * 41 + sd) * 0.3 };
+  }
+  if (c) {
+    const a = hash(cx * 29 + sd, cz * 31) * Math.PI, m = ((x, n) => ((x % n) + n) % n);
+    c.cos = Math.cos(a); c.sin = Math.sin(a); c.cx = cx; c.cz = cz;
+    c.name = CONT_A[m(cx * 5 + cz * 3 + sd, 16)] + CONT_B[m(cx * 3 + cz + (sd >> 4), 10)];
+  }
+  contCells.set(key, c);
+  return c;
+}
+let lsX = NaN, lsZ = NaN, lsV = 0, lsC = null, lsS = 0;
+/** How far inland a spot is by its continent (above 0 land, below 0 sea); `lsC` the continent. */
+function continentField(x, z) {
+  if (OSX === null) { OSX = hash(WORLD.seed, 211) * 50000; OSZ = hash(WORLD.seed, 223) * 50000; }
+  const wx = x + (fbm((x + OSX) * 0.0004 + 3.3, (z + OSZ) * 0.0004 - 8.1) - 0.5) * 2600, wz = z + (fbm((x + OSX) * 0.0004 - 5.7, (z + OSZ) * 0.0004 + 2.9) - 0.5) * 2600;
+  const fz = (z - HOME.z) / CONTINENT_CELL + 0.5, cz = Math.floor(fz);
+  let best = -9, win = null;
+  for (let j = -1; j <= 1; j++) {
+    const r = cz + j, row = r & 1 ? 0.5 : 0, cx = Math.floor((x - HOME.x) / CONTINENT_CELL + 0.5 - row);
+    for (let i = -1; i <= 1; i++) {
+      const c = contCell(cx + i, r);
+      if (!c) continue;
+      const dx = wx - c.x, dz = wz - c.z, u = dx * c.cos + dz * c.sin, v = dz * c.cos - dx * c.sin;
+      const f = 1 - Math.hypot(u / c.s, v * c.s) / c.R;
+      if (f > best) { best = f; win = c; }
+    }
+  }
+  lsC = win;
+  return best + (fbm((x + OSX) * 0.0011 - 9.0, (z + OSZ) * 0.0011 + 6.0) - 0.5) * 0.3;
+}
+/** The sea at a spot, worked out in full (seaAt reads it from a grid). */
+function seaExact(x, z) {
+  const d = Math.hypot(x - HOME.x, z - HOME.z);
+  const c = lsV = continentField(x, z);
+  if (c >= 0) return 0;
+  let s = smooth(0, -0.2, c) * smooth(2000, 3200, d);
+  if (c > -0.42) { // islands on the shelf, more of them toward an equator
+    const n = fbm((x + OSZ) * 0.0013 + 31.0, (z + OSX) * 0.0013 - 12.0), warm = 1 - smooth(0.15, 0.45, latitudeAt(x, z));
+    s *= 1 - smooth(0.68 - warm * 0.06, 0.73 - warm * 0.06, n);
+  }
+  return s;
+}
+// The sea is read under every height, and worked out in full it costs several times the rest of the
+// land's noise; but it changes only over hundreds of metres, so it is worked out once on a grid of
+// SEA_STEP metres (in blocks of SEA_BLOCK squares, the oldest dropped past SEA_KEEP) and read between.
+const SEA_STEP = 32, SEA_BLOCK = 64, SEA_KEEP = 900, seaBlocks = new Map();
+let sbKey = NaN, sbArr = null;
+function seaBlock(bx, bz) {
+  const key = bx * 131071 + bz;
+  if (key === sbKey) return sbArr;
+  let a = seaBlocks.get(key);
+  if (!a) {
+    const W = SEA_BLOCK + 1, x0 = HOME.x + bx * SEA_BLOCK * SEA_STEP, z0 = HOME.z + bz * SEA_BLOCK * SEA_STEP;
+    a = new Float32Array(W * W);
+    for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) a[j * W + i] = seaExact(x0 + i * SEA_STEP, z0 + j * SEA_STEP);
+    if (seaBlocks.size >= SEA_KEEP) seaBlocks.delete(seaBlocks.keys().next().value);
+    seaBlocks.set(key, a);
+  }
+  sbKey = key; sbArr = a;
+  return a;
+}
 /** How much a spot is out at sea (0 land .. 1 open sea): how far the land there is sunk. */
 export function seaAt(x, z) {
-  const d = Math.hypot(x - HOME.x, z - HOME.z);
-  if (d < 2000) return 0;
-  if (OSX === null) OSX = hash(WORLD.seed, 109) * 20000;
-  const c = fbm((x + OSX) * 0.00021 + 7.7, (z - OSX) * 0.00021 - 3.1);
-  return smooth(0.44, 0.32, c) * smooth(2000, 3200, d);
+  if (x === lsX && z === lsZ) return lsS;
+  lsX = x; lsZ = z;
+  const dx = x - HOME.x, dz = z - HOME.z;
+  if (dx * dx + dz * dz < 4e6) return (lsS = 0);
+  const gx = dx / SEA_STEP, gz = dz / SEA_STEP, ix = Math.floor(gx), iz = Math.floor(gz), bx = Math.floor(ix / SEA_BLOCK), bz = Math.floor(iz / SEA_BLOCK);
+  const a = seaBlock(bx, bz), W = SEA_BLOCK + 1, k = (iz - bz * SEA_BLOCK) * W + (ix - bx * SEA_BLOCK), fx = gx - ix, fz = gz - iz;
+  const s0 = a[k] + (a[k + 1] - a[k]) * fx, s1 = a[k + W] + (a[k + W + 1] - a[k + W]) * fx;
+  return (lsS = s0 + (s1 - s0) * fz);
 }
+/** The continent a spot belongs to (or the one whose shore it is off): { name, x, z, R, cx, cz }. */
+export function continentAt(x, z) { continentField(x, z); return lsC; }
 /** How much a spot is in the mountains (0 none .. 1 the heart of a range). */
 export function rangeAt(x, z) { return smooth(0.5, 0.72, fbm((x + SX * 31) * 0.0014 + 41.3, (z + SZ * 31) * 0.0014 - 17.9)); }
 let shaped = false; // (did the last rawHeight() land on a lake's own shaped ground: its bowl, shore and path?)

@@ -103,12 +103,12 @@ function chooseWorld() {
 }
 /**
  * How the land is made, numbered: it goes up when the same seed would give different land (2: the
- * climate by latitude). A world last visited under an older number has changed beyond the ground
+ * climate by latitude; 3: continents and islands). A world last visited under an older number has changed beyond the ground
  * round home, so what pointed at its land is cleared once: where you stood, the places found, the
  * explored map, the waystones woken, what was tracked, the camp and the lanterns (which go back in
  * the backpack: features/camp.js). What you carry, your journals, pets and settings are kept.
  */
-export const WORLD_GEN = 2;
+export const WORLD_GEN = 3;
 /** Was this world's land changed under you since your last visit? (For a line to say so.) */
 export let landChanged = false;
 function checkLand() {

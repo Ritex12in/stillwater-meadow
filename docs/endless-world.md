@@ -1061,6 +1061,55 @@ no far blue mountains); the terrace is still a round drum with one fall; no deer
 **Not seen in a picture:** the back door and the way up; the stream's lower steps and its end; a
 heart in another seed; night. **Not measured:** speed on the owner's laptop.
 
+### The falls of a heart, to a description (2026-11-27)
+
+The owner: "I wanted to ask how the waterfall should look, then build according to that." The
+description we wrote and built to (ours, from the picture):
+
+> A group of falls: one broad main fall with a thinner one each side, a few metres apart, landing in
+> one pool. The water blue-violet in its body with white ropes running down it, narrow at the lip
+> and widening into a veil, breaking into spray at the foot. A soft lilac mist at the foot. A broad
+> pool, about 20 m across, churned white where the water lands, ringed with boulders. The rock dark
+> and wet beside the water, with streaks of green moss down the face; the rest of the cliff dry grey
+> stone. Blossom trees and the pagodas at the rim above; the stream leaving under the red bridge.
+
+Left out on purpose: a cliff broken into ledges with the water in two leaps, and a lake at the foot
+(both reshape the land much more). Dropped: trees leaning over the falls (the game has no way to
+lean a tree).
+
+What was built, still under `WORLD_GEN` 4 and not on `main`:
+
+- **Three falls** (`core/shape.js heartLayout`, `heartRiver`; `world/rivers.js ribbon`): the main
+  fall as before, and a thinner one 7.5 m along the rim to each side. The side falls are not rivers
+  (the land answers for the one nearest river only, so three would cut ridges between their beds):
+  they are drawn with the main stream's water, each a rill lying on the top from the stream to the
+  lip and a veil down the face as the rock stands, widening to twice its width, with mist at its foot.
+- **A pool 22 m across** reaching the cliff's foot under all three, with thirteen boulders by the
+  falls' feet. The main fall is 3.4 m at the lip and 7 m at the foot.
+- **The water's colour**: at a heart, blue-violet (`#7a8bbd`, after the picture's `#7a8bb3`) in the
+  falls' veins, the pool and the stream, at the brightness it had; more of it shows between the white
+  ropes. Every other river is as it was (each river's own `uHeart`, nought elsewhere).
+- **Mist**: lilac at a heart and half as thick again. No more puffs than a tall fall had (9, and 3 at
+  each side fall), for the laptop's sake.
+- **Wet rock and moss** (`world/terrain.js`): where the nearest heart's three falls leave the lip is
+  given to the ground's shader, which darkens the stone within about 9 m of each and runs streaks of
+  moss down it. By the pixel, so it is the same at any distance.
+- **The ground's `grove` number is now two**: the grove, and how sheer the ground is (it was one
+  number, sheer below nought, and the ground between a stone point and a grove point passed through
+  plain grass: the green wedges along the cliff's foot). The stone is drawn over the grove's ground.
+
+Pictures (seed 1): `heart-bridge-fall.png`, `heart-fall.png`, `heart-pool.png`, `heart-way-in.png`.
+Blue, which was 0% in every view against the picture's 12%: 1 to 2% from the path, 6% close to the
+falls, 27% standing at the pool.
+
+**Still off:** from the path the falls are a small part of the view, so blue stays low there; the
+mist is faint (it does not blur the base of the rock as the description asks); the boulders sit in a
+row at the falls' feet, not round the pool; the pool's outline is angular; the side veils kink
+outward at the bottom; a rill lies on the grass with no bed of its own. **Not seen:** the rills on
+top; the falls frozen in winter; night. **Speed:** frames at the pool and at the front door came at
+either 60 or 30 a second in turn, 60 away from the heart (the measure only reads those two steps, so
+it does not say how close to the line it is).
+
 ### A way to build it (ours; nothing agreed)
 
 Colour first, since it is the largest gap and changes no land: (a) the grove's own look where you

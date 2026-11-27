@@ -1081,7 +1081,9 @@ export function heartLayout(s) {
   if (s.lay) return s.lay;
   const sd = s.side, at = (r, phi) => ({ x: s.x + Math.cos(s.th + phi * sd) * r, z: s.z + Math.sin(s.th + phi * sd) * r }), rim = (phi) => rimOf(s, phi * sd);
   const fall = at(rim(0.5), 0.5), view = at(s.R + 52, 0.12), back = at(s.R + 85, Math.PI), top = at(rim(2.95) - 16, 2.95), mid = { x: s.x, z: s.z };
-  return (s.lay = { fall, big: at(rim(-0.12) - 10, -0.12), small: at(rim(0.95) - 9, 0.95), view, back,
+  // (a thinner fall either side of the main one, 7.5 m along the rim from it: where each leaves the lip, and which way is out)
+  const sides = [-1, 1].map((k) => { const phi = 0.5 + k * 7.5 / rim(0.5), p = at(rim(phi) - 0.3, phi); return { x: p.x, z: p.z, ox: Math.cos(s.th + phi * sd), oz: Math.sin(s.th + phi * sd) }; });
+  return (s.lay = { fall, sides, big: at(rim(-0.12) - 10, -0.12), small: at(rim(0.95) - 9, 0.95), view, back,
     ways: [[view, at(s.R + 50, 0.85), at(rim(1.45) + 54, 1.45), at(rim(1.95) + 50, 1.95), at(rim(2.5) + 16, 2.5), top, mid], [back, top]] });
 }
 /** Is a spot in a heart's glade: the open ground in front of its cliff, where no tree hides the fall from the way in? */
@@ -1591,21 +1593,23 @@ function heartRiver(s) {
   for (let r = Rr - 21; r < Rr - 1.4; r += 3.1) rows.push([r, 2 + 0.8 * (r - Rr + 21) / 20, RIVER_BANK, 0]);
   // (how far out the way in crosses it: the first length of the path, from the view, cut by this line; no step is put there, so a bridge can stand)
   const W = heartLayout(s).ways[0], wx = W[1].x - W[0].x, wz = W[1].z - W[0].z, den = ca * wz - sa * wx, cross = Math.abs(den) > 1e-6 ? ((W[0].x - s.x) * wz - (W[0].z - s.z) * wx) / den : s.R + 45;
-  rows.push([Rr - 0.4, 3, 1.5, 1], [Rr + 5.2, 5, 5, 0], [Rr + 9.5, 11, 5, 0], [Rr + 14, 11, 5, 0], [Rr + 18.5, 4.5, 2.5, 0]); // (the lip, and the face in one length: one sheet of water; the pool)
+  rows.push([Rr - 0.4, 3.4, 1.5, 1], [Rr + 5.0, 7, 5, 0], [Rr + 5.3, 19, 5, 0], [Rr + 9.5, 22, 5, 0], [Rr + 14, 21, 5, 0], [Rr + 19.5, 5, 2.5, 0]); // (a pool 22 m across, reaching the cliff's foot under all three falls) // (the lip, and the face in one length: one sheet of water; the pool)
   // (and on down the glade, past the way in, as far as the ground goes on falling: it ends in a small pool of its own)
-  { let low = Infinity; for (let r = Rr + 9.5; r < Rr + 19; r += 4.5) low = Math.min(low, heightBeforeRivers(s.x + ca * r, s.z + sa * r) - 0.45);
+  { let low = Infinity; for (let r = Rr + 9.5; r < Rr + 20; r += 4.5) low = Math.min(low, heightBeforeRivers(s.x + ca * r, s.z + sa * r) - 0.45);
     for (let r = Rr + 26; r < Rr + 100; r += 8) { const gr = heightBeforeRivers(s.x + ca * r, s.z + sa * r) - RIVER_SINK; if (gr > low + 0.9 && r > cross + 12) break; low = Math.min(low, gr); rows.push([r, 3.4, RIVER_BANK, 0]); } // (always as far as the bridge)
-    const last = rows[rows.length - 1]; if (last[0] > Rr + 20) { last[1] = 6.5; last[2] = 2.5; } }
+    const last = rows[rows.length - 1]; if (last[0] > Rr + 21) { last[1] = 6.5; last[2] = 2.5; } }
   const n = rows.length, X = new Float32Array(n), Z = new Float32Array(n), lv = new Float32Array(n), g = new Float32Array(n), w = new Float32Array(n), bk = new Float32Array(n), fall = new Uint8Array(n), S = new Float32Array(n);
   let pool = Infinity, lvl = Infinity, lip = 0;
-  rows.forEach(([r, wd, b, f], i) => { X[i] = s.x + ca * r; Z[i] = s.z + sa * r; g[i] = heightBeforeRivers(X[i], Z[i]); w[i] = wd; bk[i] = b; S[i] = i ? S[i - 1] + (r - rows[i - 1][0]) : 0; if (f && !lip) lip = i; if (r > Rr + 5 && r < Rr + 19) pool = Math.min(pool, g[i] - 0.45); });
+  rows.forEach(([r, wd, b, f], i) => { X[i] = s.x + ca * r; Z[i] = s.z + sa * r; g[i] = heightBeforeRivers(X[i], Z[i]); w[i] = wd; bk[i] = b; S[i] = i ? S[i - 1] + (r - rows[i - 1][0]) : 0; if (f && !lip) lip = i; if (r > Rr + 5.1 && r < Rr + 20) pool = Math.min(pool, g[i] - 0.45); });
   for (let i = 0; i < n; i++) {
     if (i <= lip) { lvl = Math.min(lvl, g[i] - RIVER_SINK); lv[i] = lvl; fall[i] = i === lip ? 1 : 0; continue; }
-    const u = Math.min(1, (rows[i][0] - rows[lip][0]) / (Rr + 5.2 - rows[lip][0])); // (down the face in one fall, to the pool's level)
-    lv[i] = rows[i][0] < Rr + 19 ? Math.min(lvl, lvl + (pool - lvl) * u) : Math.min(lv[i - 1], g[i] - RIVER_SINK); fall[i] = u < 1 ? 1 : 0;
-    if (rows[i][0] > Rr + 19 && lv[i - 1] - lv[i] > 1.3 && (rows[i][0] < cross - 9 || rows[i - 1][0] > cross + 9)) fall[i - 1] = 1; // (a low step where the ground drops)
+    const u = Math.min(1, (rows[i][0] - rows[lip][0]) / (Rr + 5.0 - rows[lip][0])); // (down the face in one fall, to the pool's level)
+    lv[i] = rows[i][0] < Rr + 20 ? Math.min(lvl, lvl + (pool - lvl) * u) : Math.min(lv[i - 1], g[i] - RIVER_SINK); fall[i] = u < 1 ? 1 : 0;
+    if (rows[i][0] > Rr + 20 && lv[i - 1] - lv[i] > 1.3 && (rows[i][0] < cross - 9 || rows[i - 1][0] > cross + 9)) fall[i - 1] = 1; // (a low step where the ground drops)
   }
-  return { id: 'heart:' + s.id, heart: true, n, x: X, z: Z, lv, g, w, bk, fall, s: S, len: S[n - 1], end: 'pool', spring: { x: X[0], z: Z[0], h: g[0] }, drop: lv[lip] - pool };
+  // (the side falls: drawn by world/rivers.js from the lip down the face to the pool, each fed by a rill from the stream on top)
+  const sides = heartLayout(s).sides.map((q) => ({ x: q.x, z: q.z, ox: q.ox, oz: q.oz, w: 1.3, bx: s.x + ca * (Rr - 13), bz: s.z + sa * (Rr - 13), pool }));
+  return { id: 'heart:' + s.id, heart: true, sides, n, x: X, z: Z, lv, g, w, bk, fall, s: S, len: S[n - 1], end: 'pool', spring: { x: X[0], z: Z[0], h: g[0] }, drop: lv[lip] - pool };
 }
 function riverOfCell(cx, cz) {
   const k = ikey(cx, cz);

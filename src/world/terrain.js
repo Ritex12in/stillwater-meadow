@@ -21,7 +21,7 @@ import { SEASON_GLSL, seasonU } from '../core/year.js';
 import { quality } from '../systems/quality.js';
 import { biomesAt } from '../core/biome.js';
 import { wxU, neonU } from '../core/materials.js';
-import { height, lakeAt, setGroundSampler, trailAt, riverNear, riverBank, isleQ, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, yearAt, seaAt, groveAt, heartAt } from '../core/shape.js';
+import { height, lakeAt, setGroundSampler, trailAt, riverNear, riverBank, isleQ, coldBase, slopeLook, feltHeight, ASPECT, TREELINE, moistAt, snowCold, coldAt, dryOf, lushOf, snowOf, yearAt, seaAt, groveAt, heartAt, heartLayout, sitesNear } from '../core/shape.js';
 import { col, weatherize, camU } from '../core/materials.js';
 import { world } from '../core/state.js';
 import { kit } from '../core/assets.js';
@@ -118,14 +118,14 @@ function takePart() {
   if (p) return p;
   partsMade++;
   const geo = new THREE.BufferGeometry();
-  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, clm: new Float32Array(VERTS * 3), yr: new Float32Array(VERTS * 2), look: new Float32Array(VERTS * 4), grv: new Float32Array(VERTS), h: new Float32Array(GRID) };
+  const part = { geo, pos: new Float32Array(VERTS * 3), nrm: new Float32Array(VERTS * 3), col: new Float32Array(VERTS * 3), spl: textured ? new Float32Array(VERTS * 4) : null, clm: new Float32Array(VERTS * 3), yr: new Float32Array(VERTS * 2), look: new Float32Array(VERTS * 4), grv: new Float32Array(VERTS * 2), h: new Float32Array(GRID) };
   geo.setAttribute('position', new THREE.BufferAttribute(part.pos, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(part.nrm, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(part.col, 3));
   geo.setAttribute('clime', new THREE.BufferAttribute(part.clm, 3));
   geo.setAttribute('yearly', new THREE.BufferAttribute(part.yr, 2)); // (each spot's year: how much it moves it, and which half-year: core/shape.js yearAt)
   geo.setAttribute('look', new THREE.BufferAttribute(part.look, 4));
-  geo.setAttribute('grove', new THREE.BufferAttribute(part.grv, 1)); // (how much of a blossom grove: its petals lie on the ground) // (the biomes here: desert, swamp, enchanted, volcanic: core/biome.js)
+  geo.setAttribute('grove', new THREE.BufferAttribute(part.grv, 2)); // (how much of a blossom grove: its petals lie on the ground) // (the biomes here: desert, swamp, enchanted, volcanic: core/biome.js)
   if (textured) geo.setAttribute('splat', new THREE.BufferAttribute(part.spl, 4));
   geo.setIndex(tileIndex);
   geo.boundingSphere = new THREE.Sphere();
@@ -186,8 +186,8 @@ function* fill(t) {
       clm[k * 3] = cold; clm[k * 3 + 1] = dry; clm[k * 3 + 2] = pond;
       { const y = yearAt(x, z); yr[k * 2] = y.A; yr[k * 2 + 1] = y.m; }
       const bw = biomesAt(x, z, h, base, rain);
-      // (a sheer face is told to the shader in the same number, below nought: bare stone there, no moss or petals)
-      grv[k] = sheer > 0.02 ? -sheer : groveAt(x, z) * (1 - Math.max(bw.desert, bw.beach, bw.swamp, bw.volcanic));
+      // (and with it, how sheer the ground is: bare stone there, drawn over whatever the ground is)
+      grv[k * 2] = groveAt(x, z) * (1 - Math.max(bw.desert, bw.beach, bw.swamp, bw.volcanic)); grv[k * 2 + 1] = sheer;
       look[k * 4] = Math.max(bw.desert, bw.beach); look[k * 4 + 1] = bw.swamp; look[k * 4 + 2] = bw.enchanted; look[k * 4 + 3] = bw.volcanic;
       c.multiplyScalar(1 - lushOf(rain) * 0.16);
       if (textured) {
@@ -214,7 +214,7 @@ function* fill(t) {
       for (let q = 0; q < 3; q++) clm[to * 3 + q] = clm[from * 3 + q];
       yr[to * 2] = yr[from * 2]; yr[to * 2 + 1] = yr[from * 2 + 1];
       for (let q = 0; q < 4; q++) look[to * 4 + q] = look[from * 4 + q];
-      grv[to] = grv[from];
+      grv[to * 2] = grv[from * 2]; grv[to * 2 + 1] = grv[from * 2 + 1];
     }
   }
   const { geo, mesh } = part;
@@ -238,7 +238,17 @@ function release(t) {
 
 /** How far the land is drawn (the view distance setting, systems/quality.js): 0 near (the second-largest tiles, 3 x 3), 1 (the largest, 3 x 3), 2 far (the largest, 5 x 5). */
 /** Once a frame: choose which tiles are on show round (x, z), and queue the ones still to be made. */
+// Where a heart's falls leave its lip (the nearest heart's, within 600 m): the ground's shader wets the rock by them.
+const fallsU = { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] };
+let fallsX = NaN, fallsZ = NaN;
+function fallsNear(x, z) {
+  if (Math.hypot(x - fallsX, z - fallsZ) < 60) return;
+  fallsX = x; fallsZ = z;
+  const s = sitesNear(x, z, 600, 'heart').sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0], L = s ? heartLayout(s) : null, ps = L ? [L.fall, ...L.sides] : [];
+  fallsU.value.forEach((v, i) => (ps[i] ? v.set(ps[i].x, ps[i].z, 1) : v.set(0, 0, 0)));
+}
 export function updateGround(x, z) {
+  fallsNear(x, z);
   frameNo++; camX = x; camZ = z;
   const next = new Set(), was = shown;
   shown = next;
@@ -331,6 +341,7 @@ export function farHaze(sh) {
 function groundDetail(mat, textured) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uCam = camU;
+    sh.uniforms.uFalls = fallsU;
     sh.uniforms.uSeason = seasonU;
     sh.uniforms.uFreshSnow = wxU.fresh;
     if (textured) {
@@ -342,14 +353,14 @@ function groundDetail(mat, textured) {
       });
     }
     sh.uniforms.uNightGlow = neonU;
-    sh.vertexShader = 'varying vec3 vGround;\nattribute vec3 clime;\nvarying vec3 vClime;\nattribute vec2 yearly;\nvarying vec2 vYear;\nattribute vec4 look;\nvarying vec4 vLook;\nattribute float grove;\nvarying float vGrove;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+    sh.vertexShader = 'varying vec3 vGround;\nattribute vec3 clime;\nvarying vec3 vClime;\nattribute vec2 yearly;\nvarying vec2 vYear;\nattribute vec4 look;\nvarying vec4 vLook;\nattribute vec2 grove;\nvarying float vGrove;\nvarying float vSheer;\n' + (textured ? 'attribute vec4 splat;\nvarying vec4 vSplat;\n' : '') + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
       vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;
       vClime = clime;
       vYear = yearly;
       vLook = look;
-      vGrove = grove;
+      vGrove = grove.x; vSheer = grove.y;
       ${textured ? 'vSplat = splat;' : ''}`);
-    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nvarying vec2 vYear;\nvarying vec4 vLook;\nvarying float vGrove;\nuniform vec3 uCam;\nuniform float uFreshSnow;\nuniform float uNightGlow;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
+    sh.fragmentShader = 'varying vec3 vGround;\nvarying vec3 vClime;\nvarying vec2 vYear;\nvarying vec4 vLook;\nvarying float vGrove;\nvarying float vSheer;\nuniform vec3 uFalls[3];\nuniform vec3 uCam;\nuniform float uFreshSnow;\nuniform float uNightGlow;\n' + SEASON_GLSL + '#define SNOW_AMOUNT gSnowAmt\nfloat gSnowAmt = 0.0;\n' + (textured ? 'varying vec4 vSplat;\nuniform sampler2D tLush, tFlowers, tFine, tSoil, tRock, tViolet, tOrange, tLeaves;\nuniform float uBloom, uAutumn;\n#define SNOW_COLOR gSnow\nvec3 gSnow = vec3(0.93, 0.95, 0.99);\n' : '') + `
       // (wrapped first: far from the middle of the world the numbers get too big for sin() to scatter)
       float gHash(vec2 p) { return fract(sin(dot(mod(p, 1024.0), vec2(127.1, 311.7))) * 43758.5453); }
       float gNoise(vec2 p) {
@@ -430,18 +441,6 @@ function groundDetail(mat, textured) {
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.55, 0.82, 0.86), smoothstep(0.2, 0.8, vLook.z));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.13, 0.12, 0.13) * (0.85 + 0.3 * mid), smoothstep(0.2, 0.75, vLook.w));
         }
-        // a sheer face (the cliff of a grove's heart): bare stone in level beds, weathered, darker in its seams
-        // (the ground's rock picture is mossy and is laid flat, so it smears down a cliff: this is drawn by height instead)
-        if (vGrove < -0.02) {
-          float along = vGround.x * 0.8 + vGround.z * 0.6;
-          float lay = vGround.y * 0.3 + gNoise(vGround.xz * 0.05) * 2.2 + gNoise(vGround.xz * 0.31 + 9.0) * 0.45; // (the beds dip and waver)
-          float nb = floor(lay), kb = fract(sin(nb * 91.7) * 43758.5453);                                           // (each bed its own shade)
-          float seam = smoothstep(0.09, 0.0, fract(lay)) * (0.5 + 0.5 * gNoise(vec2(along * 0.4, nb)));           // (a dark seam under each, broken along its length)
-          float joint = smoothstep(0.035, 0.0, abs(fract(along * (0.1 + 0.08 * kb) + kb * 7.0) - 0.5)) * step(0.35, gNoise(vec2(floor(along * (0.1 + 0.08 * kb) + kb * 7.0) * 3.1, nb * 5.3))); // (upright cracks, not through every bed)
-          float grit = gNoise(vec2(along * 1.3, vGround.y * 2.6)) * 0.6 + gNoise(vec2(along * 0.21, vGround.y * 0.5 + 5.0)) * 0.4;
-          vec3 stone = mix(vec3(0.43, 0.41, 0.43), vec3(0.64, 0.6, 0.57), kb * 0.6 + grit * 0.4) * (0.84 + 0.3 * grit) * (1.0 - 0.42 * max(seam, joint * 0.8));
-          diffuseColor.rgb = mix(diffuseColor.rgb, stone, smoothstep(0.05, 0.55, -vGrove) * (1.0 - max(vLook.x, vLook.w))); // (not over desert sand or a volcano's black rock)
-        }
         // a blossom grove: the ground mossy and dark in the trees' shade, petals lying on it in drifts
         // (after the owner's picture: almost no green, pink over everything)
         if (vGrove > 0.05) {
@@ -464,6 +463,24 @@ function groundDetail(mat, textured) {
           float petals = mix(lies, (0.22 + 0.62 * drift) * 0.42, away);
           vec3 pink = mix(vec3(0.98, 0.6, 0.75), vec3(1.0, 0.86, 0.92), h2);
           diffuseColor.rgb = mix(diffuseColor.rgb, pink, gv * petals * 0.92);
+        }
+        // a sheer face (the cliff of a grove's heart): bare stone in level beds, weathered, darker in its seams
+        // (the ground's rock picture is mossy and is laid flat, so it smears down a cliff: this is drawn by height instead)
+        if (vSheer > 0.02) {
+          float along = vGround.x * 0.8 + vGround.z * 0.6;
+          float lay = vGround.y * 0.3 + gNoise(vGround.xz * 0.05) * 2.2 + gNoise(vGround.xz * 0.31 + 9.0) * 0.45; // (the beds dip and waver)
+          float nb = floor(lay), kb = fract(sin(nb * 91.7) * 43758.5453);                                           // (each bed its own shade)
+          float seam = smoothstep(0.09, 0.0, fract(lay)) * (0.5 + 0.5 * gNoise(vec2(along * 0.4, nb)));           // (a dark seam under each, broken along its length)
+          float joint = smoothstep(0.035, 0.0, abs(fract(along * (0.1 + 0.08 * kb) + kb * 7.0) - 0.5)) * step(0.35, gNoise(vec2(floor(along * (0.1 + 0.08 * kb) + kb * 7.0) * 3.1, nb * 5.3))); // (upright cracks, not through every bed)
+          float grit = gNoise(vec2(along * 1.3, vGround.y * 2.6)) * 0.6 + gNoise(vec2(along * 0.21, vGround.y * 0.5 + 5.0)) * 0.4;
+          vec3 stone = mix(vec3(0.43, 0.41, 0.43), vec3(0.64, 0.6, 0.57), kb * 0.6 + grit * 0.4) * (0.84 + 0.3 * grit) * (1.0 - 0.42 * max(seam, joint * 0.8));
+          // by a heart's falls the rock is wet and dark, with moss in streaks down it (by the pixel, from where the falls leave the lip)
+          float wet = 0.0;
+          for (int i = 0; i < 3; i++) wet = max(wet, uFalls[i].z * (1.0 - smoothstep(3.0, 9.5, length(vGround.xz - uFalls[i].xy))));
+          float streak = smoothstep(0.5, 0.72, gNoise(vec2(along * 2.6, vGround.y * 0.1 + 3.0))) * (0.5 + 0.5 * gNoise(vec2(along * 0.7, vGround.y * 0.6)));
+          stone = mix(stone, stone * vec3(0.56, 0.57, 0.64), wet);
+          stone = mix(stone, vec3(0.2, 0.3, 0.13) * (0.8 + 0.4 * grit), wet * streak * 0.8);
+          diffuseColor.rgb = mix(diffuseColor.rgb, stone, smoothstep(0.05, 0.55, vSheer) * (1.0 - max(vLook.x, vLook.w))); // (not over desert sand or a volcano's black rock)
         }
         // a lake a long way off: no sheet of water is spared for it, so its bed is painted the colour of water
         // (frozen over when the season is cold there, as a near lake's sheet of water would be)

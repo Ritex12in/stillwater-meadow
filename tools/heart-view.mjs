@@ -24,7 +24,8 @@ const shot = async (name, at, look, dist, pitch) => { await p.evaluate(([at, loo
 await shot('way-in', s.view, s.fall, 6.5, -0.1);
 await shot('way-in-wide', [s.view[0] + s.fx * 16, s.view[1] + s.fz * 16], [s.x, s.z], 9, -0.04);
 if (s.bridge) { await shot('bridge', s.bridge.at, s.bridge.to, 6, 0.1); await shot('bridge-fall', s.bridge.past, s.fall, 7, -0.08); } else console.log('no bridge');
-await shot('fall', s.near, s.lip, 6, -0.12);
+await shot('fall', [s.fall[0] + s.fx * 27 + s.fz * 5, s.fall[1] + s.fz * 27 - s.fx * 5], s.fall, 6, -0.16);
+await shot('pool', [s.fall[0] + s.fx * 19 - s.fz * 9, s.fall[1] + s.fz * 19 + s.fx * 9], [s.fall[0] + s.fx * 6, s.fall[1] + s.fz * 6], 7, 0.25);
 await shot('top', [s.x - s.fx * 2 + s.fz * 6, s.z - s.fz * 2 - s.fx * 6], s.big, 11, 0.22);
 await shot('lip', [s.big[0] - s.fx * 14, s.big[1] - s.fz * 14], [s.big[0] + s.fx * 30, s.big[1] + s.fz * 30], 12, 0.3);
 await b.close();

@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import { scene } from '../core/render.js';
 import { hash, TAU } from '../core/math.js';
-import { riversNear, riverIce } from '../core/shape.js';
+import { riversNear, riverIce, height } from '../core/shape.js';
 import { waterU } from './water.js';
 import { GRADE_GLSL, HAZE_GLSL } from '../core/atmosphere.js';
 import { glowTex, std, weatherize } from '../core/materials.js';
@@ -45,6 +45,7 @@ const VERT = `
   }`;
 const UNIFORMS = `
   uniform float uTime; uniform float uIce; uniform float uIceLight; uniform float uLight; uniform float uRain;
+  uniform vec4 uHeart;    // a grove's heart: its water's blue-violet, and how much of it (0 on every other river)
   uniform vec3 deep; uniform vec3 shallow; uniform vec3 skyTop; uniform vec3 skyHorizon;
   uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun;
   uniform float fogNear; uniform float fogFar;
@@ -65,6 +66,7 @@ const FRAG = GRADE_GLSL + HAZE_GLSL + UNIFORMS + NOISE + `
     vec3 skyc = mix(skyHorizon, skyTop, pow(clamp(r.y, 0.0, 1.0), 0.5));
     // the water's body: blue-green and deeper in the middle, pale and clear toward the banks
     vec3 body = mix(deep * vec3(0.72, 1.0, 0.92), shallow * vec3(0.86, 1.04, 0.98), smoothstep(0.15, 0.95, edge));
+    body = mix(body, uHeart.rgb * (dot(body, vec3(0.3, 0.59, 0.11)) / 0.56), uHeart.a * 0.75); // (a heart's water: blue-violet, as bright as it was)
     body *= 0.9 + 0.2 * h0; // (light and dark moving with the ripples)
     vec3 c = mix(body, skyc, clamp(fres * 0.6 + 0.04, 0.0, 1.0));
     c += sunColor * pow(max(dot(r, normalize(sunDir)), 0.0), 160.0) * 1.4;
@@ -77,8 +79,9 @@ const FRAG = GRADE_GLSL + HAZE_GLSL + UNIFORMS + NOISE + `
     // a fall's face: white water in ropes running down, the river's own colour showing in veins between
     float along = vFlow.x - uTime * 6.5;
     float rope = vn(vec2(across * 3.2, along * 0.22)) * 0.5 + vn(vec2(across * 7.5 + 4.0, along * 0.5)) * 0.3 + vn(vec2(across * 15.0 - 2.0, along * 1.1)) * 0.2;
-    float white = smoothstep(0.26, 0.6, rope);
-    vec3 fallC = mix(mix(shallow * vec3(0.84, 1.0, 1.0) + deep * 0.2, vec3(0.9, 0.95, 0.97), 0.45), vec3(0.95, 0.97, 0.98), white) * uLight; // (pale veins, not bright ones)
+    float white = smoothstep(0.26 + 0.14 * uHeart.a, 0.6 + 0.12 * uHeart.a, rope); // (at a heart more of the water's own colour shows between the ropes)
+    vec3 vein = mix(mix(shallow * vec3(0.84, 1.0, 1.0) + deep * 0.2, vec3(0.9, 0.95, 0.97), 0.45), uHeart.rgb, uHeart.a * 0.85);
+    vec3 fallC = mix(vein, vec3(0.95, 0.97, 0.98), white) * uLight; // (pale veins, not bright ones)
     c = mix(c, vec3(0.94, 0.96, 0.97) * uLight, foamCalm * (1.0 - vFall.x));
     c = mix(c, fallC, vFall.x);
     // frozen: pale ice
@@ -99,10 +102,10 @@ const SHEET_FRAG = GRADE_GLSL + HAZE_GLSL + UNIFORMS + NOISE + `
     float across = vFlow.y * vW * 0.5, along = vFlow.x - uTime * 9.5;
     float clump = vn(vec2(across * 2.2 + 9.0, along * 0.16)) * 0.6 + vn(vec2(across * 5.5, along * 0.34 + 2.0)) * 0.4;
     float a = smoothstep(0.5, 0.74, clump) * (1.0 - smoothstep(0.45, 1.0, abs(vFlow.y))) * smoothstep(0.0, 0.18, vFall.y) * (1.0 - smoothstep(0.82, 1.0, vFall.y)); // (thin at the lip and at the foot)
-    vec3 c = vec3(0.97, 0.98, 0.99) * uLight;
+    vec3 c = mix(vec3(0.97, 0.98, 0.99), uHeart.rgb * 1.3, uHeart.a * 0.3) * uLight;
     float dist = length(cameraPosition - vWP);
     c = mix(c, meadowHaze(fogColor, fogGlow, vWP - cameraPosition, fogSun), smoothstep(fogNear, fogFar, dist));
-    gl_FragColor = vec4(meadowGrade(c), a * 0.85 * (1.0 - uIce));
+    gl_FragColor = vec4(meadowGrade(c), a * (0.85 - 0.3 * uHeart.a) * (1.0 - uIce));
   }`;
 // Mist: soft puffs rising from a fall's foot, each swelling and thinning as it climbs.
 const MIST_VERT = `
@@ -118,12 +121,12 @@ const MIST_VERT = `
     gl_Position = projectionMatrix * mv;
   }`;
 const MIST_FRAG = GRADE_GLSL + HAZE_GLSL + `
-  uniform sampler2D tPuff; uniform float uLight; uniform float uIce;
+  uniform sampler2D tPuff; uniform float uLight; uniform float uIce; uniform vec4 uHeart;
   uniform vec3 fogColor; uniform vec3 fogGlow; uniform vec3 fogSun; uniform float fogNear; uniform float fogFar;
   varying float vLife; varying vec3 vWP;
   void main() {
-    float a = texture2D(tPuff, gl_PointCoord).a * smoothstep(0.0, 0.15, vLife) * (1.0 - vLife) * 0.7 * (1.0 - uIce);
-    vec3 c = vec3(0.96, 0.98, 1.0) * min(1.0, uLight);
+    float a = texture2D(tPuff, gl_PointCoord).a * smoothstep(0.0, 0.15, vLife) * (1.0 - vLife) * (0.7 + 0.5 * uHeart.a) * (1.0 - uIce);
+    vec3 c = mix(vec3(0.96, 0.98, 1.0), vec3(0.84, 0.79, 0.93), uHeart.a) * min(1.0, uLight); // (lilac at a heart)
     c = mix(c, meadowHaze(fogColor, fogGlow, vWP - cameraPosition, fogSun), smoothstep(fogNear, fogFar, length(cameraPosition - vWP)));
     gl_FragColor = vec4(meadowGrade(c), a);
   }`;
@@ -165,8 +168,8 @@ function stonesFor(r) {
         if (tall && !r.heart && roll() < 0.5) put(r.x[i] + dx * t + nx * side * (off + big * 1.2), r.lv[i] - drop * t + big * 0.2, r.z[i] + dz * t + nz * side * (off + big * 1.2), big * (0.4 + roll() * 0.35), 1.0);
       }
       if (!(i > 0 && r.fall[i - 1])) for (const side of [-1, 1]) put(r.x[i] - tx * 0.6 + nx * side * (hw + 0.3), r.lv[i] - 0.05, r.z[i] - tz * 0.6 + nz * side * (hw + 0.3), 0.3 + roll() * 0.3); // (the lip: where the fall begins)
-      const foot = r.fall[i + 1] ? 0 : tall ? 5 : 3; // (round the pool: where the fall ends)
-      for (let k = 0; k < foot; k++) { const a = (roll() - 0.5) * 2.4, d = hw * (0.9 + roll() * 0.9) + (tall ? 0.8 : 0.2); put(r.x[i + 1] + tx * (0.8 + roll() * 2.5) + nx * Math.sin(a) * d * 1.3, r.lv[i + 1] - 0.1, r.z[i + 1] + tz * (0.8 + roll() * 2.5) + nz * Math.sin(a) * d * 1.3, 0.22 + roll() * (tall ? 0.7 : 0.35)); }
+      const foot = r.fall[i + 1] ? 0 : r.heart && tall ? 13 : tall ? 5 : 3; // (round the pool: where the fall ends; a ring of them round a heart's broad pool)
+      for (let k = 0; k < foot; k++) { const a = (roll() - 0.5) * 2.4, d = (r.heart && tall ? r.w[i + 1] / 2 * (0.75 + roll() * 0.4) : hw * (0.9 + roll() * 0.9)) + (tall ? 0.8 : 0.2); put(r.x[i + 1] + tx * (0.8 + roll() * 2.5) + nx * Math.sin(a) * d * 1.3, r.lv[i + 1] - 0.1, r.z[i + 1] + tz * (0.8 + roll() * 2.5) + nz * Math.sin(a) * d * 1.3, 0.22 + roll() * (tall ? 0.7 : 0.35)); }
     } else {
       // calm and quick water: a stone on the bank now and then; in quick water more of them, some in the stream
       const quick = Math.min(1, Math.max(0, drop / len) * 6);
@@ -215,7 +218,7 @@ function ribbon(r) {
   geo.setAttribute('aW', new THREE.BufferAttribute(wid, 1));
   geo.setIndex(idx);
   geo.computeBoundingSphere();
-  const u = Object.assign({}, waterU, { uIce: { value: 0 } });
+  const u = Object.assign({}, waterU, { uIce: { value: 0 }, uHeart: { value: new THREE.Vector4(0.48, 0.55, 0.74, r.heart ? 1 : 0) } });
   const mat = new THREE.ShaderMaterial({ uniforms: u, vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 2 });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(ox, 0, oz);
@@ -251,6 +254,40 @@ function ribbon(r) {
     mesh.add(sheet); own.push(sg, sm);
   }
 
+  // a heart's side falls: a rill from the stream on top to the lip, then a veil down the face (widening as it drops) to the pool
+  const feet = [];
+  if (r.sides && r.sides.length) {
+    const NS = 3, vp = [], vf = [], va = [], vw = [], vi = [];
+    const row = (x, y, z, px, pz, w, s, pour) => { for (let c = 0; c < NS; c++) { const uu = c - 1; vp.push(x + px * uu * w / 2 - ox, y, z + pz * uu * w / 2 - oz); vf.push(s, uu); va.push(pour, 0); vw.push(w); } };
+    const strip = (from, rows) => { for (let k = 0; k < rows - 1; k++) for (let c = 0; c < NS - 1; c++) { const a = from + k * NS + c, b = a + 1, d = a + NS, e = d + 1; vi.push(a, d, b, b, d, e); } };
+    r.sides.forEach((q, n) => {
+      const px = -q.oz, pz = q.ox, top = height(q.x - q.ox * 0.6, q.z - q.oz * 0.6);
+      // the rill: lying on the grass of the top, from the stream to the lip
+      let base = vp.length / 3; const RL = 7;
+      for (let k = 0; k < RL; k++) { const t = k / (RL - 1), x = q.bx + (q.x - q.bx) * t, z = q.bz + (q.z - q.bz) * t; row(x, Math.max(height(x, z), top - 0.4) + 0.07, z, px, pz, 0.9 + 0.4 * t, t * 12 + n * 31, 0); }
+      strip(base, RL);
+      // the face as it stands (the pool's bed is cut into its foot): how far out the rock is at each height
+      const prof = []; for (let d = 0; d <= 9; d += 0.3) prof.push(height(q.x + q.ox * d, q.z + q.oz * d));
+      const drop = top - q.pool, FL = 12; base = vp.length / 3;
+      for (let k = 0; k < FL; k++) {
+        const t = k / (FL - 1), y = top - drop * t; let d = 0; while (d < prof.length - 1 && prof[d] > y + 0.2) d++;
+        const out = k ? d * 0.3 + 0.35 + 0.5 * Math.sin(Math.PI * Math.min(1, t * 1.2)) : 0; // (it stands off the rock, most a little below the lip)
+        row(q.x + q.ox * out, k ? y + 0.05 : top + 0.07, q.z + q.oz * out, px, pz, q.w * (1 + 1.1 * t), 12 + drop * t + n * 31, 1);
+        if (k === FL - 1) feet.push({ x: q.x + q.ox * out, z: q.z + q.oz * out, y: q.pool, drop });
+      }
+      strip(base, FL);
+    });
+    const vg = new THREE.BufferGeometry();
+    vg.setAttribute('position', new THREE.Float32BufferAttribute(vp, 3));
+    vg.setAttribute('aFlow', new THREE.Float32BufferAttribute(vf, 2));
+    vg.setAttribute('aFall', new THREE.Float32BufferAttribute(va, 2));
+    vg.setAttribute('aW', new THREE.Float32BufferAttribute(vw, 1));
+    vg.setIndex(vi);
+    const veil = new THREE.Mesh(vg, mat);
+    veil.frustumCulled = false;
+    mesh.add(veil); own.push(vg);
+  }
+
   // mist rising from the foot of each fall: more and bigger puffs, climbing higher, below a tall one
   let mist = null;
   if (falls.length) {
@@ -264,6 +301,7 @@ function ribbon(r) {
         puff.push(1.2 + drop * 0.45 * (0.5 + j), 2.6 + Math.min(7, drop * 0.5) * (0.6 + 0.6 * j), hash(i + k * 3, 91));
       }
     }
+    for (const f of feet) for (let k = 0; k < 3; k++) { const j = hash(k * 7 + 3, Math.round(f.x * 5) + k); mp.push(f.x - ox + (j - 0.5) * 2, f.y + 0.25, f.z - oz + (hash(k, 77) - 0.5) * 2); puff.push(1.2 + f.drop * 0.3 * (0.5 + j), 2.6 + 5 * (0.6 + 0.6 * j), hash(k * 3 + 1, 91)); } // (and at the side falls' feet)
     const mg = new THREE.BufferGeometry();
     mg.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3));
     mg.setAttribute('aPuff', new THREE.Float32BufferAttribute(puff, 3));

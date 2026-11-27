@@ -815,6 +815,61 @@ are the country's in summer whatever the season; rivers are drawn, trails and br
 - `window.__meadow.map`: `open`, `cells`, `pending`, `marks`, `chosen`, `settle()` (paint all that
   is in view now), `colourAt(x, z)` (the colour drawn at a spot), `explored(x, z)`.
 
+## How the pines are grown from code (2026-11-28; made and measured, not yet in the game)
+
+The owner, shown what in the game is not made in code (`tools/kit-sheet.mjs`): "code pine tree and
+compare side by side"; then, of the first try (dark, an even cone, twice the kit's triangles):
+"study the mathematics part by part and observe the patterns; fix the darkness and irregularity
+problems, and halve the triangles".
+
+`src/world/procpines.js` (the pines), `tools/pine-study.mjs` (measures any pine part by part),
+`tools/pine-compare.mjs` (pictures, kit beside code). The game still stands the kit's pines.
+
+**What the kit's pines are, measured** (five of each kind, at the game's heights: 6.4 m the broad
+`Pine`, 7.6 m the slim `PineTree`; averages):
+
+| Part | Broad pine | Slim pine | The pattern |
+|---|---|---|---|
+| Triangles | 3515: wood 2641, needles 874 | 2073: wood 1278, needles 795 | Three quarters of the broad pine's triangles are wood (a trunk and bare branches of many sides), not needles. |
+| Needle pieces | 40, of 22 triangles each | 33, of 26 | One bough is one piece: a single bent frond, not many cards. |
+| Needle area | 60 m2 (1.5 m2 a frond) | 103 m2 | A frond is broad: nearly as wide as it is long (1.4 m long, median). |
+| Tiers | 11, 0.38 m apart, uneven by 0.06 (a sixth) | 9, uneven by a third | Tiers, but not evenly spaced. |
+| Boughs to a tier | 2 to 4 | 3 to 6 | Few: a tier is never a full ring. |
+| Empty angle round the trunk | 95, 114, 171 degrees (bottom, middle, top third) | 128, 81, 119 | Wide gaps: you see through to the trunk. |
+| Lopsidedness | 0.54 | 0.27 | Heavier and longer to one side (0 would be even all round). |
+| Slope of a bough | 0.83 m down per metre out, differing by 0.17; 0.76 low, 0.90 high | 0.84, differing by 0.25 | About 40 degrees, steeper toward the top, each its own. |
+| Silhouette (radius, bottom to top) | 2.5, 2.5, 2.3, 2.2, 2.0, 2.0, 1.6, 1.6, 1.3, 0.9 | widest half way up | A cone widest at its lowest bough (0.4 of the height); the slim kind a spindle. |
+| Needles begin | 0.24 of the height | 0.28 | A quarter of the trunk is bare. |
+| Trunk radius | 0.25 at the ground, 0.10 half way, 0.05 at three quarters | similar | Thins fast, faster than a straight taper. |
+| Bare branches | about 16 pieces of wood | about 9 | Dead branches below the needles. |
+| Normals | 0.70 up, 0.26 outward, the same all over (least 0.64 up) | 0.71 up | Lit from above everywhere: no frond is shaded by its own tilt. |
+| Vertex colour | 1.0 everywhere | 1.0 | No darkening baked in. |
+| Picture | one whole spray to a frond (0.65 across, all of it along), white | same | The colour is all the game's tint. |
+
+**What the first try got wrong, by those numbers:** 71 pieces in 5 to 9 to a tier, evenly round
+(lopsided 0.13, gaps under 60 degrees): an even cone. A branch of its own inside every frond: 4558
+triangles of wood. A slope of 0.49: flat fronds whose undersides showed. Vertex colour 0.65 to 1.0 and
+a grey picture (170 to 240): dark twice over. Needles down to the ground.
+
+**The pines now** follow the patterns: tiers with uneven gaps, closer toward the top; 3 to 5 boughs
+to a tier at uneven angles, more and longer to one side; each bough one fan-shaped frond of 20
+triangles, ridged along its stem, its sides hanging; slopes each their own; a fast-thinning trunk
+with a slight lean and bend and two to four dead branches; normals up and a little out; a near-white
+picture; no branch inside a frond (the stem is painted on).
+
+| | Kit broad | Code broad | Kit slim | Code slim |
+|---|---|---|---|---|
+| Triangles | 3515 | about 1050 | 2073 | about 1150 |
+| Needle pieces | 40 | 41 | 33 | about 45 |
+| Slope | 0.83 | 0.80 | 0.84 | not re-measured |
+| Widest (share of height) | 0.40 | 0.41 | (leans; not comparable) | narrower than the kit's |
+| Lopsidedness | 0.54 | about 0.5 | 0.27 | about 0.4 |
+
+**Still short of the kit:** the fronds are plainer in outline (the kit's have deep hand-cut
+scallops); the slim pine's fronds read as broad leaves where the kit's are feathery, and its needles
+begin higher; the undersides of the topmost fronds still show dark from below. **Not tried:** in the
+game itself (the season's tint, snow, wind, the far versions and impostors, the forest's cost).
+
 ## How debugging by command works, and the travelling screen (built 2026-11-28)
 
 The owner: "time to remove the world debug option and introduce a command debug option"; and "also
